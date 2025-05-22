@@ -1,7 +1,6 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, Dumbbell, Trophy } from "lucide-react";
+import { ChevronRight, Dumbbell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const Index = () => {
@@ -11,8 +10,8 @@ const Index = () => {
     {
       id: "fitness-grupal",
       title: "Instructorado de Fitness Grupal",
-      description: "Domina el arte de las clases grupales de fitness con teoría y práctica estructurada",
-      level: "Intermedio",
+      description: "Preparate para liderar clases llenas de energía y resultados con un programa actualizado.",
+      level: "Inicial",
       modules: 8,
       progress: 45,
       image: <Dumbbell className="w-12 h-12 text-white" />
@@ -23,14 +22,11 @@ const Index = () => {
     <div className="container mx-auto px-4 py-6 space-y-8">
       {/* Hero Section */}
       <div className="text-center space-y-4 mb-10">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-4">
-          <Trophy className="w-8 h-8 text-white" />
+        <div className="inline-flex items-center justify-center rounded-full bg-black mb-4">
+          <img src="/logo.webp" alt="Logo" className="w-40" />
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold text-primary">
-          Fitness Edu
-        </h1>
         <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto">
-          Tu plataforma personal de educación y formación fitness
+          Escuela de Fitness con más de 20 años de trayectoria
         </p>
       </div>
 

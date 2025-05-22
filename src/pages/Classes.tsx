@@ -9,71 +9,50 @@ const Classes = () => {
 
   const modules = [
     {
-      id: "modulo-1",
-      title: "Fundamentos del Fitness",
-      description: "Bases teóricas y prácticas del entrenamiento",
+      id: "anatomia",
+      title: "Anatomía y Fisiología",
+      description: "",
       classes: [
         {
-          id: "clase-1-1",
-          title: "Introducción al Fitness Grupal",
-          duration: "35 min",
-          thumbnail: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400",
+          id: "clase-1",
+          title: "Anatomía del esqueleto humano",
+          duration: "70 min",
+          thumbnail: "https://images.pexels.com/photos/5428151/pexels-photo-5428151.jpeg?auto=compress&cs=tinysrgb&w=400",
           completed: true
         },
         {
-          id: "clase-1-2", 
-          title: "Planificación de Sesiones",
-          duration: "42 min",
-          thumbnail: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400",
+          id: "clase-2", 
+          title: "Articulaciones",
+          duration: "60 min",
+          thumbnail: "https://images.pexels.com/photos/5723885/pexels-photo-5723885.jpeg?auto=compress&cs=tinysrgb&w=400",
           completed: true
         },
         {
-          id: "clase-1-3",
-          title: "Calentamiento y Enfriamiento",
-          duration: "28 min",
-          thumbnail: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400",
-          completed: false
-        }
-      ]
-    },
-    {
-      id: "modulo-2",
-      title: "Técnicas de Entrenamiento",
-      description: "Metodologías específicas y ejercicios",
-      classes: [
-        {
-          id: "clase-2-1",
-          title: "Entrenamiento de Fuerza",
-          duration: "48 min",
-          thumbnail: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=400",
+          id: "clase-3", 
+          title: "Planos y ejes corporales",
+          duration: "60 min",
+          thumbnail: "https://mundoentrenamiento.com/wp-content/uploads/2022/05/posicion-anatomica.png?w=400",
           completed: false
         },
         {
-          id: "clase-2-2",
-          title: "Cardio y Resistencia",
-          duration: "38 min", 
-          thumbnail: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400",
-          completed: false
-        }
-      ]
-    },
-    {
-      id: "modulo-3",
-      title: "Especialización",
-      description: "Técnicas avanzadas y poblaciones especiales",
-      classes: [
-        {
-          id: "clase-3-1",
-          title: "HIIT y Entrenamiento Funcional",
-          duration: "45 min",
-          thumbnail: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400",
+          id: "clase-4", 
+          title: "Músculos",
+          duration: "60 min",
+          thumbnail: "https://namastezaragoza.com/wp-content/uploads/freshizer/5f0d84353d66c3b41782797dd3a0e622_musculos-800-c-90.jpg?w=400",
           completed: false
         },
         {
-          id: "clase-3-2",
-          title: "Adaptaciones para Diferentes Edades",
-          duration: "52 min",
-          thumbnail: "https://images.unsplash.com/photo-1506629905963-b674cd1d7e0d?w=400",
+          id: "clase-5", 
+          title: "Fisiología muscular",
+          duration: "60 min",
+          thumbnail: "https://blogs.ugto.mx/rea/wp-content/uploads/sites/71/2021/11/duehkshvxuq-1.jpg?w=400",
+          completed: false
+        },
+        {
+          id: "clase-6", 
+          title: "Análisis del Movimiento",
+          duration: "60 min",
+          thumbnail: "https://images.pexels.com/photos/3757376/pexels-photo-3757376.jpeg?auto=compress&cs=tinysrgb&w=400",
           completed: false
         }
       ]

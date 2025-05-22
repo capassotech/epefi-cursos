@@ -22,12 +22,9 @@ const Header = () => {
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-white font-bold text-sm">FE</span>
+            <div className="rounded-lg bg-black flex items-center justify-center">
+              <img src="/logo.webp" alt="Logo" className="w-12" />
             </div>
-            <h1 className="text-lg font-bold text-primary">
-              Fitness Edu
-            </h1>
           </div>
           
           <div className="hidden md:flex items-center space-x-4 flex-1 max-w-md mx-8">

@@ -10,51 +10,51 @@ const Theory = () => {
   const theoryUnits = [
     {
       id: "unidad-1",
-      title: "Anatomía y Fisiología del Ejercicio",
-      description: "Fundamentos científicos del movimiento humano",
-      readTime: "25 min",
+      title: "El esqueleto humano",
+      description: "Definición, concepto. Los huesos. Tejidos. Ubicación anatómica de todos los huesos.",
+      readTime: "30 min",
       completed: true,
-      topics: ["Sistema muscular", "Sistema cardiovascular", "Metabolismo energético"]
+      topics: ["Definición", "Concepto", "Los huesos", "Tejidos", "Ubicación"]
     },
     {
       id: "unidad-2", 
-      title: "Principios del Entrenamiento",
-      description: "Bases metodológicas para la planificación",
+      title: "Articulaciones",
+      description: "Tipos y clasificación. Movimientos articulares.",
       readTime: "30 min",
       completed: true,
-      topics: ["Principio de sobrecarga", "Especificidad", "Progresión"]
+      topics: ["Tipos y clasificación", "Movimientos articulares"]
     },
     {
       id: "unidad-3",
-      title: "Biomecánica del Movimiento",
-      description: "Análisis técnico de los ejercicios",
+      title: "Planos y ejes corporales",
+      description: "Centro de gravedad, planos y ejes corporales. Palancas del cuerpo. Clasificación, tipos.",
       readTime: "35 min",
       completed: false,
-      topics: ["Planos de movimiento", "Palancas", "Análisis gestual"]
+      topics: ["Centro de gravedad", "Planos y ejes corporales", "Palancas del cuerpo", "Clasificación", "Tipos"]
     },
     {
       id: "unidad-4",
-      title: "Nutrición Deportiva",
-      description: "Alimentación para el rendimiento",
-      readTime: "28 min", 
+      title: "Músculos",
+      description: "Tipos. Ubicación anatómica. Clasificación según su función.",
+      readTime: "30 min", 
       completed: false,
-      topics: ["Macronutrientes", "Hidratación", "Suplementación"]
+      topics: ["Tipos", "Ubicación anatómica", "Clasificación según su función"]
     },
     {
       id: "unidad-5",
-      title: "Psicología del Ejercicio",
-      description: "Aspectos mentales del entrenamiento",
-      readTime: "22 min",
+      title: "Fisiología muscular",
+      description: "La fibra muscular. Miofibrilla. Contracción muscular. Acción muscular conjunta.",
+      readTime: "30 min",
       completed: false,
-      topics: ["Motivación", "Adherencia", "Manejo del estrés"]
+      topics: ["La fibra muscular", "Miofibrilla", "Contracción muscular", "Acción muscular conjunta"]
     },
     {
       id: "unidad-6",
-      title: "Lesiones y Prevención",
-      description: "Seguridad en el entrenamiento grupal",
-      readTime: "40 min",
+      title: "Análisis del Movimiento",
+      description: "Definición. Tipos de movimiento.",
+      readTime: "20 min",
       completed: false,
-      topics: ["Lesiones comunes", "Protocolos de seguridad", "Primeros auxilios"]
+      topics: ["Definición", "Tipos de movimiento"]
     }
   ];
 
@@ -65,7 +65,7 @@ const Theory = () => {
           Material Teórico
         </h1>
         <p className="text-gray-600 dark:text-gray-300">
-          Contenido enriquecido con texto, imágenes y videos
+          Acá vas a encontrar el material teórico para estudiar a tu ritmo. Cada unidad incluye un resumen de los temas tratados y un tiempo estimado de lectura.
         </p>
       </div>
 

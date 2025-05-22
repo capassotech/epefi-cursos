@@ -9,15 +9,24 @@ const Curso = () => {
   const navigate = useNavigate();
 
   const stats = [
-    { label: "Clases Completadas", value: "12/24", progress: 50 },
-    { label: "Unidades de Teoría", value: "8/15", progress: 53 },
-    { label: "Tiempo de Estudio", value: "24h", progress: 75 },
+    { label: "Clases presenciales completadas", value: "3/17", progress: 18 },
+    { label: "Tiempo de cursado", value: "10.5h", progress: 18 },
+    { label: "Unidades de teoría", value: "2/6", progress: 33 },
   ];
 
   const recentActivity = [
-    { type: "class", title: "Técnicas de Cardio HIIT", module: "Módulo 3", duration: "45 min" },
-    { type: "theory", title: "Anatomía del Ejercicio", unit: "Unidad 2", readTime: "15 min" },
-    { type: "class", title: "Flexibilidad y Movilidad", module: "Módulo 2", duration: "30 min" },
+    { type: "class", title: "Anatomía del esqueleto humano", module: "Módulo 1", duration: "70 min" },
+    { type: "theory", title: "Anatomía del esqueleto humano", unit: "Módulo 1", readTime: "30 min" },
+    { type: "class", title: "Articulaciones", module: "Módulo 2", duration: "60 min" },
+    { type: "theory", title: "Articulaciones", unit: "Módulo 2", readTime: "30 min" },
+    // { type: "class", title: "Planos y ejes corporales", module: "Módulo 3", duration: "30 min" },
+    // { type: "theory", title: "Planos y ejes corporales", unit: "Módulo 3", readTime: "30 min" },
+    // { type: "class", title: "Músculos", module: "Módulo 4", duration: "30 min" },
+    // { type: "theory", title: "Músculos", unit: "Módulo 4", readTime: "30 min" },
+    // { type: "class", title: "Fisiología muscular", module: "Módulo 5", duration: "30 min" },
+    // { type: "theory", title: "Fisiología muscular", unit: "Módulo 5", readTime: "30 min" },
+    // { type: "class", title: "Análisis del Movimiento", module: "Módulo 6", duration: "30 min" },
+    // { type: "theory", title: "Análisis del Movimiento", unit: "Módulo 6", readTime: "30 min" },
   ];
 
   return (
@@ -28,10 +37,10 @@ const Curso = () => {
           <Trophy className="w-8 h-8 text-white" />
         </div>
         <h1 className="text-3xl md:text-4xl font-bold text-primary">
-          Instructorado de Fitness
+          Instructorado de fitness grupal
         </h1>
         <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto">
-          Tu plataforma personal para dominar el arte del fitness grupal. Organiza, estudia y progresa.
+          Clases grabadas y material teórico para que puedas estudiar a tu ritmo
         </p>
       </div>
 
@@ -84,7 +93,7 @@ const Curso = () => {
                   Material Teórico
                 </CardTitle>
                 <CardDescription className="text-white/80">
-                  Contenido enriquecido y multimedia
+                  Todo lo que necesitas para estudiar
                 </CardDescription>
               </div>
               <ChevronRight className="w-6 h-6" />
