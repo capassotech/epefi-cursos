@@ -13,6 +13,7 @@ import TheoryDetail from "./pages/TheoryDetail";
 import ClassDetail from "./pages/ClassDetail";
 import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
+import Curso from "./pages/Curso";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
           <Layout>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/curso" element={<Curso />} />
               <Route path="/classes" element={<Classes />} />
               <Route path="/classes/:moduleId/:classId" element={<ClassDetail />} />
               <Route path="/theory" element={<Theory />} />
