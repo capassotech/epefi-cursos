@@ -82,7 +82,7 @@ const Theory = () => {
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
                     unit.completed 
                       ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'
-                      : 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400'
+                      : 'bg-primary/10 dark:bg-primary/20 text-primary'
                   }`}>
                     {unit.completed ? (
                       <CheckCircle className="w-6 h-6" />
@@ -129,17 +129,17 @@ const Theory = () => {
       </div>
 
       {/* Progress Summary */}
-      <Card className="bg-gradient-to-r from-purple-500 to-blue-600 text-white border-0">
+      <Card className="bg-primary text-white border-0">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Progreso de Estudio</CardTitle>
-          <CardDescription className="text-purple-100">
+          <CardDescription className="text-white/80">
             Has completado 2 de 6 unidades teóricas
           </CardDescription>
           <div className="mt-4">
-            <div className="w-full bg-purple-200/30 rounded-full h-3">
+            <div className="w-full bg-white/30 rounded-full h-3">
               <div className="bg-white h-3 rounded-full" style={{ width: '33%' }}></div>
             </div>
-            <p className="text-sm mt-2 text-purple-100">33% completado</p>
+            <p className="text-sm mt-2 text-white/80">33% completado</p>
           </div>
         </CardHeader>
       </Card>

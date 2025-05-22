@@ -24,10 +24,10 @@ const Index = () => {
     <div className="container mx-auto px-4 py-6 space-y-8">
       {/* Hero Section */}
       <div className="text-center space-y-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-4">
           <Trophy className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl md:text-4xl font-bold text-primary">
           Instructorado de Fitness
         </h1>
         <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto">
@@ -38,7 +38,7 @@ const Index = () => {
       {/* Progress Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((stat, index) => (
-          <Card key={index} className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 border-0 shadow-lg">
+          <Card key={index} className="bg-background border-border shadow-lg">
             <CardHeader className="pb-2">
               <CardDescription>{stat.label}</CardDescription>
               <CardTitle className="text-2xl">{stat.value}</CardTitle>
@@ -53,7 +53,7 @@ const Index = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card 
-          className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          className="bg-primary text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
           onClick={() => navigate("/classes")}
         >
           <CardHeader>
@@ -63,7 +63,7 @@ const Index = () => {
                   <Play className="w-5 h-5" />
                   Clases Grabadas
                 </CardTitle>
-                <CardDescription className="text-blue-100">
+                <CardDescription className="text-white/80">
                   Videos organizados por módulo
                 </CardDescription>
               </div>
@@ -73,7 +73,7 @@ const Index = () => {
         </Card>
 
         <Card 
-          className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          className="bg-black text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
           onClick={() => navigate("/theory")}
         >
           <CardHeader>
@@ -83,7 +83,7 @@ const Index = () => {
                   <BookOpen className="w-5 h-5" />
                   Material Teórico
                 </CardTitle>
-                <CardDescription className="text-purple-100">
+                <CardDescription className="text-white/80">
                   Contenido enriquecido y multimedia
                 </CardDescription>
               </div>
@@ -107,8 +107,8 @@ const Index = () => {
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                   item.type === 'class' 
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                    : 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400'
+                    ? 'bg-primary/10 dark:bg-primary/20 text-primary'
+                    : 'bg-black/10 dark:bg-white/10 text-black dark:text-white'
                 }`}>
                   {item.type === 'class' ? <Play className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
                 </div>
@@ -128,17 +128,17 @@ const Index = () => {
       </Card>
 
       {/* Call to Action */}
-      <Card className="bg-gradient-to-r from-orange-400 to-pink-500 text-white border-0 shadow-lg">
+      <Card className="bg-primary text-white border-0 shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">¿Listo para continuar aprendiendo?</CardTitle>
-          <CardDescription className="text-orange-100">
+          <CardDescription className="text-white/80">
             Accede a todo tu contenido educativo organizado y optimizado para mobile
           </CardDescription>
           <div className="pt-4 space-x-4">
             <Button 
               variant="secondary" 
               onClick={() => navigate("/classes")}
-              className="bg-white text-orange-500 hover:bg-gray-100"
+              className="bg-white text-primary hover:bg-gray-100"
             >
               Ver Clases
             </Button>
