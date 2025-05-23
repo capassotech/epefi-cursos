@@ -11,14 +11,14 @@ const Curso = () => {
   const stats = [
     { label: "Clases presenciales completadas", value: "3/17", progress: 18 },
     { label: "Tiempo de cursado", value: "10.5h", progress: 18 },
-    { label: "Unidades de teoría", value: "2/6", progress: 33 },
+    { label: "Unidades de teoría", value: "1/6", progress: 16 },
   ];
 
   const recentActivity = [
     { type: "class", title: "Anatomía del esqueleto humano", module: "Módulo 1", duration: "70 min" },
     { type: "theory", title: "Anatomía del esqueleto humano", unit: "Módulo 1", readTime: "30 min" },
-    { type: "class", title: "Articulaciones", module: "Módulo 2", duration: "60 min" },
-    { type: "theory", title: "Articulaciones", unit: "Módulo 2", readTime: "30 min" },
+    // { type: "class", title: "Articulaciones", module: "Módulo 2", duration: "60 min" },
+    // { type: "theory", title: "Articulaciones", unit: "Módulo 2", readTime: "30 min" },
     // { type: "class", title: "Planos y ejes corporales", module: "Módulo 3", duration: "30 min" },
     // { type: "theory", title: "Planos y ejes corporales", unit: "Módulo 3", readTime: "30 min" },
     // { type: "class", title: "Músculos", module: "Módulo 4", duration: "30 min" },

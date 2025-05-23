@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Play, Clock, Users, Download, Share } from "lucide-react";
+import { url } from "inspector";
 
 const ClassDetail = () => {
   const { moduleId, classId } = useParams();
@@ -11,22 +12,20 @@ const ClassDetail = () => {
 
   // Mock data - en una app real esto vendría de una API
   const classData = {
-    title: "Introducción al Fitness Grupal",
-    description: "En esta clase introductoria aprenderás los fundamentos del entrenamiento grupal, incluyendo técnicas de motivación, manejo de grupos diversos y estructura básica de una sesión.",
-    duration: "35 min",
-    instructor: "Prof. Ana Martínez",
-    module: "Módulo 1: Fundamentos del Fitness",
-    videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ", // Placeholder
+    title: "Anatomía del esqueleto humano",
+    description: "En esta clase se desarrolla una introducción clara al esqueleto humano abordando cuatro ejes fundamentales: su definición y concepto general, la clasificación y funciones de los huesos, los tejidos que lo componen, y la ubicación anatómica de todos los huesos del cuerpo. Un repaso esencial para comprender la base estructural del cuerpo humano y su importancia en el movimiento y la práctica segura del fitness grupal.",
+    duration: "70 min",
+    instructor: "Prof. Laura Martino",
+    module: "Módulo 1: Anatomía y Fisiología",
+    videoUrl: "https://drive.google.com/file/d/11t1DmY5OsDrakooS2RFsNNfUQTALOkh8/preview", // Placeholder
     objectives: [
-      "Comprender los principios básicos del fitness grupal",
-      "Aprender técnicas de motivación grupal",
-      "Conocer la estructura de una sesión típica",
-      "Identificar diferentes tipos de participantes"
+      "Definición, concepto",
+      "Los huesos",
+      "Tejidos",
+      "Ubicación anatómica de todos los huesos"
     ],
     resources: [
-      { name: "Planilla de estructura de clase", type: "PDF" },
-      { name: "Ejercicios de calentamiento", type: "PDF" },
-      { name: "Audio para práctica", type: "MP3" }
+      { name: "Aparato locomotor", type: "PDF", url: "https://drive.google.com/file/d/1ch4A3_KQTMm3MK5HkgttW61lZE8bp4aZ/view?usp=sharing" },
     ]
   };
 
@@ -34,8 +33,8 @@ const ClassDetail = () => {
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center space-x-4">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
           onClick={() => navigate('/classes')}
         >
@@ -61,14 +60,8 @@ const ClassDetail = () => {
               className="w-full h-full rounded-t-lg"
               allowFullScreen
             />
-            <div className="absolute bottom-4 left-4 flex items-center space-x-2">
-              <Badge className="bg-black/70 text-white">
-                <Play className="w-3 h-3 mr-1" />
-                En reproducción
-              </Badge>
-            </div>
           </div>
-          
+
           <div className="p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
@@ -81,7 +74,7 @@ const ClassDetail = () => {
                   <span>{classData.instructor}</span>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm">
                   <Share className="w-4 h-4 mr-2" />
@@ -145,14 +138,22 @@ const ClassDetail = () => {
                     <p className="text-sm text-gray-500 dark:text-gray-400">{resource.type}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  Descargar
-                </Button>
+                <a
+                  href={resource.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Button variant="outline" size="sm">
+                    Descargar
+                  </Button>
+                </a>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
 
       {/* Navigation */}
       <div className="flex justify-between">

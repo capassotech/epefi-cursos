@@ -21,35 +21,35 @@ const Classes = () => {
           completed: true
         },
         {
-          id: "clase-2", 
+          id: "",
           title: "Articulaciones",
           duration: "60 min",
           thumbnail: "https://images.pexels.com/photos/5723885/pexels-photo-5723885.jpeg?auto=compress&cs=tinysrgb&w=400",
-          completed: true
+          completed: false
         },
         {
-          id: "clase-3", 
+          id: "",
           title: "Planos y ejes corporales",
           duration: "60 min",
           thumbnail: "https://mundoentrenamiento.com/wp-content/uploads/2022/05/posicion-anatomica.png?w=400",
           completed: false
         },
         {
-          id: "clase-4", 
+          id: "",
           title: "Músculos",
           duration: "60 min",
           thumbnail: "https://namastezaragoza.com/wp-content/uploads/freshizer/5f0d84353d66c3b41782797dd3a0e622_musculos-800-c-90.jpg?w=400",
           completed: false
         },
         {
-          id: "clase-5", 
+          id: "",
           title: "Fisiología muscular",
           duration: "60 min",
           thumbnail: "https://blogs.ugto.mx/rea/wp-content/uploads/sites/71/2021/11/duehkshvxuq-1.jpg?w=400",
           completed: false
         },
         {
-          id: "clase-6", 
+          id: "",
           title: "Análisis del Movimiento",
           duration: "60 min",
           thumbnail: "https://images.pexels.com/photos/3757376/pexels-photo-3757376.jpeg?auto=compress&cs=tinysrgb&w=400",
@@ -85,15 +85,19 @@ const Classes = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {module.classes.map((classItem) => (
-              <Card 
-                key={classItem.id}
-                className="cursor-pointer hover:shadow-md transition-all duration-200 bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
-                onClick={() => navigate(`/classes/${module.id}/${classItem.id}`)}
+              <Card
+                key={classItem.id || crypto.randomUUID()}
+                className="cursor-pointer hover:shadow-md transition-all duration-200 bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 relative"
+                onClick={() => {
+                  if (classItem.id) {
+                    navigate(`/classes/${module.id}/${classItem.id}`);
+                  }
+                }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-4">
                     <div className="relative flex-shrink-0">
-                      <img 
+                      <img
                         src={classItem.thumbnail}
                         alt={classItem.title}
                         className="w-20 h-16 md:w-24 md:h-18 object-cover rounded-lg"
@@ -108,8 +112,13 @@ const Classes = () => {
                           </svg>
                         </div>
                       )}
+                      {!classItem.id && (
+                        <div className="absolute top-1 left-1 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow">
+                          Próximamente
+                        </div>
+                      )}
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
                         {classItem.title}

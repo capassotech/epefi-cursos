@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,80 +8,61 @@ const TheoryDetail = () => {
   const { unitId } = useParams();
   const navigate = useNavigate();
 
-  // Mock data - en una app real esto vendría de una API
+  // Nuevo contenido basado en MODULO 1 ÓSEO.pdf
   const theoryData = {
-    title: "Anatomía y Fisiología del Ejercicio",
-    readTime: "25 min",
+    title: "Anatomía del Sistema Óseo",
+    readTime: "30 min",
     completed: false,
     sections: [
       {
-        id: "sistema-muscular",
-        title: "Sistema Muscular",
-        content: `El sistema muscular está compuesto por más de 600 músculos que trabajan en conjunto para permitir el movimiento corporal. En el contexto del fitness grupal, es fundamental comprender cómo funcionan los diferentes tipos de fibras musculares.
-
-Los músculos se clasifican en tres tipos principales:
-- **Músculos esqueléticos**: Los que utilizamos para el movimiento voluntario
-- **Músculos cardíacos**: El músculo del corazón
-- **Músculos lisos**: Encontrados en órganos internos
-
-Para el entrenamiento de fitness grupal, nos enfocamos principalmente en los músculos esqueléticos, que se pueden entrenar y fortalecer a través del ejercicio dirigido.`,
-        image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600",
+        id: "introduccion-biologia",
+        title: "Introducción a la Biología Humana",
+        content: `La biología estudia todo lo que está dotado de vida. En el caso del ser humano, se divide en ciencias morfológicas (anatomía) y fisiológicas (fisiología).\n\n- **Anatomía**: Estudia la forma, estructura, situación y relaciones de las partes del cuerpo.\n- **Fisiología**: Analiza cómo funcionan las células, tejidos, órganos y sistemas del organismo.`,
+        image: "https://images.unsplash.com/photo-1628348068343-c6a848d2b6dd?w=600 ",
         videoEmbed: null
       },
       {
-        id: "sistema-cardiovascular", 
-        title: "Sistema Cardiovascular",
-        content: `El sistema cardiovascular es el motor que impulsa nuestro rendimiento durante el ejercicio. Está compuesto por el corazón, los vasos sanguíneos y la sangre.
-
-Durante el ejercicio aeróbico, el corazón aumenta su frecuencia para bombear más sangre oxigenada a los músculos que trabajan. Este proceso es fundamental para entender cómo diseñar entrenamientos efectivos.
-
-**Adaptaciones cardiovasculares al ejercicio:**
-- Aumento del volumen sistólico
-- Mejora de la eficiencia cardíaca
-- Reducción de la frecuencia cardíaca en reposo
-- Mayor capacidad de transporte de oxígeno`,
-        image: "https://images.unsplash.com/photo-1628348068343-c6a848d2b6dd?w=600",
-        videoEmbed: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+        id: "aparato-locomotor",
+        title: "Aparato Locomotor",
+        content: `El aparato locomotor es el encargado del movimiento corporal y está compuesto por:\n\n- **Sistema Óseo**: Proporciona soporte y protección.\n- **Sistema Articular**: Permite movilidad entre huesos.\n- **Sistema Muscular**: Genera movimiento mediante contracciones.\n\nAdemás, otros sistemas reguladores como el nervioso y endocrino influyen directamente en su funcionamiento.`,
+        image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600 ",
+        videoEmbed: "https://www.youtube.com/embed/dQw4w9WgXcQ "
       },
       {
-        id: "metabolismo-energetico",
-        title: "Metabolismo Energético", 
-        content: `El cuerpo humano utiliza tres sistemas energéticos principales para producir ATP (adenosín trifosfato), la "moneda energética" celular:
-
-**1. Sistema Fosfagénico (ATP-PC)**
-- Duración: 0-10 segundos
-- Intensidad: Muy alta
-- Ejemplo: Sprint corto, levantamiento de pesas
-
-**2. Sistema Glucolítico**
-- Duración: 10 segundos - 2 minutos  
-- Intensidad: Alta
-- Ejemplo: Ejercicios de HIIT
-
-**3. Sistema Oxidativo**
-- Duración: Más de 2 minutos
-- Intensidad: Moderada a baja
-- Ejemplo: Ejercicio aeróbico sostenido
-
-Entender estos sistemas nos permite diseñar entrenamientos específicos según los objetivos de cada participante.`,
-        image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600",
+        id: "sistema-oseo",
+        title: "Sistema Óseo",
+        content: `El sistema óseo está formado por huesos, cartílagos y articulaciones. Cumple funciones esenciales como:\n\n- Protección de órganos internos (ej.: cerebro, corazón).\n- Sostén de músculos y órganos.\n- Facilitación del movimiento junto a los músculos.\n- Producción de células sanguíneas (hematopoyesis).\n\nLos huesos están compuestos por:\n\n- **Células óseas**:\n  - *Osteoblastos*: Forman tejido óseo.\n  - *Osteocitos*: Mantienen la matriz ósea.\n  - *Osteoclastos*: Destruyen tejido óseo viejo.\n\n- **Matriz orgánica**: Contiene colágeno (resistencia y flexibilidad).\n- **Sales inorgánicas**: Principalmente calcio y fósforo (dureza y rigidez).`,
+        image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600 ",
+        videoEmbed: null
+      },
+      {
+        id: "clasificacion-huesos",
+        title: "Clasificación de los Huesos",
+        content: `Según su forma y dimensiones, los huesos se clasifican en:\n\n- **Huesos largos**: Predomina la longitud (ej.: fémur, húmero).\n- **Huesos cortos**: Tienen forma cúbica (ej.: carpo, tarso).\n- **Huesos planos**: Grandes superficies anchas (ej.: cráneo, escápula).\n- **Huesos irregulares**: No entran en categorías anteriores (ej.: vértebras, maxilar).\n\nTambién existen dos tipos de tejido óseo:\n\n- **Tejido compacto**: Denso y resistente (diáfisis de huesos largos).\n- **Tejido esponjoso**: Con cavidades llenas de médula ósea (epífisis y huesos planos).`,
+        image: null,
+        videoEmbed: null
+      },
+      {
+        id: "desarrollo-huesos",
+        title: "Desarrollo y Osificación",
+        content: `El proceso de osificación transforma membranas o cartílagos en hueso. Este proceso comienza durante el desarrollo fetal y puede durar hasta los 30 años.\n\n- El crecimiento longitudinal ocurre en el **cartílago de crecimiento** de las epífisis.\n- Las hormonas principales son:\n  - Hormona del crecimiento (GH)\n  - Estrógenos (en mujeres)\n  - Testosterona (en hombres)\n\nEl ejercicio físico favorece el ancho, densidad y resistencia ósea, aunque tiene poco efecto sobre la longitud final del hueso.`,
+        image: null,
         videoEmbed: null
       }
     ],
     quiz: {
-      question: "¿Cuál es el sistema energético principal utilizado durante un ejercicio de HIIT de 30 segundos?",
+      question: "¿Cuál de las siguientes NO es una función principal del sistema óseo?",
       options: [
-        "Sistema Fosfagénico",
-        "Sistema Glucolítico", 
-        "Sistema Oxidativo",
-        "Todos por igual"
+        "Protección de órganos internos",
+        "Producción de células sanguíneas",
+        "Movimiento activo del cuerpo",
+        "Soporte de tejidos blandos"
       ],
-      correct: 1
+      correct: 2
     }
   };
 
   const markAsCompleted = () => {
-    // Aquí implementarías la lógica para marcar como completada
     console.log("Unidad marcada como completada");
   };
 
@@ -119,7 +99,7 @@ Entender estos sistemas nos permite diseñar entrenamientos específicos según 
               <BookOpen className="w-6 h-6" />
               <div>
                 <h3 className="font-medium">Progreso de Lectura</h3>
-                <p className="text-sm text-purple-100">3 secciones por leer</p>
+                <p className="text-sm text-purple-100">{theoryData.sections.length} secciones por leer</p>
               </div>
             </div>
             {!theoryData.completed && (
@@ -149,7 +129,6 @@ Entender estos sistemas nos permite diseñar entrenamientos específicos según 
                   {section.title}
                 </h2>
               </div>
-
               {section.image && (
                 <div className="rounded-lg overflow-hidden">
                   <img 
@@ -159,7 +138,6 @@ Entender estos sistemas nos permite diseñar entrenamientos específicos según 
                   />
                 </div>
               )}
-
               <div className="prose dark:prose-invert max-w-none">
                 {section.content.split('\n').map((paragraph, pIndex) => {
                   if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
@@ -167,13 +145,6 @@ Entender estos sistemas nos permite diseñar entrenamientos específicos según 
                       <h3 key={pIndex} className="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-4 mb-2">
                         {paragraph.slice(2, -2)}
                       </h3>
-                    );
-                  } else if (paragraph.startsWith('- **')) {
-                    return (
-                      <li key={pIndex} className="text-gray-600 dark:text-gray-300 ml-4">
-                        <strong>{paragraph.slice(4, paragraph.indexOf('**', 4))}:</strong>
-                        {paragraph.slice(paragraph.indexOf('**', 4) + 2)}
-                      </li>
                     );
                   } else if (paragraph.startsWith('- ')) {
                     return (
@@ -193,7 +164,6 @@ Entender estos sistemas nos permite diseñar entrenamientos específicos según 
                   return null;
                 })}
               </div>
-
               {section.videoEmbed && (
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
