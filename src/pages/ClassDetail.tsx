@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,20 +12,26 @@ const ClassDetail = () => {
   // Mock data - en una app real esto vendría de una API
   const classData = {
     title: "Anatomía del esqueleto humano",
-    description: "En esta clase se desarrolla una introducción clara al esqueleto humano abordando cuatro ejes fundamentales: su definición y concepto general, la clasificación y funciones de los huesos, los tejidos que lo componen, y la ubicación anatómica de todos los huesos del cuerpo. Un repaso esencial para comprender la base estructural del cuerpo humano y su importancia en el movimiento y la práctica segura del fitness grupal.",
+    description:
+      "En esta clase se desarrolla una introducción clara al esqueleto humano abordando cuatro ejes fundamentales: su definición y concepto general, la clasificación y funciones de los huesos, los tejidos que lo componen, y la ubicación anatómica de todos los huesos del cuerpo. Un repaso esencial para comprender la base estructural del cuerpo humano y su importancia en el movimiento y la práctica segura del fitness grupal.",
     duration: "70 min",
     instructor: "Prof. Laura Martino",
     module: "Módulo 1: Anatomía y Fisiología",
-    videoUrl: "https://drive.google.com/file/d/11t1DmY5OsDrakooS2RFsNNfUQTALOkh8/preview", // Placeholder
+    videoUrl:
+      "https://drive.google.com/file/d/11t1DmY5OsDrakooS2RFsNNfUQTALOkh8/preview", // Placeholder
     objectives: [
       "Definición, concepto",
       "Los huesos",
       "Tejidos",
-      "Ubicación anatómica de todos los huesos"
+      "Ubicación anatómica de todos los huesos",
     ],
     resources: [
-      { name: "Aparato locomotor", type: "PDF", url: "https://drive.google.com/file/d/1ch4A3_KQTMm3MK5HkgttW61lZE8bp4aZ/view?usp=sharing" },
-    ]
+      {
+        name: "Aparato locomotor",
+        type: "PDF",
+        url: "https://drive.google.com/file/d/1ch4A3_KQTMm3MK5HkgttW61lZE8bp4aZ/view?usp=sharing",
+      },
+    ],
   };
 
   return (
@@ -36,7 +41,7 @@ const ClassDetail = () => {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate('/classes')}
+          onClick={() => navigate("/classes")}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -112,7 +117,9 @@ const ClassDetail = () => {
               {classData.objectives.map((objective, index) => (
                 <li key={index} className="flex items-start space-x-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                  <span className="text-gray-600 dark:text-gray-300">{objective}</span>
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {objective}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -128,14 +135,21 @@ const ClassDetail = () => {
           </h2>
           <div className="space-y-3">
             {classData.resources.map((resource, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+              >
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center">
                     <Download className="w-4 h-4" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-gray-100">{resource.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{resource.type}</p>
+                    <p className="font-medium text-gray-900 dark:text-gray-100">
+                      {resource.name}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {resource.type}
+                    </p>
                   </div>
                 </div>
                 <a
@@ -153,7 +167,6 @@ const ClassDetail = () => {
           </div>
         </CardContent>
       </Card>
-
 
       {/* Navigation */}
       <div className="flex justify-between">

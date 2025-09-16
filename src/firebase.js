@@ -5,15 +5,14 @@ import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBYVbFkQ2no23REuOlixl3pr4dhBIijCwQ",
-    authDomain: "epefi-cursos.firebaseapp.com",
-    projectId: "epefi-cursos",
-    storageBucket: "epefi-cursos.firebasestorage.app",
-    messagingSenderId: "802081217440",
-    appId: "1:802081217440:web:5529a15bdb280d8d57a2c5",
-    measurementId: "G-RT024RQC4T"
+  apiKey: "AIzaSyDmUUc9pf94sLVD0RRPW-t0j0zjYmfud7o",
+  authDomain: "epefi-admin.firebaseapp.com",
+  projectId: "epefi-admin",
+  storageBucket: "epefi-admin.firebasestorage.app",
+  messagingSenderId: "148104863138",
+  appId: "1:148104863138:web:a90f184ad83e2b65db66fb",
+  measurementId: "G-DJ6V3STCGZ",
 };
-
 // Inicializa Firebase
 const app = initializeApp(firebaseConfig);
 
