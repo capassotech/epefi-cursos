@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import {
@@ -58,8 +57,7 @@ export default function AuthFormView({
     return (
       (formData.firstName as string)?.trim().length >= 2 &&
       (formData.lastName as string)?.trim().length >= 2 &&
-      (formData.dni as string)?.length >= 7 &&
-      formData.acceptTerms === true
+      (formData.dni as string)?.length >= 7
     );
   };
 
@@ -154,39 +152,6 @@ export default function AuthFormView({
           />
         </div>
         {errors.dni && <p className="form-error">{errors.dni}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="terms"
-            checked={formData.acceptTerms as boolean}
-            onCheckedChange={(checked) =>
-              onInputChange("acceptTerms", checked === true)
-            }
-            disabled={isSubmitting}
-            className="border-input data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-          />
-          <Label htmlFor="terms" className="text-sm text-foreground">
-            Acepto los{" "}
-            <Link
-              to="/terms"
-              className="text-primary hover:underline transition-colors"
-            >
-              términos y condiciones
-            </Link>{" "}
-            y la{" "}
-            <Link
-              to="/privacy"
-              className="text-primary hover:underline transition-colors"
-            >
-              política de privacidad
-            </Link>
-          </Label>
-        </div>
-        {errors.acceptTerms && (
-          <p className="form-error">{errors.acceptTerms}</p>
-        )}
       </div>
 
       <Button

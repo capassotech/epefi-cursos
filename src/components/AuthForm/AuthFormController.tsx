@@ -1,4 +1,3 @@
-
 import type React from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -25,9 +24,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     firstName: "",
     lastName: "",
     dni: "",
-    acceptTerms: false,
   });
-
 
   const getPasswordRequirements = (password: string) => {
     return {
@@ -40,27 +37,29 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
 
   const validateForm = (googleAuth: boolean = false) => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!googleAuth) {
       if (!formData.email) {
         newErrors.email = "El email es requerido";
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         newErrors.email = "El formato del email es inválido";
       }
-  
+
       if (!formData.password) {
         newErrors.password = "La contraseña es requerida";
       } else {
         const requirements = getPasswordRequirements(formData.password);
-        const allRequirementsMet = requirements.minLength && 
-                                  requirements.hasUppercase && 
-                                  requirements.hasSpecialChar && 
-                                  requirements.hasNumber;
-        
+        const allRequirementsMet =
+          requirements.minLength &&
+          requirements.hasUppercase &&
+          requirements.hasSpecialChar &&
+          requirements.hasNumber;
+
         if (!allRequirementsMet) {
-          newErrors.password = "La contraseña no cumple con todos los requisitos";
+          newErrors.password =
+            "La contraseña no cumple con todos los requisitos";
         }
-      } 
+      }
     }
 
     if (!isLogin) {
@@ -70,7 +69,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
         } else if (formData.firstName.trim().length < 2) {
           newErrors.firstName = "El nombre debe tener al menos 2 caracteres";
         }
-  
+
         if (!formData.lastName.trim()) {
           newErrors.lastName = "El apellido es requerido";
         } else if (formData.lastName.trim().length < 2) {
@@ -83,10 +82,6 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       } else if (!/^\d{7,8}$/.test(formData.dni)) {
         newErrors.dni = "El DNI debe tener entre 7 y 8 dígitos";
       }
-
-      if (!formData.acceptTerms) {
-        newErrors.acceptTerms = "Debes aceptar los términos y condiciones";
-      }
     }
 
     setErrors(newErrors);
@@ -96,7 +91,6 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
 
     if (!isLogin && !validateForm()) {
       toast.error("Por favor, corrige los errores en el formulario");
@@ -117,9 +111,9 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
           duration: 4000,
         });
 
-        // setTimeout(() => {
-        //   navigate("/test-vocacional");
-        // }, 1000);
+        setTimeout(() => {
+          navigate("/");
+        }, 1000);
       } else {
         await register(formData);
 
@@ -131,11 +125,11 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
           duration: 4000,
         });
 
-        // setTimeout(() => {
-        //   navigate("/test-vocacional");
-        // }, 1000);
+        setTimeout(() => {
+          navigate("/");
+        }, 1000);
       }
-    } catch (error: any) {     
+    } catch (error: any) {
       toast.error(error.error);
     } finally {
       setIsSubmitting(false);
@@ -157,7 +151,10 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
         }, 2000);
         return;
       } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : "Error en el login con Google";
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Error en el login con Google";
         toast.error(errorMessage);
         return;
       }
@@ -169,7 +166,12 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     }
 
     try {
-      await googleRegister(formData.firstName, formData.lastName, formData.dni, formData.acceptTerms);
+      await googleRegister(
+        formData.firstName,
+        formData.lastName,
+        formData.dni,
+        true
+      );
 
       toast.success("¡Bienvenido a INEE!", {
         description: "Tu cuenta ha sido creada exitosamente",
@@ -180,7 +182,10 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
         navigate("/");
       }, 2000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Error en el registro con Google";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Error en el registro con Google";
       toast.error(errorMessage);
     }
   };
@@ -219,7 +224,9 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       isSubmitting={isSubmitting}
       showPassword={showPassword}
       setShowPassword={setShowPassword}
-      passwordRequirements={getPasswordRequirements(formData.password as string || '')}
+      passwordRequirements={getPasswordRequirements(
+        (formData.password as string) || ""
+      )}
     />
   );
 };
