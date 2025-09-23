@@ -1,6 +1,6 @@
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
@@ -34,20 +34,15 @@ interface RegisterData {
 }
 
 class AuthService {
-  // LOGIN - Usando Firebase SDK (NO REST API)
+  // LOGIN - Usando Firebase SDK
   async login(data: LoginData) {
     try {
-      console.log("Intentando login con Firebase SDK:", data.email);
-
-      // 1. Autenticar con Firebase directamente
       const userCredential = await signInWithEmailAndPassword(
         auth,
         data.email,
         data.password
       );
       const firebaseUser = userCredential.user;
-
-      console.log("Login exitoso con Firebase:", firebaseUser.uid);
 
       // 2. Obtener token para llamadas al backend
       const token = await firebaseUser.getIdToken();
@@ -58,7 +53,7 @@ class AuthService {
           "/api/auth/login",
           {
             email: data.email,
-            password: data.password, // Solo para verificación en backend si es necesario
+            // No enviar password al backend en este caso
           },
           {
             headers: {
@@ -68,7 +63,6 @@ class AuthService {
         );
 
         const userData = response.data.user;
-        console.log("Datos del usuario desde backend:", userData);
 
         // 4. Guardar datos en localStorage
         this.saveStudentDataToStorage({
@@ -124,62 +118,53 @@ class AuthService {
     }
   }
 
-  // REGISTER - Usando Firebase SDK
   async register(data: RegisterData) {
     try {
-      console.log("Registrando usuario:", data.email);
+      const response = await api.post("/api/auth/register", {
+        email: data.email,
+        password: data.password,
+        nombre: data.nombre,
+        apellido: data.apellido,
+        dni: data.dni,
+      });
 
-      // 1. Crear usuario en Firebase
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
-      const firebaseUser = userCredential.user;
-
-      // 2. Registrar en el backend
-      const token = await firebaseUser.getIdToken();
-
-      const response = await api.post(
-        "/api/auth/register",
-        {
-          email: data.email,
-          password: data.password,
-          nombre: data.nombre,
-          apellido: data.apellido,
-          dni: data.dni,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      if (response.data.customToken) {
+        await signInWithCustomToken(auth, response.data.customToken);
+        console.log("Autenticación Firebase exitosa");
+      }
 
       const userData = response.data.user;
 
-      // 3. Guardar datos
+      // Guardar datos en localStorage
       this.saveStudentDataToStorage({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || data.email,
+        uid: userData.uid,
+        email: userData.email,
         nombre: userData.nombre,
         apellido: userData.apellido,
         dni: userData.dni,
         role: userData.role,
-        loginTime: new Date().toISOString(),
+        registrationTime: new Date().toISOString(),
         fechaRegistro: new Date().toISOString(),
       });
 
       return {
         success: true,
         user: userData,
-        firebaseUser: firebaseUser,
+        customToken: response.data.customToken,
       };
     } catch (error: any) {
       console.error("Error en registro:", error);
+
+      // Manejar errores del backend
+      if (error.response?.data?.error) {
+        throw {
+          error: error.response.data.error,
+          code: error.response.status,
+        };
+      }
+
       throw {
-        error:
-          this.getFirebaseErrorMessage(error.code) || "Error en el registro",
+        error: "Error en el registro",
         code: error.code,
       };
     }
@@ -280,7 +265,6 @@ class AuthService {
   saveStudentDataToStorage(data: any) {
     try {
       localStorage.setItem("studentData", JSON.stringify(data));
-      console.log("Datos guardados en localStorage:", data);
     } catch (error) {
       console.error("Error saving to localStorage:", error);
     }
@@ -309,7 +293,6 @@ class AuthService {
   clearStudentDataFromStorage() {
     try {
       localStorage.removeItem("studentData");
-      console.log("localStorage cleared");
     } catch (error) {
       console.error("Error clearing localStorage:", error);
     }
