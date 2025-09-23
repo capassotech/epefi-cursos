@@ -1,7 +1,7 @@
-/// <reference types="vite/client" />
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
+// Configuración de Firebase para el frontend
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -12,7 +12,30 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+// Debug: verificar que las variables estén cargadas
+console.log("Firebase Config Check:", {
+  apiKey: firebaseConfig.apiKey
+    ? `${firebaseConfig.apiKey.substring(0, 10)}...`
+    : "MISSING",
+  authDomain: firebaseConfig.authDomain || "MISSING",
+  projectId: firebaseConfig.projectId || "MISSING",
+});
+
+// Verificar que las variables críticas estén presentes
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error(
+    "FIREBASE CONFIG ERROR: Missing critical environment variables"
+  );
+  console.error("Please check your .env file contains:");
+  console.error("- VITE_FIREBASE_API_KEY");
+  console.error("- VITE_FIREBASE_PROJECT_ID");
+  console.error("- VITE_FIREBASE_AUTH_DOMAIN");
+}
+
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
+// Exportar servicios
 export const auth = getAuth(app);
+
 export default app;

@@ -47,23 +47,23 @@ const App = () => (
 
               {/* Rutas protegidas - CON Layout */}
               <Route element={<Layout />}>
-                {/* <Route element={<ProtectedRoute />}> */}
-                {/* Rutas originales de EPEFI - ahora protegidas */}
-                <Route path="/" element={<Index />} />
-                <Route path="/curso" element={<Curso />} />
-                <Route path="/classes" element={<Classes />} />
-                <Route
-                  path="/classes/:moduleId/:classId"
-                  element={<ClassDetail />}
-                />
-                <Route path="/theory" element={<Theory />} />
-                <Route path="/theory/:unitId" element={<TheoryDetail />} />
-                <Route path="/search" element={<Search />} />
-                {/* Nueva ruta de perfil */}
-                <Route path="/profile" element={<Profile />} />
-                <Route path="*" element={<NotFound />} />
+                <Route element={<ProtectedRoute />}>
+                  {/* Rutas originales de EPEFI - ahora protegidas */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/curso" element={<Curso />} />
+                  <Route path="/classes" element={<Classes />} />
+                  <Route
+                    path="/classes/:moduleId/:classId"
+                    element={<ClassDetail />}
+                  />
+                  <Route path="/theory" element={<Theory />} />
+                  <Route path="/theory/:unitId" element={<TheoryDetail />} />
+                  <Route path="/search" element={<Search />} />
+                  {/* Nueva ruta de perfil */}
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="*" element={<NotFound />} />
+                </Route>
               </Route>
-              {/* </Route> */}
             </Routes>
           </AuthProvider>
         </BrowserRouter>

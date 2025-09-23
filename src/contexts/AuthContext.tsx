@@ -9,7 +9,16 @@ import {
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../../config/firebase-client";
 import authService from "../services/authService";
-import { UserProfile } from "../types/types";
+
+interface UserProfile {
+  uid: string;
+  email: string;
+  nombre: string;
+  apellido: string;
+  dni?: string;
+  role: any;
+  fechaRegistro?: string;
+}
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -19,7 +28,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<any>;
   register: (userData: any) => Promise<any>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
   googleRegister: (
     firstName: string,
     lastName: string,
@@ -50,57 +58,123 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = !!firebaseUser && !!user;
+  // isAuthenticated SOLO depende de firebaseUser
+  const isAuthenticated = !!firebaseUser;
 
-  // Escuchar cambios en el estado de autenticación de Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log(
+        "🔥 Auth state changed:",
+        firebaseUser ? "logged in" : "logged out"
+      );
+
       setFirebaseUser(firebaseUser);
 
       if (firebaseUser) {
+        // Intentar obtener datos del localStorage primero
         try {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const storedData = authService.getStudentDataFromStorage();
+          console.log("📦 Stored data:", storedData);
 
-          // Si hay un usuario de Firebase, obtener su perfil del backend
-          const profile = await authService.getProfile();
-          setUser(profile);
+          if (storedData && storedData.uid === firebaseUser.uid) {
+            console.log("✅ Using stored data");
+            setUser(storedData as UserProfile);
+          } else {
+            console.log("📝 Creating basic profile from Firebase user");
+            // Crear perfil básico con datos de Firebase
+            const basicProfile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              nombre: firebaseUser.displayName?.split(" ")[0] || "Usuario",
+              apellido:
+                firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+              role: { admin: false, student: true },
+              fechaRegistro: new Date().toISOString(),
+            };
+            setUser(basicProfile);
 
-          authService.updateStudentDataInStorage({
-            dni: profile.dni,
-            fechaRegistro: profile.fechaRegistro,
-            lastProfileUpdate: new Date().toISOString(),
-          });
+            // Intentar obtener datos del backend en segundo plano (sin bloquear)
+            fetchUserProfileInBackground(firebaseUser);
+          }
         } catch (error) {
-          console.error("Error al obtener perfil:", error);
-          setUser(null);
+          console.error("Error with stored data:", error);
+          // Crear perfil mínimo si hay error
+          const minimalProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || "",
+            nombre: "Usuario",
+            apellido: "",
+            role: { admin: false, student: true },
+            fechaRegistro: new Date().toISOString(),
+          };
+          setUser(minimalProfile);
         }
       } else {
+        console.log("🚪 User logged out");
         setUser(null);
       }
 
+      // ✅ CRÍTICO: Siempre establecer isLoading en false al final
       setIsLoading(false);
+      console.log("✅ Auth loading complete");
     });
 
     return () => unsubscribe();
   }, []);
 
+  // Función para obtener perfil del backend sin bloquear la UI
+  const fetchUserProfileInBackground = async (firebaseUser: User) => {
+    try {
+      console.log("🌐 Fetching profile from backend...");
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch("http://localhost:3000/api/users/me", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const profileData = await response.json();
+        console.log("✅ Backend profile fetched:", profileData);
+
+        const updatedProfile: UserProfile = {
+          uid: profileData.uid || firebaseUser.uid,
+          email: profileData.email || firebaseUser.email || "",
+          nombre: profileData.nombre || "Usuario",
+          apellido: profileData.apellido || "",
+          dni: profileData.dni,
+          role: profileData.role || { admin: false, student: true },
+          fechaRegistro: profileData.fechaRegistro || profileData.fechaCreacion,
+        };
+
+        setUser(updatedProfile);
+        authService.updateStudentDataInStorage(updatedProfile);
+      } else {
+        console.warn("Backend profile fetch failed:", response.status);
+      }
+    } catch (error) {
+      console.warn("Backend profile fetch error:", error);
+      // No hacer nada - seguir con el perfil básico
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
-
-      // Los datos ya se guardaron en localStorage en el servicio
+      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
       const response = await authService.login({ email, password });
-      return response; // Retornar respuesta para usar en el componente
+      return response;
     } catch (error) {
-      setIsLoading(false);
+      // ✅ NO modificar isLoading aquí tampoco
       throw error;
     }
   };
 
   const register = async (userData: any) => {
     try {
-      setIsLoading(true);
-
+      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
       const response = await authService.register({
         email: userData.email,
         password: userData.password,
@@ -108,12 +182,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         apellido: userData.lastName,
         dni: userData.dni,
       });
-
-      // Los datos ya se guardaron en localStorage en el servicio
-      setIsLoading(false);
-      return response; // Retornar respuesta para usar en el componente
+      return response;
     } catch (error) {
-      setIsLoading(false);
+      // ✅ NO modificar isLoading aquí tampoco
       throw error;
     }
   };
@@ -125,31 +196,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     acceptTerms: boolean
   ) => {
     try {
-      setIsLoading(true);
-
+      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
       const response = await authService.googleRegister(
         firstName,
         lastName,
         dni,
         acceptTerms
       );
-
-      setIsLoading(false);
       return response;
     } catch (error) {
-      setIsLoading(false);
+      // ✅ NO modificar isLoading aquí tampoco
       throw error;
     }
   };
 
   const googleLogin = async () => {
     try {
-      setIsLoading(true);
+      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
       const response = await authService.googleLogin();
-      setIsLoading(false);
       return response;
     } catch (error) {
-      setIsLoading(false);
+      // ✅ NO modificar isLoading aquí tampoco
       throw error;
     }
   };
@@ -157,49 +224,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       await authService.logout();
-      setUser(null);
-      setFirebaseUser(null);
+      // Los estados se limpiarán automáticamente por onAuthStateChanged
     } catch (error) {
       console.error("Error during logout:", error);
     }
   };
 
-  const refreshUser = async () => {
-    try {
-      if (firebaseUser) {
-        const profile = await authService.getProfile();
-        setUser(profile);
-
-        authService.updateStudentDataInStorage({
-          dni: profile.dni,
-          fechaRegistro: profile.fechaRegistro,
-          lastProfileUpdate: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("Error al refrescar usuario:", error);
-      await logout();
-    }
-  };
-
   const forgotPassword = async (email: string) => {
-    try {
-      await authService.forgotPassword(email);
-      console.log("Email de recuperación enviado exitosamente");
-    } catch (error: any) {
-      console.log("Error al recuperar contraseña:", error.message);
-      console.log("Usuario existe:", error.exists);
-
-      throw error;
-    }
+    await authService.forgotPassword(email);
   };
 
   const changePassword = async (oobCode: string, password: string) => {
-    try {
-      await authService.changePassword(oobCode, password);
-    } catch (error) {
-      console.error("Error al cambiar contraseña:", error);
-    }
+    await authService.changePassword(oobCode, password);
   };
 
   const value: AuthContextType = {
@@ -210,7 +246,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
-    refreshUser,
     googleRegister,
     googleLogin,
     forgotPassword,

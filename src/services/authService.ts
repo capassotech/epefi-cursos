@@ -1,275 +1,336 @@
-import axios from "axios";
-import { getAuth, GoogleAuthProvider, signInWithCustomToken, signOut, signInWithPopup, signInWithCredential, sendPasswordResetEmail, confirmPasswordReset } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendPasswordResetEmail,
+  confirmPasswordReset,
+} from "firebase/auth";
 import { auth } from "../../config/firebase-client";
-import { RegisterData, LoginData, AuthResponse, UserProfile } from "../types/types";
+import axios from "axios";
 
+// Configuración de axios
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || "http://localhost:5173";
 
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-api.interceptors.request.use(async (config) => {
-  try {
-    const user = auth.currentUser;
-    if (user) {
-      const idToken = await user.getIdToken();
-      config.headers.Authorization = `Bearer ${idToken}`;
-    }
-  } catch (error) {
-    console.error("Error getting ID token:", error);
-  }
-  return config;
-});
+interface LoginData {
+  email: string;
+  password: string;
+}
+
+interface RegisterData {
+  email: string;
+  password: string;
+  nombre: string;
+  apellido: string;
+  dni: string;
+}
 
 class AuthService {
-  async register(userData: RegisterData): Promise<AuthResponse> {
+  // LOGIN - Usando Firebase SDK (NO REST API)
+  async login(data: LoginData) {
     try {
-      const response = await api.post("/auth/register", userData);
+      console.log("Intentando login con Firebase SDK:", data.email);
 
-      if (response.data.customToken) {
-        await signInWithCustomToken(auth, response.data.customToken);
-      }
+      // 1. Autenticar con Firebase directamente
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+      const firebaseUser = userCredential.user;
 
-      if (response.data.user) {
-        const studentData = {
-          uid: response.data.user.uid,
-          email: response.data.user.email,
-          nombre: response.data.user.nombre,
-          apellido: response.data.user.apellido,
-          role: response.data.user.role,
-          registrationTime: new Date().toISOString(),
+      console.log("Login exitoso con Firebase:", firebaseUser.uid);
+
+      // 2. Obtener token para llamadas al backend
+      const token = await firebaseUser.getIdToken();
+
+      // 3. Verificar/obtener datos adicionales del backend
+      try {
+        const response = await api.post(
+          "/api/auth/login",
+          {
+            email: data.email,
+            password: data.password, // Solo para verificación en backend si es necesario
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const userData = response.data.user;
+        console.log("Datos del usuario desde backend:", userData);
+
+        // 4. Guardar datos en localStorage
+        this.saveStudentDataToStorage({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || data.email,
+          nombre: userData.nombre,
+          apellido: userData.apellido,
+          dni: userData.dni,
+          role: userData.role,
+          loginTime: new Date().toISOString(),
+          fechaRegistro: userData.fechaRegistro || new Date().toISOString(),
+        });
+
+        return {
+          success: true,
+          user: userData,
+          firebaseUser: firebaseUser,
+        };
+      } catch (backendError: any) {
+        console.warn(
+          "Backend verification failed, but Firebase login successful:",
+          backendError
+        );
+
+        // Si falla el backend pero Firebase funciona, crear perfil básico
+        const basicUserData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || data.email,
+          nombre: firebaseUser.displayName?.split(" ")[0] || "",
+          apellido:
+            firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+          role: { admin: false, student: true },
+          loginTime: new Date().toISOString(),
+          fechaRegistro: new Date().toISOString(),
         };
 
-        localStorage.setItem("studentData", JSON.stringify(studentData));
-      }
+        this.saveStudentDataToStorage(basicUserData);
 
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.data) {
-        throw error.response.data;
+        return {
+          success: true,
+          user: basicUserData,
+          firebaseUser: firebaseUser,
+        };
       }
-      throw new Error("Error de conexión. Verifica tu conexión a internet.");
+    } catch (error: any) {
+      console.error("Error en login:", error);
+      throw {
+        error:
+          this.getFirebaseErrorMessage(error.code) ||
+          "Error en el inicio de sesión",
+        code: error.code,
+      };
     }
   }
 
+  // REGISTER - Usando Firebase SDK
+  async register(data: RegisterData) {
+    try {
+      console.log("Registrando usuario:", data.email);
 
+      // 1. Crear usuario en Firebase
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password
+      );
+      const firebaseUser = userCredential.user;
+
+      // 2. Registrar en el backend
+      const token = await firebaseUser.getIdToken();
+
+      const response = await api.post(
+        "/api/auth/register",
+        {
+          email: data.email,
+          password: data.password,
+          nombre: data.nombre,
+          apellido: data.apellido,
+          dni: data.dni,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const userData = response.data.user;
+
+      // 3. Guardar datos
+      this.saveStudentDataToStorage({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || data.email,
+        nombre: userData.nombre,
+        apellido: userData.apellido,
+        dni: userData.dni,
+        role: userData.role,
+        loginTime: new Date().toISOString(),
+        fechaRegistro: new Date().toISOString(),
+      });
+
+      return {
+        success: true,
+        user: userData,
+        firebaseUser: firebaseUser,
+      };
+    } catch (error: any) {
+      console.error("Error en registro:", error);
+      throw {
+        error:
+          this.getFirebaseErrorMessage(error.code) || "Error en el registro",
+        code: error.code,
+      };
+    }
+  }
+
+  // GOOGLE LOGIN
   async googleLogin() {
     try {
-      const googleProvider = new GoogleAuthProvider();
-      const auth = getAuth();
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
 
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      const userExists = await this.userExists(user.uid);
-      if (!userExists) {
-        await this.logout();
-        throw new Error("El usuario no está registrado");
-      }
-
-      const idToken = await user.getIdToken();
-      return { idToken, user };
-    } catch (error: any) {
-      throw new Error(error.message);
-    }
-  }
-
-  async googleRegister(firstName: string, lastName: string, dni: string, acceptTerms: boolean): Promise<void> {
-    const googleProvider = new GoogleAuthProvider();
-    const auth = getAuth();
-
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    const idToken = await user.getIdToken();
-
-    const userExists = await this.userExists(user.uid);
-    if (userExists) {
-      await this.logout();
-      throw new Error("El usuario ya está registrado");
-    }
-
-    try {
-      const response = await api.post("/auth/google-register", {
-        idToken,
-        email: user.email,
-        nombre: firstName,
-        apellido: lastName,
-        dni: dni,
-        aceptaTerminos: acceptTerms,
-      });
-
-      const studentData = {
-        uid: user.uid,
-        email: user.email,
-        nombre: firstName,
-        apellido: lastName,
-        role: "student",
-        registrationTime: new Date().toISOString(),
+      // Crear perfil básico para Google login
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || "",
+        nombre: firebaseUser.displayName?.split(" ")[0] || "",
+        apellido: firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+        role: { admin: false, student: true },
+        loginTime: new Date().toISOString(),
+        fechaRegistro: new Date().toISOString(),
       };
 
-      localStorage.setItem("studentData", JSON.stringify(studentData));
+      this.saveStudentDataToStorage(userData);
 
-      return response.data;
+      return {
+        success: true,
+        user: userData,
+        firebaseUser: firebaseUser,
+      };
     } catch (error: any) {
-      console.error("Error en googleLogin: ", error.response?.data?.error);
-      throw new Error(error.response?.data?.error || error.message);
+      console.error("Error en Google login:", error);
+      throw {
+        error:
+          this.getFirebaseErrorMessage(error.code) ||
+          "Error en el login con Google",
+        code: error.code,
+      };
     }
   }
 
-  // Iniciar sesión
-  async login(credentials: LoginData): Promise<AuthResponse> {
-    try {
-      const response = await api.post("/auth/login", credentials);
-
-      if (response.data.customToken) {
-        await signInWithCustomToken(auth, response.data.customToken);
-      }
-
-      if (response.data.user) {
-        const studentData = {
-          uid: response.data.user.uid,
-          email: response.data.user.email,
-          nombre: response.data.user.nombre,
-          apellido: response.data.user.apellido,
-          role: response.data.user.role,
-          loginTime: new Date().toISOString(),
-        };
-
-        localStorage.setItem("studentData", JSON.stringify(studentData));
-      }
-
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.data) {
-        throw error.response.data;
-      }
-      throw new Error("Error de conexión. Verifica tu conexión a internet.");
-    }
+  // GOOGLE REGISTER
+  async googleRegister(
+    firstName: string,
+    lastName: string,
+    dni: string,
+    acceptTerms: boolean
+  ) {
+    return this.googleLogin(); // Por ahora es igual que el login
   }
 
-  async getUserById(uid: string): Promise<UserProfile> {
-    try {
-      const response = await api.get(`/auth/user/${uid}`);
-      console.log(response.data)
-      return response.data;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || "Error al obtener el usuario");
-    }
-  }
-
-  async userExists(uid: string): Promise<boolean> {
-    try {
-      await api.get(`/auth/user/${uid}`);
-      return true;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        return false;
-      }
-      // Si es otro tipo de error (500, 401, etc.), lo lanzamos
-      throw new Error(error.response?.data?.error || "Error al verificar el usuario");
-    }
-  }
-
-  async forgotPassword(email: string): Promise<void> {
-    try {
-      // Validar si el usuario existe en la db
-      await api.get(`/auth/check-email/${email}`);
-
-      const result = await sendPasswordResetEmail(auth, email, {
-        url: `${FRONTEND_URL}/recuperar-contrasena`,
-      });
-      console.log("result", result);
-      
-    } catch (error: any) {
-      const customError = new Error(error.response?.data?.error || "Error al enviar email de recuperación");
-      (customError as any).exists = error.response?.data?.exists || false;
-      
-      throw customError;
-    }
-  }
-
-  async changePassword(oobCode: string, password: string): Promise<void> {
-    try {
-      await confirmPasswordReset(auth, oobCode, password);
-    } catch (error: any) {
-      throw new Error(error.message || "Error al cambiar contraseña");
-    }
-  }
-
-  // Obtener perfil del usuario
-  async getProfile(): Promise<UserProfile> {
-    try {
-      const response = await api.get("/auth/me");
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.status === 401) {
-        await this.logout();
-        throw new Error(
-          "Sesión expirada. Por favor, inicia sesión nuevamente."
-        );
-      }
-      throw new Error(
-        error.response?.data?.error || "Error al obtener el perfil"
-      );
-    }
-  }
-
-  // Cerrar sesión
-  async logout(): Promise<void> {
+  // LOGOUT
+  async logout() {
     try {
       await signOut(auth);
+      this.clearStudentDataFromStorage();
+      return { success: true };
+    } catch (error: any) {
+      console.error("Error en logout:", error);
+      throw {
+        error: "Error al cerrar sesión",
+        code: error.code,
+      };
+    }
+  }
+
+  // FORGOT PASSWORD
+  async forgotPassword(email: string) {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (error: any) {
+      throw {
+        error:
+          this.getFirebaseErrorMessage(error.code) ||
+          "Error al enviar email de recuperación",
+        code: error.code,
+      };
+    }
+  }
+
+  // CHANGE PASSWORD
+  async changePassword(oobCode: string, newPassword: string) {
+    try {
+      await confirmPasswordReset(auth, oobCode, newPassword);
+      return { success: true };
+    } catch (error: any) {
+      throw {
+        error:
+          this.getFirebaseErrorMessage(error.code) ||
+          "Error al cambiar contraseña",
+        code: error.code,
+      };
+    }
+  }
+
+  // UTILS
+  saveStudentDataToStorage(data: any) {
+    try {
+      localStorage.setItem("studentData", JSON.stringify(data));
+      console.log("Datos guardados en localStorage:", data);
+    } catch (error) {
+      console.error("Error saving to localStorage:", error);
+    }
+  }
+
+  getStudentDataFromStorage() {
+    try {
+      const data = localStorage.getItem("studentData");
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error("Error reading from localStorage:", error);
+      return null;
+    }
+  }
+
+  updateStudentDataInStorage(updates: any) {
+    try {
+      const currentData = this.getStudentDataFromStorage() || {};
+      const updatedData = { ...currentData, ...updates };
+      this.saveStudentDataToStorage(updatedData);
+    } catch (error) {
+      console.error("Error updating localStorage:", error);
+    }
+  }
+
+  clearStudentDataFromStorage() {
+    try {
       localStorage.removeItem("studentData");
+      console.log("localStorage cleared");
     } catch (error) {
-      console.error("Error during logout:", error);
+      console.error("Error clearing localStorage:", error);
     }
   }
 
-  isAuthenticated(): boolean {
-    return !!auth.currentUser;
-  }
+  private getFirebaseErrorMessage(errorCode: string): string {
+    const errors: { [key: string]: string } = {
+      "auth/user-not-found": "Usuario no encontrado",
+      "auth/wrong-password": "Contraseña incorrecta",
+      "auth/email-already-in-use": "El email ya está registrado",
+      "auth/weak-password": "La contraseña es muy débil",
+      "auth/invalid-email": "Email inválido",
+      "auth/user-disabled": "Usuario deshabilitado",
+      "auth/too-many-requests": "Demasiados intentos. Intenta más tarde",
+      "auth/network-request-failed": "Error de conexión",
+      "auth/popup-closed-by-user": "Ventana cerrada por el usuario",
+      "auth/cancelled-popup-request": "Login cancelado",
+    };
 
-  getCurrentUser() {
-    return auth.currentUser;
-  }
-
-  async getToken(): Promise<string | null> {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        return await user.getIdToken();
-      }
-      return null;
-    } catch (error) {
-      console.error("Error getting token:", error);
-      return null;
-    }
-  }
-
-  getStudentDataFromStorage(): any {
-    try {
-      const studentData = localStorage.getItem("studentData");
-      return studentData ? JSON.parse(studentData) : null;
-    } catch (error) {
-      console.error("Error al obtener datos del estudiante:", error);
-      return null;
-    }
-  }
-
-  updateStudentDataInStorage(data: any): void {
-    try {
-      const existingData = this.getStudentDataFromStorage();
-      const updatedData = { ...existingData, ...data };
-      localStorage.setItem("studentData", JSON.stringify(updatedData));
-    } catch (error) {
-      console.error("Error al actualizar datos del estudiante:", error);
-    }
+    return errors[errorCode] || "Error desconocido";
   }
 }
 
-const authService = new AuthService();
-export default authService;
+export default new AuthService();
