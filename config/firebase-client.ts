@@ -12,16 +12,6 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Debug: verificar que las variables estén cargadas
-console.log("Firebase Config Check:", {
-  apiKey: firebaseConfig.apiKey
-    ? `${firebaseConfig.apiKey.substring(0, 10)}...`
-    : "MISSING",
-  authDomain: firebaseConfig.authDomain || "MISSING",
-  projectId: firebaseConfig.projectId || "MISSING",
-});
-
-// Verificar que las variables críticas estén presentes
 if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   console.error(
     "FIREBASE CONFIG ERROR: Missing critical environment variables"
