@@ -26,8 +26,8 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    {/* Mantenemos el tema oscuro de EPEFI pero cambiamos el storageKey */}
-    <ThemeProvider defaultTheme="dark" storageKey="epefi-edu-theme">
+    {/* Cambiamos a "system" para detectar automáticamente el tema del dispositivo */}
+    <ThemeProvider defaultTheme="system" storageKey="epefi-edu-theme">
       <TooltipProvider>
         <Toaster />
         <Sonner position="top-right" />
@@ -51,6 +51,7 @@ const App = () => (
                   {/* Rutas originales de EPEFI - ahora protegidas */}
                   <Route path="/" element={<Index />} />
                   <Route path="/curso" element={<Curso />} />
+                  <Route path="/curso/:courseId" element={<Curso />} />
                   <Route path="/classes" element={<Classes />} />
                   <Route
                     path="/classes/:moduleId/:classId"
