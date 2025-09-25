@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
+import { useTheme } from "@/components/ThemeProvider";
 import {
   Eye,
   EyeOff,
@@ -52,6 +53,14 @@ export default function AuthFormView({
     hasNumber: boolean;
   };
 }) {
+  const { theme } = useTheme();
+
+  // Detectar si está en modo oscuro
+  const isDarkMode =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+
   const isStep1Valid = () => {
     if (isLogin) return true;
     return (
@@ -477,9 +486,6 @@ export default function AuthFormView({
               )}
             </button>
           </div>
-          {/* {errors.password && (
-                  <p className="form-error whitespace-pre-line">{errors.password}</p>
-                )} */}
         </div>
 
         <Button
@@ -508,7 +514,15 @@ export default function AuthFormView({
           <Link to="/" className="inline-flex items-center space-x-2 mb-8">
             <div className="flex items-center space-x-2">
               <div className="h-10 rounded-lg flex items-center justify-center">
-                <img src="/logo.webp" alt="EPEFI Logo" className="h-20" />
+                <img
+                  src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
+                  alt="EPEFI Logo"
+                  className="h-20 transition-opacity duration-300"
+                  onError={(e) => {
+                    // Fallback en caso de error al cargar la imagen
+                    (e.target as HTMLImageElement).src = "/logo.webp";
+                  }}
+                />
               </div>
             </div>
           </Link>
