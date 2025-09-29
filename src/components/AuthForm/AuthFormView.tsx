@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { PasswordRequirements } from "../PasswordRequirements";
+import ThemeToggle from "../ThemeToggle";
 
 export default function AuthFormView({
   isLogin = false,
@@ -508,7 +509,10 @@ export default function AuthFormView({
   );
 
   return (
-    <div className="min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="relative min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Link to="/" className="inline-flex items-center space-x-2 mb-8">
