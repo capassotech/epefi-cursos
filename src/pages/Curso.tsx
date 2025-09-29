@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
+  CheckCircle2,
   FileText,
   Play,
   School,
@@ -12,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 const courseDetail = {
   id: "fitness-grupal",
@@ -37,6 +39,7 @@ const courseDetail = {
                 "Recorrido visual por las principales estructuras óseas.",
               type: "VIDEO" as const,
               duration: "18 min",
+              completed: true,
             },
             {
               id: "pdf-articulaciones",
@@ -44,6 +47,7 @@ const courseDetail = {
               description: "Clasificación y cuidados básicos.",
               type: "PDF" as const,
               size: "2.5 MB",
+              completed: true,
             },
             {
               id: "video-musculos",
@@ -51,6 +55,7 @@ const courseDetail = {
               description: "Principales grupos musculares y funciones.",
               type: "VIDEO" as const,
               duration: "22 min",
+              completed: false,
             },
           ],
         },
@@ -65,6 +70,7 @@ const courseDetail = {
               description: "Fases y características clave.",
               type: "VIDEO" as const,
               duration: "15 min",
+              completed: false,
             },
             {
               id: "pdf-mapas",
@@ -72,6 +78,7 @@ const courseDetail = {
               description: "Material de apoyo descargable.",
               type: "PDF" as const,
               size: "1.8 MB",
+              completed: false,
             },
           ],
         },
@@ -94,6 +101,7 @@ const courseDetail = {
               description: "Frecuencia, intensidad y volumen explicados.",
               type: "VIDEO" as const,
               duration: "20 min",
+              completed: false,
             },
             {
               id: "pdf-hojas",
@@ -101,6 +109,7 @@ const courseDetail = {
               description: "Descargá y adaptá a tus clases.",
               type: "PDF" as const,
               size: "800 KB",
+              completed: false,
             },
           ],
         },
@@ -115,6 +124,7 @@ const courseDetail = {
               description: "Checklist previo a cada clase.",
               type: "VIDEO" as const,
               duration: "12 min",
+              completed: false,
             },
             {
               id: "pdf-checklist",
@@ -122,6 +132,7 @@ const courseDetail = {
               description: "Formato imprimible para llevar a clase.",
               type: "PDF" as const,
               size: "600 KB",
+              completed: false,
             },
           ],
         },
@@ -140,6 +151,29 @@ const CourseDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedSubjectId, setSelectedSubjectId] = useState(courseDetail.subjects[0]?.id);
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const initialCompletedItems = useMemo(() => {
+    return courseDetail.subjects.flatMap((subject) =>
+      subject.modules.flatMap((module) =>
+        module.items.filter((item) => item.completed).map((item) => item.id)
+      )
+    );
+  }, []);
+  const [completedItems, setCompletedItems] = useState<string[]>(initialCompletedItems);
+
+  const totalItems = useMemo(() => {
+    return courseDetail.subjects.reduce((count, subject) => {
+      return (
+        count +
+        subject.modules.reduce(
+          (moduleCount, module) => moduleCount + module.items.length,
+          0
+        )
+      );
+    }, 0);
+  }, []);
+
+  const completedCount = completedItems.length;
+  const progressPercentage = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
 
   const selectedSubject = useMemo<Subject | undefined>(() => {
     return courseDetail.subjects.find((subject) => subject.id === selectedSubjectId);
@@ -163,6 +197,14 @@ const CourseDetailPage: React.FC = () => {
     }
 
     return item.size;
+  };
+
+  const toggleItemCompletion = (itemId: string) => {
+    setCompletedItems((current) =>
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    );
   };
 
   const renderModule = (module: Module) => {
@@ -196,47 +238,72 @@ const CourseDetailPage: React.FC = () => {
 
         {isExpanded && (
           <CardContent className="space-y-3 border-t border-slate-100 bg-white px-4 py-3">
-            {module.items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3"
-              >
-                <span
-                  className={`mt-1 flex h-9 w-9 items-center justify-center rounded-full ${
-                    item.type === "VIDEO"
-                      ? "bg-orange-100 text-orange-600"
-                      : "bg-slate-200 text-slate-600"
-                  }`}
-                  aria-hidden="true"
+            {module.items.map((item) => {
+              const isCompleted = completedItems.includes(item.id);
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3"
                 >
-                  {getItemIcon(item.type)}
-                </span>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                  <p className="text-xs text-slate-500">{item.description}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`border-0 text-[11px] font-medium uppercase tracking-wide ${
-                        item.type === "VIDEO"
-                          ? "bg-orange-500/10 text-orange-600"
-                          : "bg-slate-500/10 text-slate-600"
+                  <span
+                    className={`mt-1 flex h-9 w-9 items-center justify-center rounded-full ${
+                      item.type === "VIDEO"
+                        ? "bg-orange-100 text-orange-600"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {getItemIcon(item.type)}
+                  </span>
+                  <div className="flex-1 space-y-1">
+                    <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                    <p className="text-xs text-slate-500">{item.description}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`border-0 text-[11px] font-medium uppercase tracking-wide ${
+                          item.type === "VIDEO"
+                            ? "bg-orange-500/10 text-orange-600"
+                            : "bg-slate-500/10 text-slate-600"
+                        }`}
+                      >
+                        {item.type}
+                      </Badge>
+                      <span className="text-xs text-slate-400">{getItemBadge(item)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-pressed={isCompleted}
+                      onClick={() => toggleItemCompletion(item.id)}
+                      className={`h-8 w-8 rounded-full border ${
+                        isCompleted
+                          ? "border-green-200 bg-green-50 text-green-600"
+                          : "border-slate-200 text-slate-400 hover:border-green-200 hover:text-green-500"
                       }`}
                     >
-                      {item.type}
-                    </Badge>
-                    <span className="text-xs text-slate-400">{getItemBadge(item)}</span>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="sr-only">
+                        {isCompleted
+                          ? "Marcar contenido como pendiente"
+                          : "Marcar contenido como completado"}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-2 text-xs text-orange-600"
+                    >
+                      {item.type === "VIDEO" ? "Ver" : "Descargar"}
+                    </Button>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto px-2 text-xs text-orange-600"
-                >
-                  {item.type === "VIDEO" ? "Ver" : "Descargar"}
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         )}
       </Card>
@@ -263,6 +330,23 @@ const CourseDetailPage: React.FC = () => {
       </header>
 
       <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-slate-400">
+                Progreso general
+              </p>
+              <p className="text-sm font-semibold text-slate-900">
+                {completedCount} de {totalItems} contenidos completados
+              </p>
+            </div>
+            <span className="text-sm font-semibold text-orange-600">
+              {progressPercentage}%
+            </span>
+          </div>
+          <Progress value={progressPercentage} className="mt-3 h-2" />
+        </section>
+
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Acerca del curso</h2>
           <p className="text-sm leading-relaxed text-slate-600">{courseDetail.summary}</p>
