@@ -275,7 +275,7 @@ const CourseDetailPage: React.FC = () => {
               Materias del programa
             </h2>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {courseDetail.subjects.map((subject) => {
               const isActive = subject.id === selectedSubjectId;
 
@@ -287,13 +287,27 @@ const CourseDetailPage: React.FC = () => {
                     setSelectedSubjectId(subject.id);
                     setExpandedModuleId(null);
                   }}
-                  className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm transition-colors ${
+                  aria-pressed={isActive}
+                  className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 ${
                     isActive
-                      ? "border-orange-500 bg-orange-500 text-white"
-                      : "border-slate-200 bg-white text-slate-600"
+                      ? "border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-200"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-orange-200 hover:bg-orange-50/60"
                   }`}
                 >
-                  {subject.name}
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-semibold leading-snug">{subject.name}</span>
+                    <Badge
+                      variant="outline"
+                      className={`border-0 text-[11px] font-medium uppercase tracking-wide ${
+                        isActive ? "bg-orange-500/10 text-orange-600" : "bg-slate-500/10 text-slate-600"
+                      }`}
+                    >
+                      {subject.modules.length} módulos
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    {subject.description}
+                  </p>
                 </button>
               );
             })}
