@@ -58,7 +58,7 @@ const Header = () => {
             className="flex items-center space-x-3 cursor-pointer"
             onClick={() => navigate("/")}
           >
-            <div className="rounded-lg bg-black flex items-center justify-center">
+            <div className="rounded-lg flex items-center justify-center">
               <img
                 src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
                 alt="Logo"
