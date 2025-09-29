@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -15,11 +14,15 @@ import {
   Clock,
   HelpCircle,
   FileImage,
-  BookOpen,
   GraduationCap,
-  Video,
-  Home,
 } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 const ModuleView = () => {
   const navigate = useNavigate();
@@ -33,72 +36,140 @@ const ModuleView = () => {
     image:
       "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=300&fit=crop",
     level: "Intermedio",
-    modules: [
+    subjects: [
       {
-        id: "modulo-1",
-        title: "Anatomía y Fisiología",
-        description: "Fundamentos del cuerpo humano y su funcionamiento",
-        contents: [
+        id: "subject-1",
+        name: "Anatomía aplicada",
+        description:
+          "Bases anatómicas imprescindibles para entender el movimiento humano y evitar lesiones.",
+        modules: [
           {
-            id: "content-1",
-            title: "Anatomía del esqueleto humano",
-            description:
-              "Introducción clara al esqueleto humano, clasificación y funciones de los huesos",
-            type: "VIDEO",
-            url: "https://example.com/video1",
-            thumbnail:
-              "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=300&h=200&fit=crop",
-            duration: "70 min",
-            order: 1,
-            completed: true,
+            id: "modulo-1",
+            title: "Estructura ósea y articular",
+            summary: "Comprendé cómo se organiza el cuerpo para el movimiento.",
+            contents: [
+              {
+                id: "content-1",
+                title: "Anatomía del esqueleto humano",
+                description:
+                  "Introducción clara al esqueleto humano, clasificación y funciones de los huesos",
+                type: "VIDEO",
+                url: "https://example.com/video1",
+                thumbnail:
+                  "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=300&h=200&fit=crop",
+                duration: "70 min",
+                order: 1,
+                completed: true,
+              },
+              {
+                id: "content-2",
+                title: "Aparato locomotor",
+                description: "Material teórico complementario",
+                type: "PDF",
+                url: "https://example.com/pdf1",
+                order: 2,
+                completed: true,
+              },
+              {
+                id: "content-3",
+                title: "Articulaciones",
+                description:
+                  "Tipos de articulaciones y su función en el movimiento",
+                type: "VIDEO",
+                url: "https://example.com/video2",
+                thumbnail:
+                  "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=300&h=200&fit=crop",
+                duration: "60 min",
+                order: 3,
+                completed: false,
+              },
+            ],
           },
           {
-            id: "content-2",
-            title: "Aparato locomotor",
-            description: "Material teórico complementario",
-            type: "PDF",
-            url: "https://example.com/pdf1",
-            order: 2,
-            completed: true,
-          },
-          {
-            id: "content-3",
-            title: "Articulaciones",
-            description:
-              "Tipos de articulaciones y su función en el movimiento",
-            type: "VIDEO",
-            url: "https://example.com/video2",
-            thumbnail:
-              "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=300&h=200&fit=crop",
-            duration: "60 min",
-            order: 3,
-            completed: false,
+            id: "modulo-1b",
+            title: "Fisiología del ejercicio",
+            summary: "Procesos fisiológicos clave para planificar clases seguras.",
+            contents: [
+              {
+                id: "content-6",
+                title: "Sistemas energéticos",
+                description: "Cómo responde el cuerpo durante el ejercicio grupal.",
+                type: "VIDEO",
+                url: "https://example.com/video4",
+                duration: "45 min",
+                order: 1,
+                completed: false,
+              },
+              {
+                id: "content-7",
+                title: "Guía rápida de fisiología",
+                description: "Resumen descargable para repasar antes de las clases.",
+                type: "PDF",
+                url: "https://example.com/pdf2",
+                order: 2,
+                completed: false,
+              },
+            ],
           },
         ],
       },
       {
-        id: "modulo-2",
-        title: "Metodología del Entrenamiento",
-        description: "Fundamentos científicos del entrenamiento deportivo",
-        contents: [
+        id: "subject-2",
+        name: "Metodología y evaluación",
+        description:
+          "Herramientas prácticas para planificar, ejecutar y medir sesiones efectivas.",
+        modules: [
           {
-            id: "content-4",
-            title: "Principios del Entrenamiento",
-            description: "Fundamentos científicos del entrenamiento deportivo",
-            type: "VIDEO",
-            url: "https://example.com/video3",
-            duration: "50 min",
-            order: 1,
-            completed: false,
+            id: "modulo-2",
+            title: "Metodología del Entrenamiento",
+            summary: "Diseñá rutinas dinámicas y progresivas.",
+            contents: [
+              {
+                id: "content-4",
+                title: "Principios del Entrenamiento",
+                description: "Fundamentos científicos del entrenamiento deportivo",
+                type: "VIDEO",
+                url: "https://example.com/video3",
+                duration: "50 min",
+                order: 1,
+                completed: false,
+              },
+              {
+                id: "content-5",
+                title: "Evaluación Diagnóstica",
+                description: "Test de conocimientos iniciales",
+                type: "EVALUATION",
+                url: "https://example.com/test1",
+                order: 2,
+                completed: false,
+              },
+            ],
           },
           {
-            id: "content-5",
-            title: "Evaluación Diagnóstica",
-            description: "Test de conocimientos iniciales",
-            type: "EVALUATION",
-            url: "https://example.com/test1",
-            order: 2,
-            completed: false,
+            id: "modulo-3",
+            title: "Planificación de clases",
+            summary: "Organizá módulos listos para llevar al salón.",
+            contents: [
+              {
+                id: "content-8",
+                title: "Plantilla de clase",
+                description: "Descargá un formato editable para planificar tus sesiones.",
+                type: "PDF",
+                url: "https://example.com/pdf3",
+                order: 1,
+                completed: false,
+              },
+              {
+                id: "content-9",
+                title: "Clase modelo guiada",
+                description: "Video completo con indicaciones para replicar con tu grupo.",
+                type: "VIDEO",
+                url: "https://example.com/video5",
+                duration: "35 min",
+                order: 2,
+                completed: false,
+              },
+            ],
           },
         ],
       },
@@ -106,16 +177,20 @@ const ModuleView = () => {
   };
 
   // Estados
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeSubject, setActiveSubject] = useState(
+    courseData.subjects[0]?.id ?? ""
+  );
 
   // Calcular progreso total
   const getInitialCompletedContents = () => {
     const completed = [];
-    courseData.modules.forEach((module) => {
-      module.contents.forEach((content) => {
-        if (content.completed) {
-          completed.push(content.id);
-        }
+    courseData.subjects.forEach((subject) => {
+      subject.modules.forEach((module) => {
+        module.contents.forEach((content) => {
+          if (content.completed) {
+            completed.push(content.id);
+          }
+        });
       });
     });
     return completed;
@@ -125,10 +200,9 @@ const ModuleView = () => {
     getInitialCompletedContents()
   );
 
-  const totalContents = courseData.modules.reduce(
-    (acc, module) => acc + module.contents.length,
-    0
-  );
+  const totalContents = courseData.subjects
+    .flatMap((subject) => subject.modules)
+    .reduce((acc, module) => acc + module.contents.length, 0);
   const completedCount = completedContents.length;
   const progressPercentage =
     totalContents > 0 ? Math.round((completedCount / totalContents) * 100) : 0;
@@ -169,14 +243,30 @@ const ModuleView = () => {
     return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
   };
 
-  const getAllContents = () => {
-    return courseData.modules.flatMap((module) =>
-      module.contents.map((content) => ({
-        ...content,
-        moduleName: module.title,
-      }))
-    );
-  };
+  const subjectsProgress = useMemo(() => {
+    return courseData.subjects.map((subject) => {
+      const subjectContents = subject.modules.flatMap((module) => module.contents);
+      const completed = subjectContents.filter((content) =>
+        completedContents.includes(content.id)
+      ).length;
+      return {
+        subjectId: subject.id,
+        completed,
+        total: subjectContents.length,
+        percentage:
+          subjectContents.length > 0
+            ? Math.round((completed / subjectContents.length) * 100)
+            : 0,
+      };
+    });
+  }, [completedContents]);
+
+  const getSubjectProgress = (subjectId) =>
+    subjectsProgress.find((subject) => subject.subjectId === subjectId) ?? {
+      completed: 0,
+      total: 0,
+      percentage: 0,
+    };
 
   const renderContentItem = (content, showModule = false) => (
     <Card
@@ -273,6 +363,10 @@ const ModuleView = () => {
     </Card>
   );
 
+  const activeSubjectData = courseData.subjects.find(
+    (subject) => subject.id === activeSubject
+  );
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6 pb-24">
       {/* Header minimalista */}
@@ -324,203 +418,142 @@ const ModuleView = () => {
         </CardContent>
       </Card>
 
-      {/* Desktop Tabs - más minimalistas */}
-      <div className="hidden sm:block">
-        <div className="flex border-b border-gray-100 dark:border-gray-800">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "overview"
-                ? "border-orange-500 text-orange-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Home className="w-4 h-4" />
-            Inicio
-          </button>
-          <button
-            onClick={() => setActiveTab("all-content")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "all-content"
-                ? "border-orange-500 text-orange-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            Contenido
-          </button>
-          {courseData.modules.map((module) => (
-            <button
-              key={module.id}
-              onClick={() => setActiveTab(module.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === module.id
-                  ? "border-orange-500 text-orange-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span className="truncate max-w-32">{module.title}</span>
-            </button>
-          ))}
-        </div>
+      {/* Navegación por materias */}
+      <div className="sticky top-0 z-40 -mx-4 px-4 pb-2 bg-white dark:bg-gray-950 sm:static sm:-mx-0">
+        <ScrollArea className="w-full" type="scroll">
+          <div className="flex gap-2 py-2">
+            {courseData.subjects.map((subject) => {
+              const subjectProgress = getSubjectProgress(subject.id);
+              return (
+                <button
+                  key={subject.id}
+                  onClick={() => setActiveSubject(subject.id)}
+                  className={`flex min-w-[180px] flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 sm:min-w-[220px] ${
+                    activeSubject === subject.id
+                      ? "border-orange-400 bg-orange-50/70 text-orange-600 dark:border-orange-500/70 dark:bg-orange-500/10 dark:text-orange-200"
+                      : "border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                  }`}
+                  aria-pressed={activeSubject === subject.id}
+                >
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <GraduationCap className="h-4 w-4" />
+                      <span className="truncate">{subject.name}</span>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        activeSubject === subject.id
+                          ? "border-orange-400 text-orange-500 dark:border-orange-500/70 dark:text-orange-200"
+                          : "border-gray-200 text-gray-500 dark:border-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {subjectProgress.percentage}%
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-2 dark:text-gray-400">
+                    {subject.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+          <ScrollBar orientation="horizontal" className="hidden sm:flex" />
+        </ScrollArea>
       </div>
 
-      {/* Tab Content */}
-      <div className="space-y-4">
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {courseData.modules.map((module) => {
-              const moduleCompleted = module.contents.filter((c) =>
-                completedContents.includes(c.id)
+      {/* Contenido por materia */}
+      {activeSubjectData && (
+        <div className="space-y-4">
+          <Card className="border-gray-100 dark:border-gray-800">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {activeSubjectData.name}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {activeSubjectData.description}
+                  </p>
+                </div>
+                {(() => {
+                  const progress = getSubjectProgress(activeSubjectData.id);
+                  return (
+                    <div className="flex items-center gap-3 rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-600 dark:bg-orange-500/10 dark:text-orange-200">
+                      <Trophy className="h-4 w-4" />
+                      {progress.completed}/{progress.total} completados
+                    </div>
+                  );
+                })()}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Accordion
+            key={activeSubjectData.id}
+            type="multiple"
+            defaultValue={activeSubjectData.modules.length ? [activeSubjectData.modules[0].id] : []}
+            className="space-y-3"
+          >
+            {activeSubjectData.modules.map((module) => {
+              const moduleCompleted = module.contents.filter((content) =>
+                completedContents.includes(content.id)
               ).length;
               const moduleProgress = Math.round(
                 (moduleCompleted / module.contents.length) * 100
               );
 
               return (
-                <Card
+                <AccordionItem
+                  value={module.id}
                   key={module.id}
-                  className="cursor-pointer hover:shadow-sm transition-all duration-200 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
-                  onClick={() => setActiveTab(module.id)}
+                  className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all dark:border-gray-800 dark:bg-gray-900"
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate pr-2">
-                        {module.title}
-                      </h3>
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-                      >
-                        {moduleCompleted}/{module.contents.length}
-                      </Badge>
-                    </div>
-                    <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
-                      <div
-                        className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300"
-                        style={{ width: `${moduleProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-                      <span>
-                        {
-                          module.contents.filter((c) => c.type === "VIDEO")
-                            .length
-                        }{" "}
-                        videos
-                      </span>
-                      <span>
-                        {module.contents.filter((c) => c.type === "PDF").length}{" "}
-                        PDFs
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* All Content Tab */}
-        {activeTab === "all-content" && (
-          <div className="space-y-3">
-            {getAllContents().map((content) =>
-              renderContentItem(content, true)
-            )}
-          </div>
-        )}
-
-        {/* Individual Module Tabs */}
-        {courseData.modules.map(
-          (module) =>
-            activeTab === module.id && (
-              <div key={module.id} className="space-y-3">
-                <Card className="border-gray-100 dark:border-gray-800">
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      {module.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                      {module.description}
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-gray-500">
-                        {
-                          module.contents.filter((c) =>
-                            completedContents.includes(c.id)
-                          ).length
-                        }{" "}
-                        / {module.contents.length} completados
-                      </span>
-                      <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
-                        <div
-                          className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${Math.round(
-                              (module.contents.filter((c) =>
-                                completedContents.includes(c.id)
-                              ).length /
-                                module.contents.length) *
-                                100
-                            )}%`,
-                          }}
-                        ></div>
+                  <AccordionTrigger className="px-4 py-3 text-left text-base font-semibold text-gray-900 transition-all hover:bg-orange-50/60 hover:no-underline data-[state=open]:bg-orange-50/80 dark:text-gray-100 dark:hover:bg-orange-500/10">
+                    <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm uppercase tracking-wide text-orange-500 dark:text-orange-200">
+                          Módulo
+                        </p>
+                        <h3 className="text-lg font-semibold">{module.title}</h3>
+                        {module.summary && (
+                          <p className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                            {module.summary}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                        <Badge
+                          variant="outline"
+                          className="border-gray-200 text-xs uppercase tracking-wide dark:border-gray-700"
+                        >
+                          {moduleCompleted}/{module.contents.length} completados
+                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500"
+                              style={{ width: `${moduleProgress}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            {moduleProgress}%
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-3">
-                  {module.contents
-                    .sort((a, b) => a.order - b.order)
-                    .map((content) => renderContentItem(content))}
-                </div>
-              </div>
-            )
-        )}
-      </div>
-
-      {/* Mobile Fixed Bottom Tabs - minimalistas */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 sm:hidden z-50">
-        <div className="flex items-center justify-around py-2">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "overview" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <Home className="w-5 h-5 mb-1" />
-            <span className="text-xs">Inicio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("all-content")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "all-content" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <BookOpen className="w-5 h-5 mb-1" />
-            <span className="text-xs">Todo</span>
-          </button>
-
-          {courseData.modules.map((module, index) => (
-            <button
-              key={module.id}
-              onClick={() => setActiveTab(module.id)}
-              className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-                activeTab === module.id ? "text-orange-500" : "text-gray-500"
-              }`}
-            >
-              <FileText className="w-5 h-5 mb-1" />
-              <span className="text-xs truncate max-w-12">
-                Tema {index + 1}
-              </span>
-            </button>
-          ))}
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-3 bg-gray-50 px-4 pb-4 pt-2 dark:bg-gray-950/60">
+                    {module.contents
+                      .sort((a, b) => a.order - b.order)
+                      .map((content) => renderContentItem(content))}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         </div>
-      </div>
+      )}
     </div>
   );
 };
