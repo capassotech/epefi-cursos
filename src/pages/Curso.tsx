@@ -1,10 +1,15 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   ArrowLeft,
   Trophy,
@@ -24,14 +29,13 @@ import {
 const ModuleView = () => {
   const navigate = useNavigate();
 
-  // Estructura de datos como en tu implementación real
   const courseData = {
     id: "fitness-grupal",
     title: "Instructorado de fitness grupal",
     description:
       "Formación completa en fitness grupal con metodología actualizada y base científica aplicada.",
     image:
-      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600&h=300&fit=crop",
+      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop",
     level: "Intermedio",
     modules: [
       {
@@ -105,12 +109,18 @@ const ModuleView = () => {
     ],
   };
 
-  // Estados
-  const [activeTab, setActiveTab] = useState("overview");
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
 
-  // Calcular progreso total
+  const [activeSection, setActiveSection] = useState("overview");
+
   const getInitialCompletedContents = () => {
-    const completed = [];
+    const completed: string[] = [];
     courseData.modules.forEach((module) => {
       module.contents.forEach((content) => {
         if (content.completed) {
@@ -129,12 +139,13 @@ const ModuleView = () => {
     (acc, module) => acc + module.contents.length,
     0
   );
+
   const completedCount = completedContents.length;
+
   const progressPercentage =
     totalContents > 0 ? Math.round((completedCount / totalContents) * 100) : 0;
 
-  // Helper functions
-  const toggleContentComplete = (contentId) => {
+  const toggleContentComplete = (contentId: string) => {
     setCompletedContents((prev) =>
       prev.includes(contentId)
         ? prev.filter((id) => id !== contentId)
@@ -150,24 +161,26 @@ const ModuleView = () => {
     }
   };
 
-  const getIcon = (type) => {
-    switch (type) {
-      case "VIDEO":
-        return <Play className="w-4 h-4" />;
-      case "PDF":
-        return <FileText className="w-4 h-4" />;
-      case "EVALUATION":
-        return <HelpCircle className="w-4 h-4" />;
-      case "IMAGE":
-        return <FileImage className="w-4 h-4" />;
-      default:
-        return <FileText className="w-4 h-4" />;
-    }
-  };
+  const sections = [
+    { id: "overview", label: "Resumen", icon: Home },
+    { id: "modules", label: "Temas", icon: FileText },
+    { id: "all", label: "Todo", icon: BookOpen },
+  ];
 
-  const getTypeColor = (type) => {
-    return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
-  };
+  const typeLabels = {
+    VIDEO: "Video",
+    PDF: "Material",
+    EVALUATION: "Evaluación",
+    IMAGE: "Imagen",
+  } as Record<string, string>;
+
+  const typeStyles = {
+    VIDEO: "bg-orange-500/10 text-orange-500",
+    PDF: "bg-blue-500/10 text-blue-500",
+    EVALUATION: "bg-violet-500/10 text-violet-500",
+    IMAGE: "bg-emerald-500/10 text-emerald-500",
+    DEFAULT: "bg-slate-500/10 text-slate-500",
+  } as Record<string, string>;
 
   const getAllContents = () => {
     return courseData.modules.flatMap((module) =>
@@ -178,199 +191,409 @@ const ModuleView = () => {
     );
   };
 
-  const renderContentItem = (content, showModule = false) => (
-    <Card
-      key={content.id}
-      className="hover:shadow-sm transition-all duration-200 border-gray-100 dark:border-gray-800 cursor-pointer"
-      onClick={() => handleContentClick(content)}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleContentComplete(content.id);
-            }}
-            className={`w-5 h-5 rounded-full flex items-center justify-center border-2 transition-colors flex-shrink-0 ${
-              completedContents.includes(content.id)
-                ? "bg-orange-500 border-orange-500 text-white"
-                : "border-gray-300 hover:border-orange-400"
-            }`}
-          >
-            {completedContents.includes(content.id) && (
-              <CheckCircle2 className="w-3 h-3" />
-            )}
-          </button>
+  const totals = useMemo(() => {
+    let videos = 0;
+    let pdfs = 0;
+    let evaluations = 0;
 
-          {content.thumbnail && content.type === "VIDEO" ? (
-            <div className="relative flex-shrink-0">
-              <img
-                src={content.thumbnail}
-                alt={content.title}
-                className="w-14 h-10 object-cover rounded-md"
-              />
-              <div className="absolute inset-0 bg-black/30 rounded-md flex items-center justify-center">
-                <Play className="w-3 h-3 text-white" />
+    courseData.modules.forEach((module) => {
+      module.contents.forEach((content) => {
+        if (content.type === "VIDEO") videos += 1;
+        if (content.type === "PDF") pdfs += 1;
+        if (content.type === "EVALUATION") evaluations += 1;
+      });
+    });
+
+    return { videos, pdfs, evaluations };
+  }, [courseData.modules]);
+
+  const nextContent = useMemo(() => {
+    for (const module of courseData.modules) {
+      const pending = module.contents
+        .sort((a, b) => a.order - b.order)
+        .find((content) => !completedContents.includes(content.id));
+
+      if (pending) {
+        return {
+          ...pending,
+          moduleName: module.title,
+        };
+      }
+    }
+    return null;
+  }, [completedContents, courseData.modules]);
+
+  const renderContentItem = (content, showModule = false, highlight = false) => {
+    const isCompleted = completedContents.includes(content.id);
+    const IconContainer = () => {
+      if (content.thumbnail && content.type === "VIDEO") {
+        return (
+          <div className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-900 sm:h-24 sm:w-32">
+            <img
+              src={content.thumbnail}
+              alt={content.title}
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Play className="h-4 w-4 text-white" />
+            </div>
+          </div>
+        );
+      }
+
+      const style = typeStyles[content.type] || typeStyles.DEFAULT;
+
+      return (
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl ${style} sm:h-14 sm:w-14`}
+        >
+          {content.type === "VIDEO" && <Play className="h-5 w-5" />}
+          {content.type === "PDF" && <FileText className="h-5 w-5" />}
+          {content.type === "EVALUATION" && <HelpCircle className="h-5 w-5" />}
+          {content.type === "IMAGE" && <FileImage className="h-5 w-5" />}
+          {!["VIDEO", "PDF", "EVALUATION", "IMAGE"].includes(content.type) && (
+            <FileText className="h-5 w-5" />
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <Card
+        key={content.id}
+        className={`cursor-pointer border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+          highlight
+            ? "border-orange-300/70 bg-orange-50/70 dark:border-orange-500/30 dark:bg-orange-500/10"
+            : "border-gray-200 dark:border-gray-800"
+        }`}
+        onClick={() => handleContentClick(content)}
+      >
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex items-center gap-3 sm:flex-col sm:items-start">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleContentComplete(content.id);
+              }}
+              aria-pressed={isCompleted}
+              className={`relative flex h-10 w-10 items-center justify-center rounded-full border text-sm font-semibold transition-all sm:order-2 ${
+                isCompleted
+                  ? "border-orange-500 bg-orange-500 text-white shadow"
+                  : "border-gray-300 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-900"
+              }`}
+            >
+              {isCompleted ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-gray-400" />
+              )}
+              <span className="sr-only">
+                {isCompleted ? "Marcar como pendiente" : "Marcar como completado"}
+              </span>
+            </button>
+
+            <IconContainer />
+          </div>
+
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {content.title}
+                  </h4>
+                  <Badge
+                    variant="secondary"
+                    className="bg-gray-100 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                  >
+                    {typeLabels[content.type] || content.type}
+                  </Badge>
+                  {showModule && content.moduleName && (
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                      {content.moduleName}
+                    </span>
+                  )}
+                </div>
+                {content.description && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {content.description}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleContentClick(content);
+                  }}
+                  className="bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+                >
+                  {content.type === "VIDEO" ? (
+                    <>
+                      <Play className="h-4 w-4" />
+                      Ver video
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Abrir recurso
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
-          ) : (
-            <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getTypeColor(
-                content.type
-              )}`}
-            >
-              {getIcon(content.type)}
-            </div>
-          )}
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                {content.title}
-              </h4>
-              <Badge
-                variant="outline"
-                className="text-xs border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-              >
-                {content.type}
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1 mb-2">
-              {content.description}
-            </p>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
-              {showModule && (
-                <span className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded text-xs">
-                  {content.moduleName}
-                </span>
-              )}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
               {content.duration && (
                 <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
+                  <Clock className="h-4 w-4" />
                   <span>{content.duration}</span>
+                </div>
+              )}
+              {showModule && content.moduleName && (
+                <div className="flex items-center gap-1">
+                  <BookOpen className="h-4 w-4" />
+                  <span>{content.moduleName}</span>
                 </div>
               )}
             </div>
           </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleContentClick(content);
-            }}
-            className="text-gray-600 hover:text-orange-600"
-          >
-            {content.type === "VIDEO" ? (
-              <Play className="w-4 h-4" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="container mx-auto px-4 py-6 space-y-6 pb-24">
-      {/* Header minimalista */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/")}
-          className="hover:bg-gray-100 dark:hover:bg-gray-800"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
-            {courseData.title}
-          </h1>
-          {/* Descripción solo visible en desktop */}
-          <p className="text-gray-500 dark:text-gray-400 mt-1 hidden sm:block line-clamp-1">
-            {courseData.description}
-          </p>
-        </div>
-      </div>
-
-      {/* Progress Card simplificada */}
-      <Card className="border-gray-100 dark:border-gray-800">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                Progreso del Curso
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {completedCount} de {totalContents} elementos
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-500">
-                {progressPercentage}%
-              </div>
-              <Trophy className="w-6 h-6 mx-auto mt-1 text-orange-500" />
-            </div>
-          </div>
-          <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
-            <div
-              className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
         </CardContent>
       </Card>
+    );
+  };
 
-      {/* Desktop Tabs - más minimalistas */}
-      <div className="hidden sm:block">
-        <div className="flex border-b border-gray-100 dark:border-gray-800">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "overview"
-                ? "border-orange-500 text-orange-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Home className="w-4 h-4" />
-            Inicio
-          </button>
-          <button
-            onClick={() => setActiveTab("all-content")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "all-content"
-                ? "border-orange-500 text-orange-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            Contenido
-          </button>
-          {courseData.modules.map((module) => (
-            <button
-              key={module.id}
-              onClick={() => setActiveTab(module.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === module.id
-                  ? "border-orange-500 text-orange-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span className="truncate max-w-32">{module.title}</span>
-            </button>
-          ))}
-        </div>
+  return (
+    <div className="flex w-full flex-col gap-6 pb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBack}
+          className="-ml-2 flex items-center gap-2 px-2"
+        >
+          <ArrowLeft className="h-4 w-4" /> Volver
+        </Button>
       </div>
 
-      {/* Tab Content */}
-      <div className="space-y-4">
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <section className="relative overflow-hidden rounded-3xl border border-gray-200 bg-gray-900 text-white shadow-lg dark:border-gray-700">
+        <img
+          src={courseData.image}
+          alt={courseData.title}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-transparent" />
+        <div className="relative flex flex-col gap-5 p-6 sm:p-8">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/70">
+            <GraduationCap className="h-4 w-4" />
+            {courseData.level}
+          </div>
+          <div className="space-y-3">
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+              {courseData.title}
+            </h1>
+            <p className="text-sm text-white/80 sm:text-base">
+              {courseData.description}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4" />
+              <span>{totals.videos} videos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span>{totals.pdfs} materiales</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <HelpCircle className="h-4 w-4" />
+              <span>{totals.evaluations} evaluaciones</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4" />
+              <span>{courseData.modules.length} módulos</span>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl bg-white/10 p-4 backdrop-blur">
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span>Progreso general</span>
+              <span>
+                {completedCount}/{totalContents} · {progressPercentage}%
+              </span>
+            </div>
+            <Progress value={progressPercentage} className="h-2 overflow-hidden rounded-full bg-white/30" />
+            <div className="flex items-center gap-3 text-sm text-white/80">
+              <Trophy className="h-4 w-4" />
+              <span>
+                Sigue avanzando para completar el curso y desbloquear tu certificado
+              </span>
+            </div>
+          </div>
+
+          {nextContent && (
+            <Button
+              onClick={() => handleContentClick(nextContent)}
+              className="self-start rounded-full bg-white px-6 py-2 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-100"
+            >
+              <Play className="h-4 w-4" />
+              Continuar: {nextContent.title}
+            </Button>
+          )}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+              Tiempo invertido
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-baseline gap-2 pb-4">
+            <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              ~{Math.max(1, Math.round((completedCount / Math.max(1, totalContents)) * 6))}h
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              estimadas
+            </span>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+              Contenido completado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-baseline gap-2 pb-4">
+            <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {completedCount}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              de {totalContents}
+            </span>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+              Siguiente objetivo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4">
+            {nextContent ? (
+              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                <p className="font-semibold text-gray-900 dark:text-gray-100">
+                  {nextContent.title}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {nextContent.moduleName}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                ¡Felicitaciones! Ya completaste todo el contenido disponible.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="-mx-2 flex gap-2 overflow-x-auto pb-1">
+        {sections.map((section) => {
+          const Icon = section.icon;
+          const isActive = activeSection === section.id;
+
+          return (
+            <button
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              className={`flex min-w-[120px] flex-1 items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                isActive
+                  ? "border-orange-500 bg-orange-500 text-white shadow"
+                  : "border-gray-200 bg-white text-gray-600 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {section.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeSection === "overview" && (
+        <section className="space-y-4">
+          <Card className="border-gray-200 dark:border-gray-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                Avance por módulos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {courseData.modules.map((module) => {
+                const moduleCompleted = module.contents.filter((c) =>
+                  completedContents.includes(c.id)
+                ).length;
+                const moduleProgress = Math.round(
+                  (moduleCompleted / module.contents.length) * 100
+                );
+                const videos = module.contents.filter((c) => c.type === "VIDEO").length;
+                const pdfs = module.contents.filter((c) => c.type === "PDF").length;
+
+                return (
+                  <div
+                    key={module.id}
+                    className="rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/60"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                          {module.title}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {module.description}
+                        </p>
+                      </div>
+                      <Badge className="self-start bg-white text-xs font-semibold text-gray-700 shadow-sm dark:bg-gray-800 dark:text-gray-200">
+                        {moduleCompleted}/{module.contents.length} completados
+                      </Badge>
+                    </div>
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white dark:bg-gray-800">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500"
+                        style={{ width: `${moduleProgress}%` }}
+                      ></div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="flex items-center gap-1">
+                        <Video className="h-4 w-4" /> {videos} videos
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <FileText className="h-4 w-4" /> {pdfs} PDFs
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {nextContent && (
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Tu próximo paso
+              </h2>
+              {renderContentItem(nextContent, true, true)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeSection === "modules" && (
+        <section className="space-y-3">
+          <Accordion type="single" collapsible className="space-y-3">
             {courseData.modules.map((module) => {
               const moduleCompleted = module.contents.filter((c) =>
                 completedContents.includes(c.id)
@@ -380,147 +603,50 @@ const ModuleView = () => {
               );
 
               return (
-                <Card
+                <AccordionItem
                   key={module.id}
-                  className="cursor-pointer hover:shadow-sm transition-all duration-200 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
-                  onClick={() => setActiveTab(module.id)}
+                  value={module.id}
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate pr-2">
-                        {module.title}
-                      </h3>
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
-                      >
-                        {moduleCompleted}/{module.contents.length}
-                      </Badge>
-                    </div>
-                    <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full mb-3">
-                      <div
-                        className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300"
-                        style={{ width: `${moduleProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-                      <span>
-                        {
-                          module.contents.filter((c) => c.type === "VIDEO")
-                            .length
-                        }{" "}
-                        videos
-                      </span>
-                      <span>
-                        {module.contents.filter((c) => c.type === "PDF").length}{" "}
-                        PDFs
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-        {/* All Content Tab */}
-        {activeTab === "all-content" && (
-          <div className="space-y-3">
-            {getAllContents().map((content) =>
-              renderContentItem(content, true)
-            )}
-          </div>
-        )}
-
-        {/* Individual Module Tabs */}
-        {courseData.modules.map(
-          (module) =>
-            activeTab === module.id && (
-              <div key={module.id} className="space-y-3">
-                <Card className="border-gray-100 dark:border-gray-800">
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      {module.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                      {module.description}
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-gray-500">
-                        {
-                          module.contents.filter((c) =>
-                            completedContents.includes(c.id)
-                          ).length
-                        }{" "}
-                        / {module.contents.length} completados
-                      </span>
-                      <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
-                        <div
-                          className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${Math.round(
-                              (module.contents.filter((c) =>
-                                completedContents.includes(c.id)
-                              ).length /
-                                module.contents.length) *
-                                100
-                            )}%`,
-                          }}
-                        ></div>
+                  <AccordionTrigger className="px-4 text-left text-base font-semibold text-gray-900 hover:no-underline dark:text-gray-100 sm:px-6">
+                    <div className="flex w-full flex-col gap-2 text-left">
+                      <span>{module.title}</span>
+                      <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <span>
+                          {moduleCompleted}/{module.contents.length} completados
+                        </span>
+                        <span>·</span>
+                        <span>{moduleProgress}%</span>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4 sm:px-6">
+                    <div className="space-y-3">
+                      {module.contents
+                        .sort((a, b) => a.order - b.order)
+                        .map((content) =>
+                          renderContentItem(
+                            {
+                              ...content,
+                              moduleName: module.title,
+                            },
+                            true
+                          )
+                        )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </section>
+      )}
 
-                <div className="space-y-3">
-                  {module.contents
-                    .sort((a, b) => a.order - b.order)
-                    .map((content) => renderContentItem(content))}
-                </div>
-              </div>
-            )
-        )}
-      </div>
-
-      {/* Mobile Fixed Bottom Tabs - minimalistas */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 sm:hidden z-50">
-        <div className="flex items-center justify-around py-2">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "overview" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <Home className="w-5 h-5 mb-1" />
-            <span className="text-xs">Inicio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("all-content")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "all-content" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <BookOpen className="w-5 h-5 mb-1" />
-            <span className="text-xs">Todo</span>
-          </button>
-
-          {courseData.modules.map((module, index) => (
-            <button
-              key={module.id}
-              onClick={() => setActiveTab(module.id)}
-              className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-                activeTab === module.id ? "text-orange-500" : "text-gray-500"
-              }`}
-            >
-              <FileText className="w-5 h-5 mb-1" />
-              <span className="text-xs truncate max-w-12">
-                Tema {index + 1}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {activeSection === "all" && (
+        <section className="space-y-3">
+          {getAllContents().map((content) => renderContentItem(content, true))}
+        </section>
+      )}
     </div>
   );
 };
