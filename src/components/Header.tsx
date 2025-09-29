@@ -13,11 +13,19 @@ import ThemeToggle from "./ThemeToggle";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/components/ThemeProvider";
 
 const Header = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const { theme } = useTheme();
+
+  const isDarkMode =
+    theme === "dark" ||
+    (theme === "system" &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +58,12 @@ const Header = () => {
             className="flex items-center space-x-3 cursor-pointer"
             onClick={() => navigate("/")}
           >
-            <div className="rounded-lg bg-black flex items-center justify-center">
-              <img src="/logo.webp" alt="Logo" className="w-12" />
+            <div className="rounded-lg flex items-center justify-center">
+              <img
+                src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
+                alt="Logo"
+                className="w-12"
+              />
             </div>
           </div>
 
