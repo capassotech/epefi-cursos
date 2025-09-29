@@ -4,6 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 import {
   ArrowLeft,
@@ -107,6 +115,7 @@ const ModuleView = () => {
 
   // Estados
   const [activeTab, setActiveTab] = useState("overview");
+  const [moduleSheetOpen, setModuleSheetOpen] = useState(false);
 
   // Calcular progreso total
   const getInitialCompletedContents = () => {
@@ -178,8 +187,62 @@ const ModuleView = () => {
     );
   };
 
+  const getNextPendingContent = () => {
+    for (const module of courseData.modules) {
+      const pendingContent = module.contents.find(
+        (content) => !completedContents.includes(content.id)
+      );
+
+      if (pendingContent) {
+        return {
+          ...pendingContent,
+          moduleId: module.id,
+          moduleName: module.title,
+        };
+      }
+    }
+
+    return null;
+  };
+
+  const nextPendingContent = getNextPendingContent();
+
+  const scrollToContent = (contentId: string) => {
+    setTimeout(() => {
+      const element = document.getElementById(`content-${contentId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 250);
+  };
+
+  const handleSelectModule = (moduleId: string) => {
+    setActiveTab(moduleId);
+    setModuleSheetOpen(false);
+  };
+
+  const handleSelectContent = (moduleId: string, contentId: string) => {
+    setActiveTab(moduleId);
+    setModuleSheetOpen(false);
+    scrollToContent(contentId);
+  };
+
+  const handleContinueLearning = () => {
+    if (nextPendingContent) {
+      setActiveTab(nextPendingContent.moduleId);
+      scrollToContent(nextPendingContent.id);
+    } else {
+      setActiveTab("overview");
+    }
+  };
+
+  const isModuleView = courseData.modules.some(
+    (module) => module.id === activeTab
+  );
+
   const renderContentItem = (content, showModule = false) => (
     <Card
+      id={`content-${content.id}`}
       key={content.id}
       className="hover:shadow-sm transition-all duration-200 border-gray-100 dark:border-gray-800 cursor-pointer"
       onClick={() => handleContentClick(content)}
@@ -483,44 +546,171 @@ const ModuleView = () => {
       </div>
 
       {/* Mobile Fixed Bottom Tabs - minimalistas */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 sm:hidden z-50">
-        <div className="flex items-center justify-around py-2">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "overview" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <Home className="w-5 h-5 mb-1" />
-            <span className="text-xs">Inicio</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("all-content")}
-            className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-              activeTab === "all-content" ? "text-orange-500" : "text-gray-500"
-            }`}
-          >
-            <BookOpen className="w-5 h-5 mb-1" />
-            <span className="text-xs">Todo</span>
-          </button>
-
-          {courseData.modules.map((module, index) => (
+      <Sheet open={moduleSheetOpen} onOpenChange={setModuleSheetOpen}>
+        <nav className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 sm:hidden z-50">
+          <div className="flex items-center justify-around py-2 px-2">
             <button
-              key={module.id}
-              onClick={() => setActiveTab(module.id)}
-              className={`flex flex-col items-center justify-center py-2 px-3 transition-colors ${
-                activeTab === module.id ? "text-orange-500" : "text-gray-500"
+              onClick={() => setActiveTab("overview")}
+              className={`flex flex-col items-center justify-center gap-1 rounded-md py-2 px-3 text-xs font-medium transition-colors ${
+                activeTab === "overview" ? "text-orange-500" : "text-gray-500"
               }`}
+              aria-label="Ir al inicio del curso"
             >
-              <FileText className="w-5 h-5 mb-1" />
-              <span className="text-xs truncate max-w-12">
-                Tema {index + 1}
-              </span>
+              <Home className="h-5 w-5" />
+              <span>Inicio</span>
             </button>
-          ))}
-        </div>
-      </div>
+
+            <button
+              onClick={() => setActiveTab("all-content")}
+              className={`flex flex-col items-center justify-center gap-1 rounded-md py-2 px-3 text-xs font-medium transition-colors ${
+                activeTab === "all-content" ? "text-orange-500" : "text-gray-500"
+              }`}
+              aria-label="Ver todo el contenido"
+            >
+              <BookOpen className="h-5 w-5" />
+              <span>Contenido</span>
+            </button>
+
+            <SheetTrigger asChild>
+              <button
+                className={`flex flex-col items-center justify-center gap-1 rounded-md py-2 px-3 text-xs font-medium transition-colors ${
+                  moduleSheetOpen || isModuleView
+                    ? "text-orange-500"
+                    : "text-gray-500"
+                }`}
+                aria-label="Abrir navegación de módulos"
+              >
+                <GraduationCap className="h-5 w-5" />
+                <span>Módulos</span>
+              </button>
+            </SheetTrigger>
+
+            <button
+              onClick={handleContinueLearning}
+              disabled={!nextPendingContent}
+              className={`flex flex-col items-center justify-center gap-1 rounded-md py-2 px-3 text-xs font-medium transition-colors ${
+                nextPendingContent
+                  ? "text-orange-500"
+                  : "text-gray-400 dark:text-gray-600"
+              } ${
+                nextPendingContent
+                  ? ""
+                  : "cursor-not-allowed"
+              }`}
+              aria-label="Continuar con el siguiente contenido"
+            >
+              <Play className="h-5 w-5" />
+              <span>Continuar</span>
+            </button>
+          </div>
+        </nav>
+
+        <SheetContent
+          side="bottom"
+          className="sm:hidden max-h-[80vh] overflow-hidden border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 p-0 pb-6"
+        >
+          <SheetHeader className="px-4 pt-4 pb-3 text-left">
+            <SheetTitle className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              Navegación del curso
+            </SheetTitle>
+            <SheetDescription className="text-sm text-gray-500 dark:text-gray-400">
+              Selecciona un módulo o un contenido específico para continuar dentro del curso.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="max-h-[65vh] overflow-y-auto px-4 space-y-5">
+            {courseData.modules.map((module, index) => {
+              const moduleCompleted = module.contents.filter((content) =>
+                completedContents.includes(content.id)
+              ).length;
+              const moduleProgress = Math.round(
+                (moduleCompleted / module.contents.length) * 100
+              );
+
+              return (
+                <div
+                  key={module.id}
+                  className="rounded-xl border border-gray-100 bg-white/95 p-4 shadow-[0_0_20px_rgba(15,23,42,0.04)] dark:border-gray-800 dark:bg-gray-900/95"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-500">
+                        Módulo {index + 1}
+                      </p>
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {module.title}
+                      </h3>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {module.description}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-semibold border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                      >
+                        {moduleCompleted}/{module.contents.length}
+                      </Badge>
+                      <Progress value={moduleProgress} className="mt-2 h-1.5 w-20" />
+                    </div>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-3 w-full text-xs"
+                    onClick={() => handleSelectModule(module.id)}
+                  >
+                    Ver módulo completo
+                  </Button>
+
+                  <div className="mt-4 space-y-2">
+                    {module.contents.map((content) => {
+                      const isCompleted = completedContents.includes(content.id);
+                      const icon = React.cloneElement(getIcon(content.type), {
+                        className: "h-4 w-4",
+                      });
+
+                      return (
+                        <button
+                          key={content.id}
+                          onClick={() => handleSelectContent(module.id, content.id)}
+                          className="w-full rounded-lg border border-gray-100 bg-white/80 px-3 py-2 text-left transition-colors hover:border-orange-200 hover:bg-orange-50/50 focus:outline-none focus:ring-2 focus:ring-orange-400 dark:border-gray-800 dark:bg-gray-900/70 dark:hover:border-orange-400/60 dark:hover:bg-orange-500/10"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10 text-orange-500 dark:bg-orange-500/15">
+                              {icon}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">
+                                {content.title}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
+                                {content.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              {content.duration && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{content.duration}</span>
+                                </div>
+                              )}
+                              {isCompleted && (
+                                <CheckCircle2 className="h-4 w-4 text-orange-500" />
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
