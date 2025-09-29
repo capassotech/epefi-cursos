@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Play, Clock, Users, Download, Share } from "lucide-react";
-import { url } from "inspector";
 
 const ClassDetail = () => {
   const { moduleId, classId } = useParams();
@@ -35,9 +34,9 @@ const ClassDetail = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
         <Button
           variant="ghost"
           size="icon"
@@ -45,11 +44,11 @@ const ClassDetail = () => {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
-          <Badge variant="outline" className="mb-2">
+        <div className="space-y-1">
+          <Badge variant="outline" className="w-fit">
             {classData.module}
           </Badge>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {classData.title}
           </h1>
         </div>
@@ -67,25 +66,25 @@ const ClassDetail = () => {
             />
           </div>
 
-          <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                <div className="flex items-center space-x-1">
+          <div className="p-5 space-y-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   <span>{classData.duration}</span>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   <span>{classData.instructor}</span>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <Share className="w-4 h-4 mr-2" />
                   Compartir
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="w-full sm:w-auto">
                   <Download className="w-4 h-4 mr-2" />
                   Descargar
                 </Button>
@@ -96,7 +95,7 @@ const ClassDetail = () => {
       </Card>
 
       {/* Description and Objectives */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-6 md:grid md:grid-cols-2 md:gap-6 md:space-y-0">
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardContent className="p-6">
             <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
@@ -137,9 +136,9 @@ const ClassDetail = () => {
             {classData.resources.map((resource, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                className="flex flex-col gap-3 rounded-lg bg-gray-50 p-4 dark:bg-gray-700/50 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center">
                     <Download className="w-4 h-4" />
                   </div>
@@ -157,8 +156,9 @@ const ClassDetail = () => {
                   download
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="w-full sm:w-auto"
                 >
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full">
                     Descargar
                   </Button>
                 </a>
@@ -169,12 +169,12 @@ const ClassDetail = () => {
       </Card>
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+        <Button variant="outline" className="w-full sm:w-auto">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Clase Anterior
         </Button>
-        <Button>
+        <Button className="w-full sm:w-auto">
           Próxima Clase
           <Play className="w-4 h-4 ml-2" />
         </Button>
