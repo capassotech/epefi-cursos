@@ -329,12 +329,12 @@ const ModuleView = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 mt-1 flex flex-col items-end">
-                        <span className="sm:hidden inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-orange-600">
-                          {isOpen ? "Ocultar contenidos" : "Ver contenidos"}
+                      <div className="flex-shrink-0 mt-1 flex flex-col items-end w-full sm:w-auto">
+                        <span className="sm:hidden inline-flex items-center justify-between w-full gap-2 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-3 py-1 uppercase tracking-wide">
+                          <span>{isOpen ? "Ocultar contenidos" : "Tocá para desplegar"}</span>
                           <ChevronDown
                             className={`w-3 h-3 transition-transform ${
-                              isOpen ? "rotate-180" : ""
+                              isOpen ? "rotate-180" : "-rotate-90"
                             }`}
                           />
                         </span>
@@ -415,7 +415,7 @@ const ModuleView = () => {
                                 </Badge>
                               </div>
                               {modulo.descripcion && (
-                                <p className="hidden sm:block text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
+                                <p className="hidden md:block text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
                                   {modulo.descripcion}
                                 </p>
                               )}
