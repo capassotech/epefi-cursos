@@ -1,5 +1,5 @@
 
-import { Home, Play, BookOpen, Search } from "lucide-react";
+import { Home, Play, User } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -9,9 +9,8 @@ const BottomNavigation = () => {
 
   const navItems = [
     { icon: Home, label: "Inicio", path: "/" },
-    { icon: Play, label: "Clases", path: "/classes" },
-    { icon: BookOpen, label: "Teoría", path: "/theory" },
-    { icon: Search, label: "Buscar", path: "/search" },
+    { icon: Play, label: "Clases", path: "/Curso" },
+    { icon: User, label: "Perfil", path: "/profile" },
   ];
 
   return (
