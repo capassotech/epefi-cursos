@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import { Home, Play, User } from "lucide-react";
+import { Home, Play, Search } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +148,13 @@ const BottomNavigation = () => {
       activePath: "/curso",
       ariaLabel: continueAriaLabel,
     },
-    { icon: User, label: "Perfil", path: "/profile", activePath: "/profile" },
+    {
+      icon: Search,
+      label: "Buscar",
+      path: "/search",
+      activePath: "/search",
+      ariaLabel: "Buscar clases o teoría",
+    },
   ];
 
   return (
