@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import {
   ArrowLeft,
   ChevronDown,
-  ChevronRight,
   Trophy,
   Award,
   Play,
@@ -330,12 +329,20 @@ const ModuleView = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="flex-shrink-0 mt-1">
-                        {isOpen ? (
-                          <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
-                        )}
+                      <div className="flex-shrink-0 mt-1 flex flex-col items-end">
+                        <span className="sm:hidden inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-orange-600">
+                          {isOpen ? "Ocultar contenidos" : "Ver contenidos"}
+                          <ChevronDown
+                            className={`w-3 h-3 transition-transform ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </span>
+                        <ChevronDown
+                          className={`hidden sm:block w-4 h-4 sm:w-5 sm:h-5 text-gray-500 transition-transform ${
+                            isOpen ? "rotate-0" : "-rotate-90"
+                          }`}
+                        />
                       </div>
                     </div>
                   </CardHeader>
@@ -408,7 +415,7 @@ const ModuleView = () => {
                                 </Badge>
                               </div>
                               {modulo.descripcion && (
-                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
+                                <p className="hidden sm:block text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2">
                                   {modulo.descripcion}
                                 </p>
                               )}
