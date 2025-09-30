@@ -189,7 +189,7 @@ const Index = () => {
 
       {/* Botón para adquirir más cursos - diseño elegante con naranja como detalle */}
       <a
-        href="https://epefi.edu.ar/cursos"
+        href="https://epefi.com.ar/escuela"
         target="_blank"
         rel="noopener noreferrer"
         className="block"
