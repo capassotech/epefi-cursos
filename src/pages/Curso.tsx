@@ -390,9 +390,9 @@ const CourseDetailPage: React.FC = () => {
       </header>
 
       <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
-        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="hidden sm:block">
               <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">
                 Progreso general
               </p>
@@ -400,9 +400,15 @@ const CourseDetailPage: React.FC = () => {
                 {completedCount} de {totalItems} contenidos completados
               </p>
             </div>
-            <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
+            <div className="flex w-full items-center justify-between sm:hidden">
+              <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">
+                Progreso
+              </span>
+              <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
+            </div>
+            <span className="hidden text-sm font-semibold text-orange-600 sm:inline">{progressPercentage}%</span>
           </div>
-          <Progress value={progressPercentage} className="mt-3 h-2" />
+          <Progress value={progressPercentage} className="mt-2 h-1 sm:mt-3 sm:h-2" />
         </section>
 
         <section className="space-y-4">
