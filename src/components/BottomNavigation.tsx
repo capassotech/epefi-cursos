@@ -14,6 +14,32 @@ const DEFAULT_CONTINUE_TARGET: ContinueTarget = {
   path: "/curso",
 };
 
+const buildCoursePath = (
+  courseId?: string,
+  moduleId?: string,
+  itemId?: string,
+  fallback = "/curso"
+) => {
+  const hasCourseId = typeof courseId === "string" && courseId.length > 0;
+  const hasModuleId = typeof moduleId === "string" && moduleId.length > 0;
+  const hasItemId = typeof itemId === "string" && itemId.length > 0;
+
+  const basePath = hasCourseId ? `/curso/${courseId}` : fallback;
+
+  if (!hasModuleId) {
+    return basePath;
+  }
+
+  const params = new URLSearchParams();
+  params.set("module", moduleId!);
+
+  if (hasItemId) {
+    params.set("item", itemId!);
+  }
+
+  return `${basePath}?${params.toString()}`;
+};
+
 const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -36,13 +62,23 @@ const BottomNavigation = () => {
         const storedClass = JSON.parse(storedClassRaw);
 
         if (storedClass && typeof storedClass === "object") {
+          const computedPath = buildCoursePath(
+            typeof storedClass.courseId === "string"
+              ? storedClass.courseId
+              : undefined,
+            typeof storedClass.moduleId === "string"
+              ? storedClass.moduleId
+              : undefined,
+            typeof storedClass.itemId === "string"
+              ? storedClass.itemId
+              : undefined,
+            fallbackPath
+          );
+
           const pathFromStorage =
             typeof storedClass.path === "string" && storedClass.path.length > 0
               ? storedClass.path
-              : typeof storedClass.courseId === "string" &&
-                  storedClass.courseId.length > 0
-                ? `/curso/${storedClass.courseId}`
-                : fallbackPath;
+              : computedPath;
 
           nextTarget = {
             path: pathFromStorage,
@@ -71,13 +107,19 @@ const BottomNavigation = () => {
         const storedCourse = JSON.parse(storedCourseRaw);
 
         if (storedCourse && typeof storedCourse === "object") {
+          const computedPath = buildCoursePath(
+            typeof storedCourse.courseId === "string"
+              ? storedCourse.courseId
+              : undefined,
+            undefined,
+            undefined,
+            fallbackPath
+          );
+
           const pathFromStorage =
             typeof storedCourse.path === "string" && storedCourse.path.length > 0
               ? storedCourse.path
-              : typeof storedCourse.courseId === "string" &&
-                  storedCourse.courseId.length > 0
-                ? `/curso/${storedCourse.courseId}`
-                : fallbackPath;
+              : computedPath;
 
           nextTarget = {
             path: pathFromStorage,
