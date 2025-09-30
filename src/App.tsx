@@ -5,15 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./components/ThemeProvider";
 import Index from "./pages/Index";
-import Classes from "./pages/Classes";
-import Theory from "./pages/Theory";
 import Search from "./pages/Search";
-import TheoryDetail from "./pages/TheoryDetail";
-import ClassDetail from "./pages/ClassDetail";
 import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
 import Curso from "./pages/Curso";
-// Nuevas importaciones para la estructura de INEE
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthRedirectRoute from "./components/AuthRedirectRoute";
 import Login from "./pages/Login";
@@ -52,13 +47,6 @@ const App = () => (
                   <Route path="/" element={<Index />} />
                   <Route path="/curso" element={<Curso />} />
                   <Route path="/curso/:courseId" element={<Curso />} />
-                  <Route path="/classes" element={<Classes />} />
-                  <Route
-                    path="/classes/:moduleId/:classId"
-                    element={<ClassDetail />}
-                  />
-                  <Route path="/theory" element={<Theory />} />
-                  <Route path="/theory/:unitId" element={<TheoryDetail />} />
                   <Route path="/search" element={<Search />} />
                   {/* Nueva ruta de perfil */}
                   <Route path="/profile" element={<Profile />} />
