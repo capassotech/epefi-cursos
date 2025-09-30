@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
+import { buildCourseUrl, courses } from "@/data/courses";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -49,44 +50,40 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Mock data de cursos como INEE
-  const courses = [
-    {
-      id: "fitness-grupal",
-      title: "Instructorado de fitness grupal",
-      description:
-        "Formación completa en fitness grupal con metodología actualizada y base científica aplicada.",
-      image:
-        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=250&fit=crop",
-      level: "Intermedio",
-      modules: [
-        {
-          id: "mod1",
-          contents: [
-            { completed: true },
-            { completed: true },
-            { completed: false },
-          ],
+  const coursesWithProgress = useMemo(() => {
+    return courses.map((course) => {
+      const { totalItems, completedItems } = course.subjects.reduce(
+        (acc, subject) => {
+          subject.modules.forEach((module) => {
+            acc.totalItems += module.items.length;
+            acc.completedItems += module.items.filter(
+              (item) => item.completed
+            ).length;
+          });
+          return acc;
         },
-        { id: "mod2", contents: [{ completed: false }, { completed: false }] },
-      ],
-    },
-  ];
+        { totalItems: 0, completedItems: 0 }
+      );
 
-  const getActualProgress = (course) => {
-    const totalContents = course.modules.reduce(
-      (acc, module) => acc + module.contents.length,
-      0
-    );
-    const completedContents = course.modules.reduce(
-      (acc, module) =>
-        acc + module.contents.filter((content) => content.completed).length,
-      0
-    );
-    return totalContents > 0
-      ? Math.round((completedContents / totalContents) * 100)
-      : 0;
-  };
+      const progress =
+        totalItems > 0
+          ? Math.round((completedItems / totalItems) * 100)
+          : 0;
+
+      const totalModules = course.subjects.reduce(
+        (acc, subject) => acc + subject.modules.length,
+        0
+      );
+
+      return {
+        ...course,
+        totalItems,
+        completedItems,
+        progress,
+        totalModules,
+      };
+    });
+  }, []);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
@@ -144,17 +141,12 @@ const Index = () => {
           Mis formaciones
         </h2>
         <div className="grid grid-cols-1 gap-4">
-          {courses.map((course) => {
-            const actualProgress = getActualProgress(course);
-            const totalContents = course.modules.reduce(
-              (acc, module) => acc + module.contents.length,
-              0
-            );
+          {coursesWithProgress.map((course) => {
             return (
               <Card
                 key={course.id}
                 className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
-                onClick={() => navigate(`/curso/${course.id}`)}
+                onClick={() => navigate(buildCourseUrl(course.id))}
               >
                 <CardContent className="p-0 flex flex-col sm:flex-row">
                   {/* Imagen del curso */}
@@ -172,7 +164,7 @@ const Index = () => {
                         {course.title}
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
-                        {course.description}
+                        {course.summary}
                       </p>
                     </div>
                     <div>
@@ -182,10 +174,10 @@ const Index = () => {
                             {course.level}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {course.modules.length} módulos
+                            {course.subjects.length} materias
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                            {totalContents} elementos
+                            {course.totalModules} módulos · {course.totalItems} contenidos
                           </span>
                         </div>
                         <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
@@ -195,11 +187,11 @@ const Index = () => {
                         <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
                           <div
                             className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
-                            style={{ width: `${actualProgress}%` }}
+                            style={{ width: `${course.progress}%` }}
                           ></div>
                         </div>
                         <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
-                          {actualProgress}%
+                          {course.progress}%
                         </span>
                       </div>
                     </div>

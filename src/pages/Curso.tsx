@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -14,141 +14,49 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-
-const courseDetail = {
-  id: "fitness-grupal",
-  title: "Instructorado de fitness grupal",
-  summary:
-    "Formación completa en fitness grupal con metodología actualizada y base científica aplicada.",
-  subjects: [
-    {
-      id: "fundamentos",
-      name: "Fundamentos Anatómicos",
-      description:
-        "Comprendé cómo funciona el cuerpo y cómo impacta en la actividad física.",
-      modules: [
-        {
-          id: "fundamentos-anatomia",
-          name: "Anatomía y Fisiología",
-          description: "Base estructural del movimiento humano.",
-          items: [
-            {
-              id: "video-esqueleto",
-              title: "Anatomía del esqueleto humano",
-              description:
-                "Recorrido visual por las principales estructuras óseas.",
-              type: "VIDEO" as const,
-              duration: "18 min",
-              completed: true,
-            },
-            {
-              id: "pdf-articulaciones",
-              title: "Guía de articulaciones",
-              description: "Clasificación y cuidados básicos.",
-              type: "PDF" as const,
-              size: "2.5 MB",
-              completed: true,
-            },
-            {
-              id: "video-musculos",
-              title: "Músculos en acción",
-              description: "Principales grupos musculares y funciones.",
-              type: "VIDEO" as const,
-              duration: "22 min",
-              completed: false,
-            },
-          ],
-        },
-        {
-          id: "fundamentos-sistemas",
-          name: "Sistemas Energéticos",
-          description: "Cómo el cuerpo obtiene y usa la energía.",
-          items: [
-            {
-              id: "video-sistemas",
-              title: "Introducción a los sistemas energéticos",
-              description: "Fases y características clave.",
-              type: "VIDEO" as const,
-              duration: "15 min",
-              completed: false,
-            },
-            {
-              id: "pdf-mapas",
-              title: "Mapas metabólicos",
-              description: "Material de apoyo descargable.",
-              type: "PDF" as const,
-              size: "1.8 MB",
-              completed: false,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "planificacion",
-      name: "Planificación y Metodología",
-      description:
-        "Herramientas prácticas para diseñar clases seguras y dinámicas.",
-      modules: [
-        {
-          id: "planificacion-bases",
-          name: "Principios del Entrenamiento",
-          description: "Planificá sesiones con foco en resultados.",
-          items: [
-            {
-              id: "video-principios",
-              title: "Variables clave del entrenamiento",
-              description: "Frecuencia, intensidad y volumen explicados.",
-              type: "VIDEO" as const,
-              duration: "20 min",
-              completed: false,
-            },
-            {
-              id: "pdf-hojas",
-              title: "Plantillas de planificación",
-              description: "Descargá y adaptá a tus clases.",
-              type: "PDF" as const,
-              size: "800 KB",
-              completed: false,
-            },
-          ],
-        },
-        {
-          id: "planificacion-seguridad",
-          name: "Seguridad y Adaptaciones",
-          description: "Cuidados esenciales para distintos perfiles.",
-          items: [
-            {
-              id: "video-seguridad",
-              title: "Chequeos previos y adaptaciones",
-              description: "Checklist previo a cada clase.",
-              type: "VIDEO" as const,
-              duration: "12 min",
-              completed: false,
-            },
-            {
-              id: "pdf-checklist",
-              title: "Checklist descargable",
-              description: "Formato imprimible para llevar a clase.",
-              type: "PDF" as const,
-              size: "600 KB",
-              completed: false,
-            },
-          ],
-        },
-      ],
-    },
-  ],
-};
-
-type ModuleItem = (typeof courseDetail.subjects)[number]["modules"][number]["items"][number];
-
-type Subject = (typeof courseDetail.subjects)[number];
-
-type Module = Subject["modules"][number];
+import {
+  Course,
+  Module,
+  ModuleItem,
+  Subject,
+  courses,
+  getCourseById,
+} from "@/data/courses";
 
 const CourseDetailPage: React.FC = () => {
   const navigate = useNavigate();
+  const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams] = useSearchParams();
+
+  const courseDetail: Course | undefined = useMemo(() => {
+    if (courseId) {
+      return getCourseById(courseId) ?? courses[0];
+    }
+    return courses[0];
+  }, [courseId]);
+
+  const materiaParam = searchParams.get("materia");
+  const moduloParam = searchParams.get("modulo");
+
+  useEffect(() => {
+    if (!courseDetail) return;
+
+    const subjectExists = materiaParam
+      ? courseDetail.subjects.some((subject) => subject.id === materiaParam)
+      : false;
+
+    const fallbackSubject = courseDetail.subjects[0]?.id;
+    setSelectedSubjectId(subjectExists ? (materiaParam as string) : fallbackSubject);
+
+    if (moduloParam) {
+      const moduleExists = courseDetail.subjects.some((subject) =>
+        subject.modules.some((module) => module.id === moduloParam)
+      );
+      setExpandedModuleId(moduleExists ? moduloParam : null);
+    } else {
+      setExpandedModuleId(null);
+    }
+  }, [courseDetail, materiaParam, moduloParam]);
   const location = useLocation();
   const { courseId: courseIdParam } = useParams<{ courseId?: string }>();
   const [selectedSubjectId, setSelectedSubjectId] = useState(courseDetail.subjects[0]?.id);
@@ -216,15 +124,22 @@ const CourseDetailPage: React.FC = () => {
   }, [location.search]);
 
   const initialCompletedItems = useMemo(() => {
+    if (!courseDetail) return [] as string[];
     return courseDetail.subjects.flatMap((subject) =>
       subject.modules.flatMap((module) =>
         module.items.filter((item) => item.completed).map((item) => item.id)
       )
     );
-  }, []);
+  }, [courseDetail]);
+
   const [completedItems, setCompletedItems] = useState<string[]>(initialCompletedItems);
 
+  useEffect(() => {
+    setCompletedItems(initialCompletedItems);
+  }, [initialCompletedItems]);
+
   const totalItems = useMemo(() => {
+    if (!courseDetail) return 0;
     return courseDetail.subjects.reduce((count, subject) => {
       return (
         count +
@@ -234,14 +149,15 @@ const CourseDetailPage: React.FC = () => {
         )
       );
     }, 0);
-  }, []);
+  }, [courseDetail]);
 
   const completedCount = completedItems.length;
   const progressPercentage = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
 
   const selectedSubject = useMemo<Subject | undefined>(() => {
+    if (!courseDetail) return undefined;
     return courseDetail.subjects.find((subject) => subject.id === selectedSubjectId);
-  }, [selectedSubjectId]);
+  }, [courseDetail, selectedSubjectId]);
 
   const handleModuleToggle = (moduleId: string) => {
     setExpandedModuleId((current) => (current === moduleId ? null : moduleId));
@@ -434,6 +350,21 @@ const CourseDetailPage: React.FC = () => {
     );
   };
 
+  if (!courseDetail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Curso no encontrado
+          </p>
+          <Button variant="outline" onClick={() => navigate("/")}>
+            Volver al inicio
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
@@ -448,7 +379,12 @@ const CourseDetailPage: React.FC = () => {
           </Button>
           <div className="flex-1">
             <p className="text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{courseDetail.title}</h1>
+            <h1
+              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+              data-testid="course-title"
+            >
+              {courseDetail.title}
+            </h1>
           </div>
         </div>
       </header>
@@ -464,9 +400,7 @@ const CourseDetailPage: React.FC = () => {
                 {completedCount} de {totalItems} contenidos completados
               </p>
             </div>
-            <span className="text-sm font-semibold text-orange-600">
-              {progressPercentage}%
-            </span>
+            <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
           </div>
           <Progress value={progressPercentage} className="mt-3 h-2" />
         </section>
@@ -481,6 +415,18 @@ const CourseDetailPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {courseDetail.subjects.map((subject) => {
               const isActive = subject.id === selectedSubjectId;
+
+              const completedInSubject = subject.modules.reduce(
+                (acc, module) =>
+                  acc +
+                  module.items.filter((item) => completedItems.includes(item.id))
+                    .length,
+                0
+              );
+              const totalInSubject = subject.modules.reduce(
+                (acc, module) => acc + module.items.length,
+                0
+              );
 
               return (
                 <button
@@ -507,7 +453,7 @@ const CourseDetailPage: React.FC = () => {
                           : "bg-slate-500/10 text-slate-600 dark:bg-slate-700/60 dark:text-slate-200"
                       }`}
                     >
-                      {subject.modules.length} módulos
+                      {completedInSubject}/{totalInSubject} contenidos
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
@@ -536,8 +482,7 @@ const CourseDetailPage: React.FC = () => {
                 Cómo navegar el curso
               </h2>
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                Elegí una materia para ver sus módulos y desplegá cada módulo para acceder a
-                los videos o PDFs correspondientes.
+                Elegí una materia para ver sus módulos y desplegá cada módulo para acceder a los videos o PDFs correspondientes.
               </p>
             </div>
           </div>
