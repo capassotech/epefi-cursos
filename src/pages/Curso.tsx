@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -38,11 +38,6 @@ const CourseDetailPage: React.FC = () => {
   const materiaParam = searchParams.get("materia");
   const moduloParam = searchParams.get("modulo");
 
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(
-    courseDetail?.subjects[0]?.id
-  );
-  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
-
   useEffect(() => {
     if (!courseDetail) return;
 
@@ -62,6 +57,71 @@ const CourseDetailPage: React.FC = () => {
       setExpandedModuleId(null);
     }
   }, [courseDetail, materiaParam, moduloParam]);
+  const location = useLocation();
+  const { courseId: courseIdParam } = useParams<{ courseId?: string }>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState(courseDetail.subjects[0]?.id);
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
+  const courseIdentifier = courseIdParam ?? courseDetail.id;
+  const coursePath = courseIdParam ? `/curso/${courseIdentifier}` : "/curso";
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const lastCourseAccess = {
+      courseId: courseIdentifier,
+      courseTitle: courseDetail.title,
+      path: coursePath,
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      window.localStorage.setItem(
+        "lastCourseAccess",
+        JSON.stringify(lastCourseAccess)
+      );
+      window.dispatchEvent(
+        new CustomEvent("last-course-access-updated", {
+          detail: lastCourseAccess,
+        })
+      );
+    } catch (error) {
+      console.error("Error storing last course access", error);
+    }
+  }, [courseIdentifier, coursePath]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const moduleFromQuery = params.get("module");
+    const itemFromQuery = params.get("item");
+
+    if (!moduleFromQuery) {
+      return;
+    }
+
+    const subjectWithModule = courseDetail.subjects.find((subject) =>
+      subject.modules.some((module) => module.id === moduleFromQuery)
+    );
+
+    if (!subjectWithModule) {
+      return;
+    }
+
+    setSelectedSubjectId(subjectWithModule.id);
+    setExpandedModuleId(moduleFromQuery);
+
+    if (itemFromQuery) {
+      window.requestAnimationFrame(() => {
+        const element = document.getElementById(`course-item-${itemFromQuery}`);
+        element?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+  }, [location.search]);
 
   const initialCompletedItems = useMemo(() => {
     if (!courseDetail) return [] as string[];
@@ -119,6 +179,62 @@ const CourseDetailPage: React.FC = () => {
     return item.size;
   };
 
+  const handleAccessContent = (
+    subject: Subject,
+    module: Module,
+    item: ModuleItem
+  ) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+
+    const lastViewedClass = {
+      courseId: courseIdentifier,
+      courseTitle: courseDetail.title,
+      subjectId: subject.id,
+      subjectName: subject.name,
+      moduleId: module.id,
+      moduleName: module.name,
+      itemId: item.id,
+      itemTitle: item.title,
+      path: `${coursePath}?module=${module.id}&item=${item.id}`,
+      updatedAt: timestamp,
+    };
+
+    try {
+      window.localStorage.setItem(
+        "lastViewedClass",
+        JSON.stringify(lastViewedClass)
+      );
+      window.dispatchEvent(
+        new CustomEvent("last-viewed-class-updated", {
+          detail: lastViewedClass,
+        })
+      );
+
+      const lastCourseAccess = {
+        courseId: courseIdentifier,
+        courseTitle: courseDetail.title,
+        path: coursePath,
+        updatedAt: timestamp,
+      };
+
+      window.localStorage.setItem(
+        "lastCourseAccess",
+        JSON.stringify(lastCourseAccess)
+      );
+      window.dispatchEvent(
+        new CustomEvent("last-course-access-updated", {
+          detail: lastCourseAccess,
+        })
+      );
+    } catch (error) {
+      console.error("Error storing last viewed class information", error);
+    }
+  };
+
   const toggleItemCompletion = (itemId: string) => {
     setCompletedItems((current) =>
       current.includes(itemId)
@@ -164,6 +280,7 @@ const CourseDetailPage: React.FC = () => {
               return (
                 <div
                   key={item.id}
+                  id={`course-item-${item.id}`}
                   className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70"
                 >
                   <span
@@ -217,6 +334,9 @@ const CourseDetailPage: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       className="h-auto px-2 text-xs text-orange-600 dark:text-orange-300"
+                      onClick={() =>
+                        handleAccessContent(selectedSubject, module, item)
+                      }
                     >
                       {item.type === "VIDEO" ? "Ver" : "Descargar"}
                     </Button>
