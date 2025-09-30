@@ -9,7 +9,7 @@ const BottomNavigation = () => {
 
   const navItems = [
     { icon: Home, label: "Inicio", path: "/" },
-    { icon: Play, label: "Clases", path: "/Curso" },
+    { icon: Play, label: "Clases", path: "/curso" },
     { icon: User, label: "Perfil", path: "/profile" },
   ];
 

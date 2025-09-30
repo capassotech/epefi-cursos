@@ -11,7 +11,7 @@ import {
   School,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { courses } from "@/data/courses";
+import { buildCourseUrl, courses } from "@/data/courses";
 
 type FilterType = "all" | "course" | "materia" | "modulo";
 type SearchResultType = Exclude<FilterType, "all">;
@@ -91,7 +91,7 @@ const Search = () => {
         type: "course",
         title: course.title,
         description: course.summary,
-        path: `/curso/${course.id}`,
+        path: buildCourseUrl(course.id),
         meta: [
           `${course.subjects.length} materias`,
           `${totalModules} módulos`,
@@ -112,7 +112,7 @@ const Search = () => {
           title: subject.name,
           description: subject.description,
           courseTitle: course.title,
-          path: `/curso/${course.id}?materia=${subject.id}`,
+          path: buildCourseUrl(course.id, subject.id),
           meta: [
             `${subjectModuleCount} módulos`,
             `${subjectItemCount} contenidos`,
@@ -135,7 +135,7 @@ const Search = () => {
             description: module.description,
             courseTitle: course.title,
             subjectName: subject.name,
-            path: `/curso/${course.id}?materia=${subject.id}&modulo=${module.id}`,
+            path: buildCourseUrl(course.id, subject.id, module.id),
             meta: moduleMeta,
           };
         });

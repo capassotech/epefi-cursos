@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
-import { courses } from "@/data/courses";
+import { buildCourseUrl, courses } from "@/data/courses";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -122,7 +122,7 @@ const Index = () => {
               <Card
                 key={course.id}
                 className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
-                onClick={() => navigate(`/curso/${course.id}`)}
+                onClick={() => navigate(buildCourseUrl(course.id))}
               >
                 <CardContent className="p-0 flex flex-col sm:flex-row">
                   {/* Imagen del curso */}

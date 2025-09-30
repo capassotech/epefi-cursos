@@ -171,3 +171,25 @@ export const courses: Course[] = [
 
 export const getCourseById = (courseId: string) =>
   courses.find((course) => course.id === courseId);
+
+export const buildCourseUrl = (
+  courseId?: string,
+  subjectId?: string,
+  moduleId?: string
+) => {
+  const basePath = courseId ? `/curso/${courseId}` : "/curso";
+
+  const params = new URLSearchParams();
+
+  if (subjectId) {
+    params.set("materia", subjectId);
+  }
+
+  if (moduleId) {
+    params.set("modulo", moduleId);
+  }
+
+  const search = params.toString();
+
+  return search ? `${basePath}?${search}` : basePath;
+};
