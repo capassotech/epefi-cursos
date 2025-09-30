@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import {
   Course,
   Module,
@@ -356,6 +357,49 @@ const CourseDetailPage: React.FC = () => {
   };
   // ========= FIN módulo como desplegable =========
 
+  const ProgressOverview = ({ className = "" }) => (
+    <section
+      className={cn(
+        "rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:p-4",
+        className
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <div className="hidden sm:block">
+          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">Progreso general</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {completedCount} de {totalItems} contenidos completados
+          </p>
+        </div>
+        <div className="flex w-full items-center justify-between sm:hidden">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">Progreso</span>
+          <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
+        </div>
+        <span className="hidden text-sm font-semibold text-orange-600 sm:inline">{progressPercentage}%</span>
+      </div>
+      <Progress value={progressPercentage} className="mt-2 h-1 sm:mt-3 sm:h-2" />
+    </section>
+  );
+
+  const HowToNavigateCard = ({ className = "" }) => (
+    <section
+      className={cn(
+        "rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70",
+        className
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <BookOpen className="h-5 w-5 text-orange-500" />
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Cómo navegar el curso</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Elegí una materia para ver sus módulos y <strong>desplegá</strong> cada módulo para acceder a los videos o PDFs correspondientes.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+
   if (!courseDetail) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
@@ -370,7 +414,7 @@ const CourseDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -388,36 +432,22 @@ const CourseDetailPage: React.FC = () => {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
-        <section className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">Progreso general</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {completedCount} de {totalItems} contenidos completados
-              </p>
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
+          <ProgressOverview className="lg:hidden" />
+
+          <section className="space-y-4 lg:col-start-1 lg:row-start-1">
+            <div className="flex items-center gap-2">
+              <School className="h-4 w-4 text-orange-500" />
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Materias del programa</h2>
             </div>
-            <div className="flex w-full items-center justify-between sm:hidden">
-              <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">Progreso</span>
-              <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
-            </div>
-            <span className="hidden text-sm font-semibold text-orange-600 sm:inline">{progressPercentage}%</span>
-          </div>
-          <Progress value={progressPercentage} className="mt-2 h-1 sm:mt-3 sm:h-2" />
-        </section>
 
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <School className="h-4 w-4 text-orange-500" />
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Materias del programa</h2>
-          </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {courseDetail.subjects.map((subject) => {
+                const isActive = subject.id === selectedSubjectId;
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {courseDetail.subjects.map((subject) => {
-              const isActive = subject.id === selectedSubjectId;
-
-              const completedInSubject = subject.modules.reduce(
-                (acc, module) => acc + module.items.filter((item) => completedItems.includes(item.id)).length,
+                const completedInSubject = subject.modules.reduce(
+                  (acc, module) => acc + module.items.filter((item) => completedItems.includes(item.id)).length,
                 0
               );
               const totalInSubject = subject.modules.reduce((acc, module) => acc + module.items.length, 0);
@@ -458,33 +488,29 @@ const CourseDetailPage: React.FC = () => {
                 </button>
               );
             })}
-          </div>
+            </div>
 
-          {selectedSubject && (
-            <div className="space-y-3">
-              <div className="hidden sm:block">
-                <p className="text-sm text-slate-600 dark:text-slate-300">{selectedSubject.description}</p>
-              </div>
-
-              {/* Lista de módulos (cada uno es un desplegable) */}
+            {selectedSubject && (
               <div className="space-y-3">
-                {selectedSubject.modules.map((module) => renderModule(module))}
-              </div>
-            </div>
-          )}
-        </section>
+                <div className="hidden sm:block">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{selectedSubject.description}</p>
+                </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
-          <div className="flex items-start gap-3">
-            <BookOpen className="h-5 w-5 text-orange-500" />
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Cómo navegar el curso</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                Elegí una materia para ver sus módulos y <strong>desplegá</strong> cada módulo para acceder a los videos o PDFs correspondientes.
-              </p>
-            </div>
-          </div>
-        </section>
+                {/* Lista de módulos (cada uno es un desplegable) */}
+                <div className="space-y-3">
+                  {selectedSubject.modules.map((module) => renderModule(module))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <HowToNavigateCard className="lg:hidden" />
+
+          <aside className="hidden lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:flex lg:flex-col lg:gap-6">
+            <ProgressOverview />
+            <HowToNavigateCard />
+          </aside>
+        </div>
       </main>
     </div>
   );
