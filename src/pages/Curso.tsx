@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
   FileText,
   Play,
   School,
@@ -65,9 +66,7 @@ const CourseDetailPage: React.FC = () => {
   const coursePath = courseIdParam ? `/curso/${courseIdentifier}` : "/curso";
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const lastCourseAccess = {
       courseId: courseIdentifier,
@@ -77,40 +76,27 @@ const CourseDetailPage: React.FC = () => {
     };
 
     try {
-      window.localStorage.setItem(
-        "lastCourseAccess",
-        JSON.stringify(lastCourseAccess)
-      );
-      window.dispatchEvent(
-        new CustomEvent("last-course-access-updated", {
-          detail: lastCourseAccess,
-        })
-      );
+      window.localStorage.setItem("lastCourseAccess", JSON.stringify(lastCourseAccess));
+      window.dispatchEvent(new CustomEvent("last-course-access-updated", { detail: lastCourseAccess }));
     } catch (error) {
       console.error("Error storing last course access", error);
     }
   }, [courseIdentifier, coursePath]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const params = new URLSearchParams(location.search);
     const moduleFromQuery = params.get("module");
     const itemFromQuery = params.get("item");
 
-    if (!moduleFromQuery) {
-      return;
-    }
+    if (!moduleFromQuery) return;
 
     const subjectWithModule = courseDetail.subjects.find((subject) =>
       subject.modules.some((module) => module.id === moduleFromQuery)
     );
 
-    if (!subjectWithModule) {
-      return;
-    }
+    if (!subjectWithModule) return;
 
     setSelectedSubjectId(subjectWithModule.id);
     setExpandedModuleId(moduleFromQuery);
@@ -164,18 +150,12 @@ const CourseDetailPage: React.FC = () => {
   };
 
   const getItemIcon = (type: ModuleItem["type"]) => {
-    if (type === "VIDEO") {
-      return <Play className="h-4 w-4" />;
-    }
-
+    if (type === "VIDEO") return <Play className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
 
   const getItemBadge = (item: ModuleItem) => {
-    if (item.type === "VIDEO") {
-      return item.duration;
-    }
-
+    if (item.type === "VIDEO") return item.duration;
     return item.size;
   };
 
@@ -184,9 +164,7 @@ const CourseDetailPage: React.FC = () => {
     module: Module,
     item: ModuleItem
   ) => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     const timestamp = new Date().toISOString();
 
@@ -204,15 +182,8 @@ const CourseDetailPage: React.FC = () => {
     };
 
     try {
-      window.localStorage.setItem(
-        "lastViewedClass",
-        JSON.stringify(lastViewedClass)
-      );
-      window.dispatchEvent(
-        new CustomEvent("last-viewed-class-updated", {
-          detail: lastViewedClass,
-        })
-      );
+      window.localStorage.setItem("lastViewedClass", JSON.stringify(lastViewedClass));
+      window.dispatchEvent(new CustomEvent("last-viewed-class-updated", { detail: lastViewedClass }));
 
       const lastCourseAccess = {
         courseId: courseIdentifier,
@@ -221,15 +192,8 @@ const CourseDetailPage: React.FC = () => {
         updatedAt: timestamp,
       };
 
-      window.localStorage.setItem(
-        "lastCourseAccess",
-        JSON.stringify(lastCourseAccess)
-      );
-      window.dispatchEvent(
-        new CustomEvent("last-course-access-updated", {
-          detail: lastCourseAccess,
-        })
-      );
+      window.localStorage.setItem("lastCourseAccess", JSON.stringify(lastCourseAccess));
+      window.dispatchEvent(new CustomEvent("last-course-access-updated", { detail: lastCourseAccess }));
     } catch (error) {
       console.error("Error storing last viewed class information", error);
     }
@@ -245,35 +209,80 @@ const CourseDetailPage: React.FC = () => {
 
   const renderModule = (module: Module) => {
     const isExpanded = expandedModuleId === module.id;
+    const panelId = `module-panel-${module.id}`;
+    const buttonId = `module-trigger-${module.id}`;
+
+    const videosCount = module.items.filter((i) => i.type === "VIDEO").length;
+    const pdfCount = module.items.filter((i) => i.type === "PDF").length;
 
     return (
-      <Card key={module.id} className="border-slate-200 shadow-none dark:border-slate-800 dark:bg-slate-900/60">
+      <Card
+        key={module.id}
+        className={`border-slate-200 shadow-none dark:border-slate-800 dark:bg-slate-900/60 transition-colors ${isExpanded ? "border-orange-300/70 dark:border-orange-400/40" : ""}`}
+      >
         <button
+          id={buttonId}
           type="button"
           onClick={() => handleModuleToggle(module.id)}
-          className="w-full text-left"
+          aria-expanded={isExpanded}
+          aria-controls={panelId}
+          className={`group w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 rounded-xl`}
         >
-          <CardHeader className="space-y-1 px-4 py-3 sm:py-4">
-            <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              {module.name}
-            </CardTitle>
-            <p className="text-sm text-slate-500 dark:text-slate-300">{module.description}</p>
-            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-              <Video className="h-3.5 w-3.5" />
-              <span>
-                {module.items.filter((item) => item.type === "VIDEO").length} videos
-              </span>
-              <span aria-hidden="true">•</span>
-              <FileText className="h-3.5 w-3.5" />
-              <span>
-                {module.items.filter((item) => item.type === "PDF").length} PDF
+          <CardHeader className="space-y-2 px-4 py-3 sm:py-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {module.name}
+                  </CardTitle>
+                </div>
+
+                <p className="text-sm text-slate-500 dark:text-slate-300">{module.description}</p>
+
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <Video className="h-3.5 w-3.5" />
+                    {videosCount} videos
+                  </span>
+                  <span aria-hidden="true">•</span>
+                  <span className="inline-flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    {pdfCount} PDF
+                  </span>
+                  <span aria-hidden="true">•</span>
+                  <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-300">
+                    <Badge
+                    variant="outline"
+                    className="border-0 bg-orange-500/10 text-[9px] font-medium uppercase tracking-wide text-orange-600 dark:bg-orange-500/20 dark:text-orange-200"
+                  >
+                    {isExpanded ? "Ocultar" : "Desplegar"}
+                  </Badge>
+                  </span>
+                </div>
+              </div>
+
+              {/* Chevron que rota para indicar expandido/colapsado */}
+              <span
+                aria-hidden="true"
+                className={`mt-1 grid h-8 w-8 place-items-center rounded-full border transition-all
+                ${isExpanded
+                    ? "rotate-180 border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-600/50 dark:bg-orange-500/10 dark:text-orange-200"
+                    : "border-slate-200 text-slate-500 group-hover:border-orange-200 group-hover:bg-orange-50/60 group-hover:text-orange-600 dark:border-slate-700 dark:text-slate-400 dark:group-hover:border-orange-600/50 dark:group-hover:bg-orange-500/10 dark:group-hover:text-orange-200"
+                  }`}
+              >
+                <ChevronDown className="h-4 w-4 transition-transform" />
               </span>
             </div>
           </CardHeader>
         </button>
 
         {isExpanded && (
-          <CardContent className="space-y-3 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <CardContent
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
+            className="space-y-3 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
+          >
             {module.items.map((item) => {
               const isCompleted = completedItems.includes(item.id);
 
@@ -325,18 +334,14 @@ const CourseDetailPage: React.FC = () => {
                     >
                       <CheckCircle2 className="h-4 w-4" />
                       <span className="sr-only">
-                        {isCompleted
-                          ? "Marcar contenido como pendiente"
-                          : "Marcar contenido como completado"}
+                        {isCompleted ? "Marcar contenido como pendiente" : "Marcar contenido como completado"}
                       </span>
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-auto px-2 text-xs text-orange-600 dark:text-orange-300"
-                      onClick={() =>
-                        handleAccessContent(selectedSubject, module, item)
-                      }
+                      onClick={() => handleAccessContent(selectedSubject!, module, item)}
                     >
                       {item.type === "VIDEO" ? "Ver" : "Descargar"}
                     </Button>
@@ -349,17 +354,14 @@ const CourseDetailPage: React.FC = () => {
       </Card>
     );
   };
+  // ========= FIN módulo como desplegable =========
 
   if (!courseDetail) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
         <div className="text-center space-y-2">
-          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            Curso no encontrado
-          </p>
-          <Button variant="outline" onClick={() => navigate("/")}>
-            Volver al inicio
-          </Button>
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">Curso no encontrado</p>
+          <Button variant="outline" onClick={() => navigate("/")}>Volver al inicio</Button>
         </div>
       </div>
     );
@@ -379,10 +381,7 @@ const CourseDetailPage: React.FC = () => {
           </Button>
           <div className="flex-1">
             <p className="text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
-            <h1
-              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
-              data-testid="course-title"
-            >
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100" data-testid="course-title">
               {courseDetail.title}
             </h1>
           </div>
@@ -393,17 +392,13 @@ const CourseDetailPage: React.FC = () => {
         <section className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="hidden sm:block">
-              <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">
-                Progreso general
-              </p>
+              <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">Progreso general</p>
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                 {completedCount} de {totalItems} contenidos completados
               </p>
             </div>
             <div className="flex w-full items-center justify-between sm:hidden">
-              <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">
-                Progreso
-              </span>
+              <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">Progreso</span>
               <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
             </div>
             <span className="hidden text-sm font-semibold text-orange-600 sm:inline">{progressPercentage}%</span>
@@ -414,25 +409,18 @@ const CourseDetailPage: React.FC = () => {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <School className="h-4 w-4 text-orange-500" />
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Materias del programa
-            </h2>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Materias del programa</h2>
           </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {courseDetail.subjects.map((subject) => {
               const isActive = subject.id === selectedSubjectId;
 
               const completedInSubject = subject.modules.reduce(
-                (acc, module) =>
-                  acc +
-                  module.items.filter((item) => completedItems.includes(item.id))
-                    .length,
+                (acc, module) => acc + module.items.filter((item) => completedItems.includes(item.id)).length,
                 0
               );
-              const totalInSubject = subject.modules.reduce(
-                (acc, module) => acc + module.items.length,
-                0
-              );
+              const totalInSubject = subject.modules.reduce((acc, module) => acc + module.items.length, 0);
 
               return (
                 <button
@@ -462,9 +450,11 @@ const CourseDetailPage: React.FC = () => {
                       {completedInSubject}/{totalInSubject} contenidos
                     </Badge>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                    {subject.description}
-                  </p>
+                  <div className="hidden sm:block">
+                    <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                      {subject.description}
+                    </p>
+                  </div>
                 </button>
               );
             })}
@@ -472,7 +462,11 @@ const CourseDetailPage: React.FC = () => {
 
           {selectedSubject && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-600 dark:text-slate-300">{selectedSubject.description}</p>
+              <div className="hidden sm:block">
+                <p className="text-sm text-slate-600 dark:text-slate-300">{selectedSubject.description}</p>
+              </div>
+
+              {/* Lista de módulos (cada uno es un desplegable) */}
               <div className="space-y-3">
                 {selectedSubject.modules.map((module) => renderModule(module))}
               </div>
@@ -484,11 +478,9 @@ const CourseDetailPage: React.FC = () => {
           <div className="flex items-start gap-3">
             <BookOpen className="h-5 w-5 text-orange-500" />
             <div className="space-y-1">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                Cómo navegar el curso
-              </h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Cómo navegar el curso</h2>
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                Elegí una materia para ver sus módulos y desplegá cada módulo para acceder a los videos o PDFs correspondientes.
+                Elegí una materia para ver sus módulos y <strong>desplegá</strong> cada módulo para acceder a los videos o PDFs correspondientes.
               </p>
             </div>
           </div>
