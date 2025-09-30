@@ -1,25 +1,167 @@
 
+import { useCallback, useEffect, useState } from "react";
 import { Home, Play, User } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
+type ContinueTarget = {
+  path: string;
+  courseTitle?: string;
+  itemTitle?: string;
+};
+
+const DEFAULT_CONTINUE_TARGET: ContinueTarget = {
+  path: "/curso",
+};
+
 const BottomNavigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [continueTarget, setContinueTarget] = useState<ContinueTarget>(
+    DEFAULT_CONTINUE_TARGET
+  );
+
+  const updateContinueTarget = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const fallbackPath = "/curso";
+    let nextTarget: ContinueTarget = { ...DEFAULT_CONTINUE_TARGET };
+
+    try {
+      const storedClassRaw = window.localStorage.getItem("lastViewedClass");
+
+      if (storedClassRaw) {
+        const storedClass = JSON.parse(storedClassRaw);
+
+        if (storedClass && typeof storedClass === "object") {
+          const pathFromStorage =
+            typeof storedClass.path === "string" && storedClass.path.length > 0
+              ? storedClass.path
+              : typeof storedClass.courseId === "string" &&
+                  storedClass.courseId.length > 0
+                ? `/curso/${storedClass.courseId}`
+                : fallbackPath;
+
+          nextTarget = {
+            path: pathFromStorage,
+            courseTitle:
+              typeof storedClass.courseTitle === "string"
+                ? storedClass.courseTitle
+                : undefined,
+            itemTitle:
+              typeof storedClass.itemTitle === "string"
+                ? storedClass.itemTitle
+                : undefined,
+          };
+
+          setContinueTarget(nextTarget);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing lastViewedClass from localStorage", error);
+    }
+
+    try {
+      const storedCourseRaw = window.localStorage.getItem("lastCourseAccess");
+
+      if (storedCourseRaw) {
+        const storedCourse = JSON.parse(storedCourseRaw);
+
+        if (storedCourse && typeof storedCourse === "object") {
+          const pathFromStorage =
+            typeof storedCourse.path === "string" && storedCourse.path.length > 0
+              ? storedCourse.path
+              : typeof storedCourse.courseId === "string" &&
+                  storedCourse.courseId.length > 0
+                ? `/curso/${storedCourse.courseId}`
+                : fallbackPath;
+
+          nextTarget = {
+            path: pathFromStorage,
+            courseTitle:
+              typeof storedCourse.courseTitle === "string"
+                ? storedCourse.courseTitle
+                : undefined,
+          };
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing lastCourseAccess from localStorage", error);
+    }
+
+    setContinueTarget(nextTarget);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        !event.key ||
+        event.key === "lastViewedClass" ||
+        event.key === "lastCourseAccess"
+      ) {
+        updateContinueTarget();
+      }
+    };
+
+    const handleCustomUpdate = () => {
+      updateContinueTarget();
+    };
+
+    updateContinueTarget();
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("last-viewed-class-updated", handleCustomUpdate);
+    window.addEventListener("last-course-access-updated", handleCustomUpdate);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        "last-viewed-class-updated",
+        handleCustomUpdate
+      );
+      window.removeEventListener(
+        "last-course-access-updated",
+        handleCustomUpdate
+      );
+    };
+  }, [location.pathname, location.search, updateContinueTarget]);
+
+  const continueAriaLabel = continueTarget.itemTitle
+    ? `Continuar ${continueTarget.itemTitle}`
+    : continueTarget.courseTitle
+      ? `Continuar curso ${continueTarget.courseTitle}`
+      : "Continuar con tus clases";
 
   const navItems = [
-    { icon: Home, label: "Inicio", path: "/" },
-    { icon: Play, label: "Clases", path: "/Curso" },
-    { icon: User, label: "Perfil", path: "/profile" },
+    { icon: Home, label: "Inicio", path: "/", activePath: "/" },
+    {
+      icon: Play,
+      label: "Continuar",
+      path: continueTarget.path,
+      activePath: "/curso",
+      ariaLabel: continueAriaLabel,
+    },
+    { icon: User, label: "Perfil", path: "/profile", activePath: "/profile" },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-700 md:hidden">
       <div className="flex items-center justify-around py-2">
-        {navItems.map(({ icon: Icon, label, path }) => {
-          const isActive = location.pathname === path || 
-            (path !== "/" && location.pathname.startsWith(path));
-          
+        {navItems.map(({ icon: Icon, label, path, activePath, ariaLabel }) => {
+          const basePath = activePath ?? path;
+          const isActive =
+            basePath === "/"
+              ? location.pathname === "/"
+              : location.pathname === basePath ||
+                location.pathname.startsWith(basePath);
+
           return (
             <button
               key={path}
@@ -30,6 +172,7 @@ const BottomNavigation = () => {
                   ? "text-blue-600 dark:text-blue-400"
                   : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
               )}
+              aria-label={ariaLabel ?? label}
             >
               <Icon className={cn("w-5 h-5 mb-1", isActive && "scale-110")} />
               <span className="text-xs font-medium">{label}</span>
