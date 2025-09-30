@@ -8,6 +8,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -16,6 +17,27 @@ const Index = () => {
     theme === "dark" ||
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+
+    const updateIsMobile = (event: MediaQueryList | MediaQueryListEvent) => {
+      setIsMobile(event.matches);
+    };
+
+    // Initialize state on mount
+    updateIsMobile(mediaQuery);
+
+    const listener = (event: MediaQueryListEvent) => updateIsMobile(event);
+
+    if ("addEventListener" in mediaQuery) {
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
+    }
+
+    mediaQuery.addListener(listener);
+    return () => mediaQuery.removeListener(listener);
+  }, []);
 
   // Carrusel automático
   useEffect(() => {
@@ -69,35 +91,37 @@ const Index = () => {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
       {/* Carrusel de banners */}
-      <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
-        <div
-          className="flex transition-transform duration-500 ease-in-out"
-          style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
-        >
-          {banners.map((banner, index) => (
-            <div key={index} className="w-full flex-shrink-0">
-              <img
-                src={banner}
-                alt={`Banner ${index + 1}`}
-                className="w-full h-40 sm:h-56 md:h-64 lg:h-72 object-cover"
+      {!isMobile && (
+        <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
+          <div
+            className="flex transition-transform duration-500 ease-in-out"
+            style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
+          >
+            {banners.map((banner, index) => (
+              <div key={index} className="w-full flex-shrink-0">
+                <img
+                  src={banner}
+                  alt={`Banner ${index + 1}`}
+                  className="w-full h-40 sm:h-56 md:h-64 lg:h-72 object-cover"
+                />
+              </div>
+            ))}
+          </div>
+          {/* Puntos de navegación - mantienen estilo original */}
+          <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 flex justify-center space-x-1 sm:space-x-2">
+            {banners.map((_, index) => (
+              <button
+                key={index}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentBannerIndex ? "bg-white" : "bg-white/50"
+                }`}
+                onClick={() => setCurrentBannerIndex(index)}
+                aria-label={`Ir a banner ${index + 1}`}
               />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        {/* Puntos de navegación - mantienen estilo original */}
-        <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 flex justify-center space-x-1 sm:space-x-2">
-          {banners.map((_, index) => (
-            <button
-              key={index}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                index === currentBannerIndex ? "bg-white" : "bg-white/50"
-              }`}
-              onClick={() => setCurrentBannerIndex(index)}
-              aria-label={`Ir a banner ${index + 1}`}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Logo adaptativo según tema */}
       <div className="text-center mt-4">
