@@ -49,10 +49,10 @@ export const courses: Course[] = [
     status: "activo",
     subjects: [
       {
-        id: "fundamentos",
-        name: "Fundamentos Anatómicos",
+        id: "anatomia",
+        name: "Anatomía",
         description:
-          "Comprendé cómo funciona el cuerpo y cómo impacta en la actividad física.",
+          "Comprendé cómo funciona el cuerpo humano y cómo impacta en la actividad física.",
         modules: [
           {
             id: "fundamentos-anatomia",
@@ -112,10 +112,10 @@ export const courses: Course[] = [
         ],
       },
       {
-        id: "planificacion",
-        name: "Planificación y Metodología",
+        id: "teoria-fitness-grupal",
+        name: "Teoría del Fitness Grupal",
         description:
-          "Herramientas prácticas para diseñar clases seguras y dinámicas.",
+          "Fundamentos teóricos para diseñar clases grupales seguras y dinámicas.",
         modules: [
           {
             id: "planificacion-bases",

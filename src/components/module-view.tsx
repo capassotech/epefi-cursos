@@ -41,8 +41,8 @@ const ModuleView = () => {
     precio: 299,
     materias: [
       {
-        id: "materia-1",
-        nombre: "Anatomía y Fisiología",
+        id: "anatomia",
+        nombre: "Anatomía",
         modulos: [
           {
             id: "modulo-1",
@@ -89,8 +89,8 @@ const ModuleView = () => {
         ],
       },
       {
-        id: "materia-2",
-        nombre: "Metodología del Entrenamiento",
+        id: "teoria-fitness-grupal",
+        nombre: "Teoría del Fitness Grupal",
         modulos: [
           {
             id: "modulo-4",
@@ -107,7 +107,7 @@ const ModuleView = () => {
     ],
   };
 
-  const [openMaterias, setOpenMaterias] = useState(["materia-1"]);
+  const [openMaterias, setOpenMaterias] = useState(["anatomia"]);
   const [completedContents, setCompletedContents] = useState([
     "modulo-1",
     "modulo-2",
