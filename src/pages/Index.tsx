@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
@@ -12,6 +12,7 @@ const Index = () => {
 
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
@@ -55,8 +56,10 @@ const Index = () => {
 
   useEffect(() => {
     const fetchCourses = async () => {
+      setLoading(true);
       const courses = await CoursesService.getAllCoursesPerUser(user.uid);
       setCourses(courses.data);
+      setLoading(false);
     };
     fetchCourses();
   }, [user]);
@@ -95,6 +98,7 @@ const Index = () => {
   //     };
   //   });
   // }, [courses]);
+
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
@@ -151,65 +155,74 @@ const Index = () => {
           Mis formaciones
         </h2>
         <div className="grid grid-cols-1 gap-4">
-          {courses.length === 0
-            ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">No hay cursos asignados</p>
-              </div>
-            ) : (
-              courses.map((course) => {
-                return (
-                  <Card
-                    key={course.id}
-                    className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
-                    onClick={() => navigate(buildCourseUrl(course.id))}
-                  >
-                    <CardContent className="p-0 flex flex-col sm:flex-row">
-                      {/* Imagen del curso */}
-                      <div className="w-full sm:w-1/3 h-40 sm:h-32 md:h-40 relative overflow-hidden flex-shrink-0">
-                        <img
-                          src={course.imagen === "" ? "/placeholder.svg" : course.imagen}
-                          alt={course.titulo}
-                          className="object-cover w-full h-full transition-transform hover:scale-105"
-                        />
-                      </div>
-                      {/* Contenido del curso */}
-                      <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
-                        <div className="mb-3 sm:mb-4">
-                          <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-gray-100 break-words">
-                            {course.titulo}
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
-                            {course.descripcion}
-                          </p>
-                        </div>
-                        <div>
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                              <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-full whitespace-nowrap border border-slate-200 dark:border-slate-600">
-                                {course.estado}
-                              </span>
-                            </div>
-                            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-10 h-10 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {courses.length === 0
+                ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500 dark:text-gray-400">No hay cursos asignados</p>
+                  </div>
+                ) : (
+                  courses.map((course) => {
+                    return (
+                      <Card
+                        key={course.id}
+                        className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
+                        onClick={() => navigate(buildCourseUrl(course.id))}
+                      >
+                        <CardContent className="p-0 flex flex-col sm:flex-row">
+                          {/* Imagen del curso */}
+                          <div className="w-full sm:w-1/3 h-40 sm:h-32 md:h-40 relative overflow-hidden flex-shrink-0">
+                            <img
+                              src={course.imagen === "" ? "/placeholder.svg" : course.imagen}
+                              alt={course.titulo}
+                              className="object-cover w-full h-full transition-transform hover:scale-105"
+                            />
                           </div>
-                          {/* Barra de progreso - naranja solo como detalle */}
-                          <div className="flex items-center gap-2 mt-3 sm:mt-4">
-                            <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
-                              <div
-                                className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
-                              // style={{ width: `${course.progress}%` }}
-                              ></div>
+                          {/* Contenido del curso */}
+                          <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
+                            <div className="mb-3 sm:mb-4">
+                              <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-gray-100 break-words">
+                                {course.titulo}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
+                                {course.descripcion}
+                              </p>
                             </div>
-                            <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
-                              {/* {course.progress}% */}
-                            </span>
+                            <div>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                                  <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-full whitespace-nowrap border border-slate-200 dark:border-slate-600">
+                                    {course.estado}
+                                  </span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
+                              </div>
+                              {/* Barra de progreso - naranja solo como detalle */}
+                              <div className="flex items-center gap-2 mt-3 sm:mt-4">
+                                <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
+                                  <div
+                                    className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
+                                  // style={{ width: `${course.progress}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
+                                  {/* {course.progress}% */}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              }))}
+                        </CardContent>
+                      </Card>
+                    )
+                  }))}
+            </>
+          )}
+
         </div>
       </div>
 
