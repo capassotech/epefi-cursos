@@ -26,13 +26,12 @@ export interface Subject {
 
 export interface Course {
   id: string;
-  title: string;
-  summary: string;
-  description: string;
-  image: string;
-  level: string;
-  status: "activo" | "inactivo";
-  subjects: Subject[];
+  titulo: string;
+  descripcion: string;
+  imagen: string;
+  estado: "activo" | "inactivo";
+  precio: number;
+  materias: string[];
 }
 
 export const courses: Course[] = [

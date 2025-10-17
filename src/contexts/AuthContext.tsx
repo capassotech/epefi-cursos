@@ -128,13 +128,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log("🌐 Fetching profile from backend...");
       const token = await firebaseUser.getIdToken();
 
-      const response = await fetch("http://localhost:3000/api/users/me", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        "https://epefi-backend.onrender.com/api/users/me",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
         const profileData = await response.json();
