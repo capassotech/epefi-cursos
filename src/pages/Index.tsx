@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, Play } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
 import CoursesService from "@/services/coursesService";
 import { useAuth } from "@/contexts/AuthContext";
+import VideoModal from "@/components/video-modal";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -15,6 +16,16 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+    url: string;
+    duration?: string;
+    thumbnail?: string;
+    topics?: string[];
+  } | null>(null);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -23,6 +34,20 @@ const Index = () => {
     theme === "dark" ||
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  const handleOpenVideoModal = (course: Course) => {
+    setSelectedVideo({
+      id: course.id,
+      title: `Video de formación - ${course.titulo}`,
+      url: "https://www.youtube.com/embed/dQw4w9WgXcQ", 
+    });
+    setIsVideoModalOpen(true);
+  };
+
+  const handleCloseVideoModal = () => {
+    setIsVideoModalOpen(false);
+    setSelectedVideo(null);
+  };
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 639px)");
@@ -41,8 +66,16 @@ const Index = () => {
       return () => mediaQuery.removeEventListener("change", listener);
     }
 
-    mediaQuery.addListener(listener);
-    return () => mediaQuery.removeListener(listener);
+    // Fallback para navegadores más antiguos
+    const legacyMediaQuery = mediaQuery as MediaQueryList & {
+      addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+      removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
+    };
+    
+    if (legacyMediaQuery.addListener) {
+      legacyMediaQuery.addListener(listener);
+      return () => legacyMediaQuery.removeListener?.(listener);
+    }
   }, []);
 
   useEffect(() => {
@@ -52,7 +85,7 @@ const Index = () => {
       );
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [banners.length]);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -192,6 +225,16 @@ const Index = () => {
                               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
                                 {course.descripcion}
                               </p>
+                              <button 
+                                className="text-sm hover:underline text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 break-words flex items-center gap-1 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenVideoModal(course);
+                                }}
+                              >
+                                <Play className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200" />
+                                Ver video
+                              </button>
                             </div>
                             <div>
                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
@@ -252,6 +295,12 @@ const Index = () => {
           </div>
         </Card>
       </a>
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={handleCloseVideoModal}
+        content={selectedVideo}
+      />
     </div>
   );
 };

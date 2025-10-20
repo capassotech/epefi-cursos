@@ -30,7 +30,7 @@ const VideoModal = ({ isOpen, onClose, content }: VideoModalProps) => {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold pr-8">
+            <DialogTitle className="md:text-xl text-sm md:font-bold pr-8">
               {content.title}
             </DialogTitle>
           </div>
