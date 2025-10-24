@@ -91,51 +91,16 @@ const Index = () => {
     const fetchCourses = async () => {
       setLoading(true);
       const courses = await CoursesService.getAllCoursesPerUser(user.uid);
-      setCourses(courses.data);
+      const filteredCourses = courses.data.filter((course) => course.estado === "activo");
+      setCourses(filteredCourses);
       setLoading(false);
     };
     fetchCourses();
   }, [user]);
 
-  // const coursesWithProgress = useMemo(() => {
-  //   return courses.map((course) => {
-  //     const { totalItems, completedItems } = course.subjects.reduce(
-  //       (acc, subject) => {
-  //         subject.modules.forEach((module) => {
-  //           acc.totalItems += module.items.length;
-  //           acc.completedItems += module.items.filter(
-  //             (item) => item.completed
-  //           ).length;
-  //         });
-  //         return acc;
-  //       },
-  //       { totalItems: 0, completedItems: 0 }
-  //     );
-
-  //     const progress =
-  //       totalItems > 0
-  //         ? Math.round((completedItems / totalItems) * 100)
-  //         : 0;
-
-  //     const totalModules = course.subjects.reduce(
-  //       (acc, subject) => acc + subject.modules.length,
-  //       0
-  //     );
-
-  //     return {
-  //       ...course,
-  //       totalItems,
-  //       completedItems,
-  //       progress,
-  //       totalModules,
-  //     };
-  //   });
-  // }, [courses]);
-
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
-      {/* Carrusel de banners */}
       {!isMobile && (
         <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
           <div
@@ -152,7 +117,6 @@ const Index = () => {
               </div>
             ))}
           </div>
-          {/* Puntos de navegación - mantienen estilo original */}
           <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 flex justify-center space-x-1 sm:space-x-2">
             {banners.map((_, index) => (
               <button
@@ -167,7 +131,6 @@ const Index = () => {
         </div>
       )}
 
-      {/* Logo adaptativo según tema */}
       <div className="text-center mt-4">
         <div className="rounded-lg flex items-center justify-center">
           <img
@@ -182,7 +145,6 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Lista de Cursos */}
       <div className="space-y-4">
         <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 ml-1">
           Mis formaciones
@@ -207,9 +169,9 @@ const Index = () => {
                         className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
                         onClick={() => navigate(buildCourseUrl(course.id))}
                       >
-                        <CardContent className="p-0 flex flex-col sm:flex-row">
+                        <CardContent className="p-0 flex flex-col sm:flex-row h-[200px]">
                           {/* Imagen del curso */}
-                          <div className="w-full sm:w-1/3 h-40 sm:h-32 md:h-40 relative overflow-hidden flex-shrink-0">
+                          <div className="w-full sm:w-1/3 h-[200px] sm:h-full relative overflow-hidden flex-shrink-0">
                             <img
                               src={course.imagen === "" ? "/placeholder.svg" : course.imagen}
                               alt={course.titulo}

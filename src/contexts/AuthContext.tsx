@@ -4,11 +4,17 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../../config/firebase-client";
 import authService from "../services/authService";
+
+interface UserRole {
+  admin: boolean;
+  student: boolean;
+}
 
 interface UserProfile {
   uid: string;
@@ -16,25 +22,41 @@ interface UserProfile {
   nombre: string;
   apellido: string;
   dni?: string;
-  role: any;
+  role: UserRole;
   fechaRegistro?: string;
 }
+
+interface AuthResponse {
+  success: boolean;
+  message?: string;
+  user?: UserProfile;
+}
+
+interface RegisterUserData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dni: string;
+}
+
+
 
 interface AuthContextType {
   user: UserProfile | null;
   firebaseUser: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<any>;
-  register: (userData: any) => Promise<any>;
+  login: (email: string, password: string) => Promise<AuthResponse>;
+  register: (userData: RegisterUserData) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   googleRegister: (
     firstName: string,
     lastName: string,
     dni: string,
     acceptTerms: boolean
-  ) => Promise<any>;
-  googleLogin: () => Promise<any>;
+  ) => Promise<AuthResponse>;
+  googleLogin: () => Promise<AuthResponse>;
   forgotPassword: (email: string) => Promise<void>;
   changePassword: (oobCode: string, password: string) => Promise<void>;
 }
@@ -57,9 +79,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const API_BASE_URL = "http://localhost:3000";
 
   // isAuthenticated SOLO depende de firebaseUser
   const isAuthenticated = !!firebaseUser;
+
+  // Función para obtener perfil del backend sin bloquear la UI
+  const fetchUserProfileInBackground = useCallback(async (firebaseUser: User) => {
+    try {
+      console.log("🌐 Fetching profile from backend...");
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/users/me`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.ok) {
+        const profileData = await response.json();
+        console.log("✅ Backend profile fetched:", profileData);
+
+        const updatedProfile: UserProfile = {
+          uid: profileData.uid || firebaseUser.uid,
+          email: profileData.email || firebaseUser.email || "",
+          nombre: profileData.nombre || "Usuario",
+          apellido: profileData.apellido || "",
+          dni: profileData.dni,
+          role: profileData.role || { admin: false, student: true },
+          fechaRegistro: profileData.fechaRegistro || profileData.fechaCreacion,
+        };
+
+        setUser(updatedProfile);
+        authService.updateStudentDataInStorage(updatedProfile);
+      } else {
+        console.warn("Backend profile fetch failed:", response.status);
+      }
+    } catch (error) {
+      console.warn("Backend profile fetch error:", error);
+      // No hacer nada - seguir con el perfil básico
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -120,76 +185,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserProfileInBackground]);
 
-  // Función para obtener perfil del backend sin bloquear la UI
-  const fetchUserProfileInBackground = async (firebaseUser: User) => {
-    try {
-      console.log("🌐 Fetching profile from backend...");
-      const token = await firebaseUser.getIdToken();
-
-      const response = await fetch(
-        "https://epefi-backend.onrender.com/api/users/me",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (response.ok) {
-        const profileData = await response.json();
-        console.log("✅ Backend profile fetched:", profileData);
-
-        const updatedProfile: UserProfile = {
-          uid: profileData.uid || firebaseUser.uid,
-          email: profileData.email || firebaseUser.email || "",
-          nombre: profileData.nombre || "Usuario",
-          apellido: profileData.apellido || "",
-          dni: profileData.dni,
-          role: profileData.role || { admin: false, student: true },
-          fechaRegistro: profileData.fechaRegistro || profileData.fechaCreacion,
-        };
-
-        setUser(updatedProfile);
-        authService.updateStudentDataInStorage(updatedProfile);
-      } else {
-        console.warn("Backend profile fetch failed:", response.status);
-      }
-    } catch (error) {
-      console.warn("Backend profile fetch error:", error);
-      // No hacer nada - seguir con el perfil básico
-    }
+  const login = async (email: string, password: string): Promise<AuthResponse> => {
+    // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
+    const response = await authService.login({ email, password });
+    return response;
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.login({ email, password });
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
-  };
-
-  const register = async (userData: any) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.register({
-        email: userData.email,
-        password: userData.password,
-        nombre: userData.firstName,
-        apellido: userData.lastName,
-        dni: userData.dni,
-      });
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+  const register = async (userData: RegisterUserData): Promise<AuthResponse> => {
+    // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
+    const response = await authService.register({
+      email: userData.email,
+      password: userData.password,
+      nombre: userData.firstName,
+      apellido: userData.lastName,
+      dni: userData.dni,
+    });
+    return response;
   };
 
   const googleRegister = async (
@@ -197,34 +210,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     lastName: string,
     dni: string,
     acceptTerms: boolean
-  ) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.googleRegister(
-        firstName,
-        lastName,
-        dni,
-        acceptTerms
-      );
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+  ): Promise<AuthResponse> => {
+    // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
+    const response = await authService.googleRegister(
+      firstName,
+      lastName,
+      dni,
+      acceptTerms
+    );
+    return response;
   };
 
-  const googleLogin = async () => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.googleLogin();
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+  const googleLogin = async (): Promise<AuthResponse> => {
+    // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
+    const response = await authService.googleLogin();
+    return response;
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<void> => {
     try {
       await authService.logout();
       // Los estados se limpiarán automáticamente por onAuthStateChanged
@@ -233,27 +236,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const forgotPassword = async (email: string) => {
+  const forgotPassword = async (email: string): Promise<void> => {
     await authService.forgotPassword(email);
   };
 
-  const changePassword = async (oobCode: string, password: string) => {
+  const changePassword = async (oobCode: string, password: string): Promise<void> => {
     await authService.changePassword(oobCode, password);
   };
 
-  const value: AuthContextType = {
-    user,
-    firebaseUser,
-    isAuthenticated,
-    isLoading,
-    login,
-    register,
-    logout,
-    googleRegister,
-    googleLogin,
-    forgotPassword,
-    changePassword,
-  };
+    const value: AuthContextType = {
+      user,
+      firebaseUser,
+      isAuthenticated,
+      isLoading,
+      login,
+      register,
+      logout,
+      googleRegister,
+      googleLogin,
+      forgotPassword,
+      changePassword,
+    };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
