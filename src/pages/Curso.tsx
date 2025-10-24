@@ -5,6 +5,7 @@ import {
   BookOpen,
   School,
   ChevronDown,
+  Play,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
+import VideoModal from "@/components/video-modal";
 
 const CourseDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +29,14 @@ const CourseDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
+  const [selectedVideo, setSelectedVideo] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+    url: string;
+    thumbnail?: string;
+  } | null>(null);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -121,7 +131,21 @@ const CourseDetailPage: React.FC = () => {
 
   console.log('Course detail:', courseDetail);
 
+  const handleOpenVideo = (modulo: Modulo) => {
+    setSelectedVideo({
+      id: modulo.id,
+      title: modulo.titulo,
+      description: modulo.descripcion,
+      url: modulo.url_video,
+      thumbnail: modulo.url_miniatura,
+    });
+    setIsVideoModalOpen(true);
+  };
 
+  const handleCloseVideo = () => {
+    setIsVideoModalOpen(false);
+    setSelectedVideo(null);
+  };
 
   const CourseInfoCard = ({ className = "" }) => (
     <section
@@ -248,14 +272,27 @@ const CourseDetailPage: React.FC = () => {
                                           {modulo.descripcion}
                                         </p>
                                       )}
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                          {modulo.tipo_contenido}
-                                        </span>
-                                        {modulo.duracion && (
-                                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                                            {modulo.duracion}
+                                      <div className="flex items-center justify-between mt-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                            {modulo.tipo_contenido}
                                           </span>
+                                          {modulo.url_video && (
+                                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                                              {modulo.url_video}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {modulo.url_video && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => handleOpenVideo(modulo)}
+                                          >
+                                            <Play className="h-3 w-3 mr-1" />
+                                            Ver video
+                                          </Button>
                                         )}
                                       </div>
                                     </div>
@@ -290,6 +327,12 @@ const CourseDetailPage: React.FC = () => {
           </aside>
         </div>
       </main>
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={handleCloseVideo}
+        content={selectedVideo}
+      />
     </div>
   );
 };
