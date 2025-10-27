@@ -35,6 +35,7 @@ interface RegisterData {
 
 class AuthService {
   async login(data: LoginData) {
+    console.log("ENTRO AL LOGIN...")
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -46,7 +47,7 @@ class AuthService {
       const token = await firebaseUser.getIdToken();
 
       try {
-        const response = await api.post("/api/auth/login", { email: data.email }, {
+        const response = await api.post("/api/auth/login", { email: data.email, password: data.password }, {
             headers: {
               Authorization: `Bearer ${token}`,
             },

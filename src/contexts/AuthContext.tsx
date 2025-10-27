@@ -136,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch(
-        "http://localhost:3000/api/users/me",
+        "http://localhost:3000/api/usuarios/me",
         {
           method: "GET",
           headers: {
