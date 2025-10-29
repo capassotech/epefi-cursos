@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,6 +6,7 @@ import {
   School,
   ChevronDown,
   Play,
+  File,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,12 @@ import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import VideoModal from "@/components/video-modal";
 
-const CourseDetailPage: React.FC = () => {
+const CourseDetailPage = () => {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
-  const [modulos, setModulos] = useState<Modulo[]>([]); 
+  const [modulos, setModulos] = useState<Modulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
@@ -44,7 +45,7 @@ const CourseDetailPage: React.FC = () => {
         setLoading(false);
         return;
       }
-      
+
       try {
         setLoading(true);
         const response = await CoursesService.getCourseById(courseId);
@@ -56,7 +57,7 @@ const CourseDetailPage: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchCourse();
   }, [courseId]);
 
@@ -129,13 +130,11 @@ const CourseDetailPage: React.FC = () => {
     fetchModulos();
   }, [materias]);
 
-  console.log('Course detail:', courseDetail);
 
   const handleOpenVideo = (modulo: Modulo) => {
     setSelectedVideo({
       id: modulo.id,
       title: modulo.titulo,
-      description: modulo.descripcion,
       url: modulo.url_video,
       thumbnail: modulo.url_miniatura,
     });
@@ -145,6 +144,29 @@ const CourseDetailPage: React.FC = () => {
   const handleCloseVideo = () => {
     setIsVideoModalOpen(false);
     setSelectedVideo(null);
+  };
+
+  const handleDownloadFile = async (modulo: Modulo) => {
+    if (!modulo.url_archivo) {
+      console.error('No hay URL de archivo disponible');
+      return;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.href = modulo.url_archivo;
+      
+      const fileName = `${modulo.titulo.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.${modulo.tipo_contenido}`;
+      link.download = fileName;
+      
+      document.body.appendChild(link);
+      
+      link.click();
+      
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error al descargar el archivo:', error);
+    }
   };
 
   const CourseInfoCard = ({ className = "" }) => (
@@ -225,14 +247,14 @@ const CourseDetailPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Materias y Módulos:</h3>
-                  
+
                   <Accordion type="multiple" className="w-full space-y-2">
                     {materias.map((materia) => {
                       const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
-                      
+
                       return (
-                        <AccordionItem 
-                          key={materia.id} 
+                        <AccordionItem
+                          key={materia.id}
                           value={materia.id}
                           className="border border-slate-200 dark:border-slate-700 rounded-lg px-3"
                         >
@@ -249,7 +271,7 @@ const CourseDetailPage: React.FC = () => {
                               </div>
                             </div>
                           </AccordionTrigger>
-                          
+
                           <AccordionContent className="pb-3">
                             {loadingModulos ? (
                               <div className="text-xs text-slate-500 dark:text-slate-400 px-3">
@@ -268,21 +290,22 @@ const CourseDetailPage: React.FC = () => {
                                         {modulo.titulo}
                                       </h4>
                                       {modulo.descripcion && (
-                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                                        <p className="text-xs hidden md:block text-slate-600 dark:text-slate-400 mt-1">
                                           {modulo.descripcion}
                                         </p>
                                       )}
-                                      <div className="flex items-center justify-between mt-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                            {modulo.tipo_contenido}
-                                          </span>
-                                          {modulo.url_video && (
-                                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                                              {modulo.url_video}
-                                            </span>
-                                          )}
-                                        </div>
+                                      <div className="flex items-center gap-3 mt-1">
+                                        {modulo.url_archivo && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => handleDownloadFile(modulo)}
+                                          >
+                                            <File className="h-3 w-3 mr-1" />
+                                            Descargar archivo .{modulo.tipo_contenido}
+                                          </Button>
+                                        )}
                                         {modulo.url_video && (
                                           <Button
                                             size="sm"
