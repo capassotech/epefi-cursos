@@ -23,13 +23,10 @@ export interface Modulo {
   titulo: string;
   descripcion: string;
   tipo_contenido: "pdf" | "video" | "evaluacion" | "extra" | "imagen";
-  url_contenido: string;
+  url_archivo: string;
   url_miniatura?: string;
   bibliografia?: string;
-  duracion?: string; // Para videos
-  orden?: number; // Para organizar módulos
-  completado?: boolean; // Estado del usuario
-  temas?: string[]; // Temas tratados
+  url_video?: string;
 }
 
 export interface Usuario {

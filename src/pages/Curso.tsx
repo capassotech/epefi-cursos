@@ -1,387 +1,175 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
-  CheckCircle2,
-  ChevronDown,
-  FileText,
-  Play,
   School,
-  Video,
+  ChevronDown,
+  Play,
+  File,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
 import {
-  Course,
-  Module,
-  ModuleItem,
-  Subject,
-  courses,
-  getCourseById,
-} from "@/data/courses";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
+import { Curso, Materia, Modulo } from "@/types/types";
+import CoursesService from "@/services/coursesService";
+import VideoModal from "@/components/video-modal";
 
-const CourseDetailPage: React.FC = () => {
+const CourseDetailPage = () => {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
-  const [searchParams] = useSearchParams();
+  const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMaterias, setLoadingMaterias] = useState(true);
+  const [loadingModulos, setLoadingModulos] = useState(true);
+  const [selectedVideo, setSelectedVideo] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+    url: string;
+    thumbnail?: string;
+  } | null>(null);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  const courseDetail: Course | undefined = useMemo(() => {
-    if (courseId) {
-      return getCourseById(courseId) ?? courses[0];
-    }
-    return courses[0];
+  useEffect(() => {
+    const fetchCourse = async () => {
+      if (!courseId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await CoursesService.getCourseById(courseId);
+        setCourseDetail(response.data);
+      } catch (error) {
+        console.error('Error fetching course:', error);
+        setCourseDetail(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourse();
   }, [courseId]);
 
-  const materiaParam = searchParams.get("materia");
-  const moduloParam = searchParams.get("modulo");
-
   useEffect(() => {
-    if (!courseDetail) return;
+    const fetchMaterias = async () => {
+      if (!courseDetail?.materias || courseDetail.materias.length === 0) {
+        setMaterias([]);
+        setLoadingMaterias(false);
+        return;
+      }
 
-    const subjectExists = materiaParam
-      ? courseDetail.subjects.some((subject) => subject.id === materiaParam)
-      : false;
+      try {
+        const materiasPromises = courseDetail.materias.map(async (materiaId) => {
+          const responseMateria = await CoursesService.getMateriasByCourseId(materiaId);
+          const materiaData = responseMateria.data;
+          return Array.isArray(materiaData) ? materiaData : [materiaData];
+        });
 
-    const fallbackSubject = courseDetail.subjects[0]?.id;
-    setSelectedSubjectId(subjectExists ? (materiaParam as string) : fallbackSubject);
-
-    if (moduloParam) {
-      const moduleExists = courseDetail.subjects.some((subject) =>
-        subject.modules.some((module) => module.id === moduloParam)
-      );
-      setExpandedModuleId(moduleExists ? moduloParam : null);
-    } else {
-      setExpandedModuleId(null);
-    }
-  }, [courseDetail, materiaParam, moduloParam]);
-  const location = useLocation();
-  const { courseId: courseIdParam } = useParams<{ courseId?: string }>();
-  const [selectedSubjectId, setSelectedSubjectId] = useState(courseDetail.subjects[0]?.id);
-  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
-  const courseIdentifier = courseIdParam ?? courseDetail.id;
-  const coursePath = courseIdParam ? `/curso/${courseIdentifier}` : "/curso";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const lastCourseAccess = {
-      courseId: courseIdentifier,
-      courseTitle: courseDetail.title,
-      path: coursePath,
-      updatedAt: new Date().toISOString(),
+        const materiasArrays = await Promise.all(materiasPromises);
+        const allMaterias = materiasArrays.flat();
+        setMaterias(allMaterias);
+        setLoadingMaterias(false);
+      } catch (error) {
+        console.error('Error fetching materias:', error);
+        setMaterias([]);
+        setLoadingMaterias(false);
+      }
     };
 
-    try {
-      window.localStorage.setItem("lastCourseAccess", JSON.stringify(lastCourseAccess));
-      window.dispatchEvent(new CustomEvent("last-course-access-updated", { detail: lastCourseAccess }));
-    } catch (error) {
-      console.error("Error storing last course access", error);
-    }
-  }, [courseIdentifier, coursePath]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams(location.search);
-    const moduleFromQuery = params.get("module");
-    const itemFromQuery = params.get("item");
-
-    if (!moduleFromQuery) return;
-
-    const subjectWithModule = courseDetail.subjects.find((subject) =>
-      subject.modules.some((module) => module.id === moduleFromQuery)
-    );
-
-    if (!subjectWithModule) return;
-
-    setSelectedSubjectId(subjectWithModule.id);
-    setExpandedModuleId(moduleFromQuery);
-
-    if (itemFromQuery) {
-      window.requestAnimationFrame(() => {
-        const element = document.getElementById(`course-item-${itemFromQuery}`);
-        element?.scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-    }
-  }, [location.search]);
-
-  const initialCompletedItems = useMemo(() => {
-    if (!courseDetail) return [] as string[];
-    return courseDetail.subjects.flatMap((subject) =>
-      subject.modules.flatMap((module) =>
-        module.items.filter((item) => item.completed).map((item) => item.id)
-      )
-    );
+    fetchMaterias();
   }, [courseDetail]);
 
-  const [completedItems, setCompletedItems] = useState<string[]>(initialCompletedItems);
 
   useEffect(() => {
-    setCompletedItems(initialCompletedItems);
-  }, [initialCompletedItems]);
+    const fetchModulos = async () => {
+      if (!materias || materias.length === 0) {
+        setModulos([]);
+        setLoadingModulos(false);
+        return;
+      }
 
-  const totalItems = useMemo(() => {
-    if (!courseDetail) return 0;
-    return courseDetail.subjects.reduce((count, subject) => {
-      return (
-        count +
-        subject.modules.reduce(
-          (moduleCount, module) => moduleCount + module.items.length,
-          0
-        )
-      );
-    }, 0);
-  }, [courseDetail]);
+      try {
+        setLoadingModulos(true);
+        const allModulosPromises: Promise<Modulo[]>[] = [];
 
-  const completedCount = completedItems.length;
-  const progressPercentage = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
-
-  const selectedSubject = useMemo<Subject | undefined>(() => {
-    if (!courseDetail) return undefined;
-    return courseDetail.subjects.find((subject) => subject.id === selectedSubjectId);
-  }, [courseDetail, selectedSubjectId]);
-
-  const handleModuleToggle = (moduleId: string) => {
-    setExpandedModuleId((current) => (current === moduleId ? null : moduleId));
-  };
-
-  const getItemIcon = (type: ModuleItem["type"]) => {
-    if (type === "VIDEO") return <Play className="h-4 w-4" />;
-    return <FileText className="h-4 w-4" />;
-  };
-
-  const getItemBadge = (item: ModuleItem) => {
-    if (item.type === "VIDEO") return item.duration;
-    return item.size;
-  };
-
-  const handleAccessContent = (
-    subject: Subject,
-    module: Module,
-    item: ModuleItem
-  ) => {
-    if (typeof window === "undefined") return;
-
-    const timestamp = new Date().toISOString();
-
-    const lastViewedClass = {
-      courseId: courseIdentifier,
-      courseTitle: courseDetail.title,
-      subjectId: subject.id,
-      subjectName: subject.name,
-      moduleId: module.id,
-      moduleName: module.name,
-      itemId: item.id,
-      itemTitle: item.title,
-      path: `${coursePath}?module=${module.id}&item=${item.id}`,
-      updatedAt: timestamp,
-    };
-
-    try {
-      window.localStorage.setItem("lastViewedClass", JSON.stringify(lastViewedClass));
-      window.dispatchEvent(new CustomEvent("last-viewed-class-updated", { detail: lastViewedClass }));
-
-      const lastCourseAccess = {
-        courseId: courseIdentifier,
-        courseTitle: courseDetail.title,
-        path: coursePath,
-        updatedAt: timestamp,
-      };
-
-      window.localStorage.setItem("lastCourseAccess", JSON.stringify(lastCourseAccess));
-      window.dispatchEvent(new CustomEvent("last-course-access-updated", { detail: lastCourseAccess }));
-    } catch (error) {
-      console.error("Error storing last viewed class information", error);
-    }
-  };
-
-  const toggleItemCompletion = (itemId: string) => {
-    setCompletedItems((current) =>
-      current.includes(itemId)
-        ? current.filter((id) => id !== itemId)
-        : [...current, itemId]
-    );
-  };
-
-  const renderModule = (module: Module) => {
-    const isExpanded = expandedModuleId === module.id;
-    const panelId = `module-panel-${module.id}`;
-    const buttonId = `module-trigger-${module.id}`;
-
-    const videosCount = module.items.filter((i) => i.type === "VIDEO").length;
-    const pdfCount = module.items.filter((i) => i.type === "PDF").length;
-
-    return (
-      <Card
-        key={module.id}
-        className={`border-slate-200 shadow-none dark:border-slate-800 dark:bg-slate-900/60 transition-colors ${isExpanded ? "border-orange-300/70 dark:border-orange-400/40" : ""}`}
-      >
-        <button
-          id={buttonId}
-          type="button"
-          onClick={() => handleModuleToggle(module.id)}
-          aria-expanded={isExpanded}
-          aria-controls={panelId}
-          className={`group w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 rounded-xl`}
-        >
-          <CardHeader className="space-y-2 px-4 py-3 sm:py-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                    {module.name}
-                  </CardTitle>
-                </div>
-
-                <p className="text-sm text-slate-500 dark:text-slate-300">{module.description}</p>
-
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
-                  <span className="inline-flex items-center gap-1">
-                    <Video className="h-3.5 w-3.5" />
-                    {videosCount} videos
-                  </span>
-                  <span aria-hidden="true">•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <FileText className="h-3.5 w-3.5" />
-                    {pdfCount} PDF
-                  </span>
-                  <span aria-hidden="true">•</span>
-                  <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-300">
-                    <Badge
-                    variant="outline"
-                    className="border-0 bg-orange-500/10 text-[9px] font-medium uppercase tracking-wide text-orange-600 dark:bg-orange-500/20 dark:text-orange-200"
-                  >
-                    {isExpanded ? "Ocultar" : "Desplegar"}
-                  </Badge>
-                  </span>
-                </div>
-              </div>
-
-              {/* Chevron que rota para indicar expandido/colapsado */}
-              <span
-                aria-hidden="true"
-                className={`mt-1 grid h-8 w-8 place-items-center rounded-full border transition-all
-                ${isExpanded
-                    ? "rotate-180 border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-600/50 dark:bg-orange-500/10 dark:text-orange-200"
-                    : "border-slate-200 text-slate-500 group-hover:border-orange-200 group-hover:bg-orange-50/60 group-hover:text-orange-600 dark:border-slate-700 dark:text-slate-400 dark:group-hover:border-orange-600/50 dark:group-hover:bg-orange-500/10 dark:group-hover:text-orange-200"
-                  }`}
-              >
-                <ChevronDown className="h-4 w-4 transition-transform" />
-              </span>
-            </div>
-          </CardHeader>
-        </button>
-
-        {isExpanded && (
-          <CardContent
-            id={panelId}
-            role="region"
-            aria-labelledby={buttonId}
-            className="space-y-3 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900"
-          >
-            {module.items.map((item) => {
-              const isCompleted = completedItems.includes(item.id);
-
-              return (
-                <div
-                  key={item.id}
-                  id={`course-item-${item.id}`}
-                  className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-3 dark:border-slate-800 dark:bg-slate-900/70"
-                >
-                  <span
-                    className={`mt-1 flex h-9 w-9 items-center justify-center rounded-full ${
-                      item.type === "VIDEO"
-                        ? "bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300"
-                        : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {getItemIcon(item.type)}
-                  </span>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.title}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{item.description}</p>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`border-0 text-[11px] font-medium uppercase tracking-wide ${
-                          item.type === "VIDEO"
-                            ? "bg-orange-500/10 text-orange-600 dark:bg-orange-500/20 dark:text-orange-200"
-                            : "bg-slate-500/10 text-slate-600 dark:bg-slate-700/60 dark:text-slate-200"
-                        }`}
-                      >
-                        {item.type}
-                      </Badge>
-                      <span className="text-xs text-slate-400 dark:text-slate-500">{getItemBadge(item)}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-pressed={isCompleted}
-                      onClick={() => toggleItemCompletion(item.id)}
-                      className={`h-8 w-8 rounded-full border ${
-                        isCompleted
-                          ? "border-green-200 bg-green-50 text-green-600 dark:border-green-700 dark:bg-green-900/40 dark:text-green-300"
-                          : "border-slate-200 text-slate-400 hover:border-green-200 hover:text-green-500 dark:border-slate-700 dark:text-slate-400 dark:hover:border-green-600/70 dark:hover:text-green-300"
-                      }`}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="sr-only">
-                        {isCompleted ? "Marcar contenido como pendiente" : "Marcar contenido como completado"}
-                      </span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto px-2 text-xs text-orange-600 dark:text-orange-300"
-                      onClick={() => handleAccessContent(selectedSubject!, module, item)}
-                    >
-                      {item.type === "VIDEO" ? "Ver" : "Descargar"}
-                    </Button>
-                  </div>
-                </div>
+        materias.forEach((materia) => {
+          if (materia.modulos && materia.modulos.length > 0) {
+            materia.modulos.forEach((moduloId) => {
+              allModulosPromises.push(
+                CoursesService.getModulosByMateriaId(moduloId).then((response) => {
+                  const moduloData = response.data;
+                  return Array.isArray(moduloData) ? moduloData : [moduloData];
+                })
               );
-            })}
-          </CardContent>
-        )}
-      </Card>
-    );
+            });
+          }
+        });
+
+        const modulosArrays = await Promise.all(allModulosPromises);
+        const allModulos = modulosArrays.flat();
+        setModulos(allModulos);
+        setLoadingModulos(false);
+      } catch (error) {
+        console.error('Error fetching modulos:', error);
+        setModulos([]);
+        setLoadingModulos(false);
+      }
+    };
+
+    fetchModulos();
+  }, [materias]);
+
+
+  const handleOpenVideo = (modulo: Modulo) => {
+    setSelectedVideo({
+      id: modulo.id,
+      title: modulo.titulo,
+      url: modulo.url_video,
+      thumbnail: modulo.url_miniatura,
+    });
+    setIsVideoModalOpen(true);
   };
-  // ========= FIN módulo como desplegable =========
 
-  const ProgressOverview = ({ className = "" }) => (
-    <section
-      className={cn(
-        "rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70 sm:p-4",
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 sm:gap-3">
-        <div className="hidden sm:block">
-          <p className="text-xs uppercase tracking-widest text-slate-400 dark:text-slate-400">Progreso general</p>
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {completedCount} de {totalItems} contenidos completados
-          </p>
-        </div>
-        <div className="flex w-full items-center justify-between sm:hidden">
-          <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400 dark:text-slate-400">Progreso</span>
-          <span className="text-sm font-semibold text-orange-600">{progressPercentage}%</span>
-        </div>
-        <span className="hidden text-sm font-semibold text-orange-600 sm:inline">{progressPercentage}%</span>
-      </div>
-      <Progress value={progressPercentage} className="mt-2 h-1 sm:mt-3 sm:h-2" />
-    </section>
-  );
+  const handleCloseVideo = () => {
+    setIsVideoModalOpen(false);
+    setSelectedVideo(null);
+  };
 
-  const HowToNavigateCard = ({ className = "" }) => (
+  const handleDownloadFile = async (modulo: Modulo) => {
+    if (!modulo.url_archivo) {
+      console.error('No hay URL de archivo disponible');
+      return;
+    }
+
+    try {
+      const link = document.createElement('a');
+      link.href = modulo.url_archivo;
+      
+      const fileName = `${modulo.titulo.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.${modulo.tipo_contenido}`;
+      link.download = fileName;
+      
+      document.body.appendChild(link);
+      
+      link.click();
+      
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error al descargar el archivo:', error);
+    }
+  };
+
+  const CourseInfoCard = ({ className = "" }) => (
     <section
       className={cn(
         "rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70",
@@ -391,14 +179,29 @@ const CourseDetailPage: React.FC = () => {
       <div className="flex items-start gap-3">
         <BookOpen className="h-5 w-5 text-orange-500" />
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Cómo navegar el curso</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Información del curso</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Elegí una materia para ver sus módulos y <strong>desplegá</strong> cada módulo para acceder a los videos o PDFs correspondientes.
+            {courseDetail?.descripcion || 'Descripción no disponible'}
           </p>
+          {courseDetail?.precio && (
+            <p className="text-sm font-medium text-orange-600 dark:text-orange-300">
+              Precio: ${courseDetail.precio}
+            </p>
+          )}
         </div>
       </div>
     </section>
   );
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">Cargando curso...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!courseDetail) {
     return (
@@ -426,7 +229,7 @@ const CourseDetailPage: React.FC = () => {
           <div className="flex-1">
             <p className="text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100" data-testid="course-title">
-              {courseDetail.title}
+              {courseDetail.titulo}
             </h1>
           </div>
         </div>
@@ -434,84 +237,125 @@ const CourseDetailPage: React.FC = () => {
 
       <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
-          <ProgressOverview className="lg:hidden" />
-
           <section className="space-y-4 lg:col-start-1 lg:row-start-1">
             <div className="flex items-center gap-2">
               <School className="h-4 w-4 text-orange-500" />
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Materias del programa</h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Contenido del curso</h2>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {courseDetail.subjects.map((subject) => {
-                const isActive = subject.id === selectedSubjectId;
+            {materias.length > 0 ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Materias y Módulos:</h3>
 
-                const completedInSubject = subject.modules.reduce(
-                  (acc, module) => acc + module.items.filter((item) => completedItems.includes(item.id)).length,
-                0
-              );
-              const totalInSubject = subject.modules.reduce((acc, module) => acc + module.items.length, 0);
+                  <Accordion type="multiple" className="w-full space-y-2">
+                    {materias.map((materia) => {
+                      const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
 
-              return (
-                <button
-                  key={subject.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSubjectId(subject.id);
-                    setExpandedModuleId(null);
-                  }}
-                  aria-pressed={isActive}
-                  className={`w-full rounded-2xl border px-4 py-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 ${
-                    isActive
-                      ? "border-orange-500 bg-orange-50 text-orange-700 ring-1 ring-orange-200 dark:border-orange-500 dark:bg-orange-500/10 dark:text-orange-200"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-orange-200 hover:bg-orange-50/60 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-orange-300/60 dark:hover:bg-orange-500/5"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-semibold leading-snug text-inherit">{subject.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={`border-0 text-[11px] font-medium uppercase tracking-wide ${
-                        isActive
-                          ? "bg-orange-500/10 text-orange-600 dark:bg-orange-500/20 dark:text-orange-200"
-                          : "bg-slate-500/10 text-slate-600 dark:bg-slate-700/60 dark:text-slate-200"
-                      }`}
-                    >
-                      {completedInSubject}/{totalInSubject} contenidos
-                    </Badge>
-                  </div>
-                  <div className="hidden sm:block">
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                      {subject.description}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-            </div>
+                      return (
+                        <AccordionItem
+                          key={materia.id}
+                          value={materia.id}
+                          className="border border-slate-200 dark:border-slate-700 rounded-lg px-3"
+                        >
+                          <AccordionTrigger className="hover:no-underline py-3">
+                            <div className="flex items-center gap-3 text-left">
+                              <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                              <div>
+                                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                  {materia.nombre}
+                                </span>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                  {materiasModulos.length} módulo{materiasModulos.length !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
 
-            {selectedSubject && (
-              <div className="space-y-3">
-                <div className="hidden sm:block">
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{selectedSubject.description}</p>
+                          <AccordionContent className="pb-3">
+                            {loadingModulos ? (
+                              <div className="text-xs text-slate-500 dark:text-slate-400 px-3">
+                                Cargando módulos...
+                              </div>
+                            ) : materiasModulos.length > 0 ? (
+                              <div className="space-y-2 px-3">
+                                {materiasModulos.map((modulo, index) => (
+                                  <div
+                                    key={modulo.id}
+                                    className="flex items-start gap-3 p-2 rounded-md bg-slate-50 dark:bg-slate-800/30"
+                                  >
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                                        {modulo.titulo}
+                                      </h4>
+                                      {modulo.descripcion && (
+                                        <p className="text-xs hidden md:block text-slate-600 dark:text-slate-400 mt-1">
+                                          {modulo.descripcion}
+                                        </p>
+                                      )}
+                                      <div className="flex items-center gap-3 mt-1">
+                                        {modulo.url_archivo && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => handleDownloadFile(modulo)}
+                                          >
+                                            <File className="h-3 w-3 mr-1" />
+                                            Descargar archivo .{modulo.tipo_contenido}
+                                          </Button>
+                                        )}
+                                        {modulo.url_video && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => handleOpenVideo(modulo)}
+                                          >
+                                            <Play className="h-3 w-3 mr-1" />
+                                            Ver video
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-slate-500 dark:text-slate-400 px-3">
+                                No hay módulos disponibles para esta materia.
+                              </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
                 </div>
-
-                {/* Lista de módulos (cada uno es un desplegable) */}
-                <div className="space-y-3">
-                  {selectedSubject.modules.map((module) => renderModule(module))}
-                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {loadingMaterias ? "Cargando materias..." : "No hay materias asignadas a este curso."}
+                </p>
               </div>
             )}
           </section>
 
-          <HowToNavigateCard className="lg:hidden" />
+          <CourseInfoCard className="lg:hidden" />
 
           <aside className="hidden lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:flex lg:flex-col lg:gap-6">
-            <ProgressOverview />
-            <HowToNavigateCard />
+            <CourseInfoCard />
           </aside>
         </div>
       </main>
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={handleCloseVideo}
+        content={selectedVideo}
+      />
     </div>
   );
 };

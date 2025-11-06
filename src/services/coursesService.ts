@@ -16,6 +16,18 @@ class CoursesService {
     getAllCoursesPerUser(id: string) {
         return api.get(`/cursos/user/${id}`);
     }
+
+    getCourseById(id: string) {
+        return api.get(`/cursos/${id}`);
+    }
+
+    getMateriasByCourseId(id: string) {
+        return api.get(`/materias/${id}`);
+    }
+
+    getModulosByMateriaId(id: string) {
+        return api.get(`/modulos/${id}`);
+    }
 }
 
 export default new CoursesService();
