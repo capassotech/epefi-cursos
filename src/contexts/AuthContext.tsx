@@ -79,6 +79,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (storedData && storedData.uid === firebaseUser.uid) {
             console.log("✅ Using stored data");
             setUser(storedData as UserProfile);
+            
+            // Solo buscar datos del backend si los datos almacenados son muy básicos
+            // (no tienen datos completos del backend)
+            if (!storedData.dni && !storedData.fechaRegistro) {
+              console.log("🔄 Stored data is basic, fetching complete profile...");
+              fetchUserProfileInBackground(firebaseUser);
+            }
           } else {
             console.log("📝 Creating basic profile from Firebase user");
             // Crear perfil básico con datos de Firebase
@@ -129,7 +136,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch(
-        "https://epefi-backend.onrender.com/api/users/me",
+        "http://localhost:3000/api/usuarios/me",
         {
           method: "GET",
           headers: {
@@ -156,40 +163,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(updatedProfile);
         authService.updateStudentDataInStorage(updatedProfile);
       } else {
-        console.warn("Backend profile fetch failed:", response.status);
+        // Silenciosamente fallar - no es crítico
+        console.log("ℹ️ Backend profile not available, using stored data");
       }
     } catch (error) {
-      console.warn("Backend profile fetch error:", error);
-      // No hacer nada - seguir con el perfil básico
+      // Silenciosamente fallar - no es crítico para la funcionalidad
+      console.log("ℹ️ Backend profile fetch skipped, using stored data");
     }
   };
 
   const login = async (email: string, password: string) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.login({ email, password });
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+    const response = await authService.login({ email, password });
+    return response;
   };
 
   const register = async (userData: any) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.register({
-        email: userData.email,
-        password: userData.password,
-        nombre: userData.firstName,
-        apellido: userData.lastName,
-        dni: userData.dni,
-      });
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+    const response = await authService.register({
+      email: userData.email,
+      password: userData.password,
+      nombre: userData.firstName,
+      apellido: userData.lastName,
+      dni: userData.dni,
+    });
+    return response;
   };
 
   const googleRegister = async (
@@ -198,36 +194,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dni: string,
     acceptTerms: boolean
   ) => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.googleRegister(
-        firstName,
-        lastName,
-        dni,
-        acceptTerms
-      );
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+    const response = await authService.googleRegister(
+      firstName,
+      lastName,
+      dni,
+      acceptTerms
+    );
+    return response;
   };
 
   const googleLogin = async () => {
-    try {
-      // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
-      const response = await authService.googleLogin();
-      return response;
-    } catch (error) {
-      // ✅ NO modificar isLoading aquí tampoco
-      throw error;
-    }
+    const response = await authService.googleLogin();
+    return response;
   };
 
   const logout = async () => {
     try {
       await authService.logout();
-      // Los estados se limpiarán automáticamente por onAuthStateChanged
     } catch (error) {
       console.error("Error during logout:", error);
     }
