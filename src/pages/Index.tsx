@@ -89,11 +89,22 @@ const Index = () => {
 
   useEffect(() => {
     const fetchCourses = async () => {
+      if (!user?.uid) return;
+      
       setLoading(true);
-      const courses = await CoursesService.getAllCoursesPerUser(user.uid);
-      const filteredCourses = courses.data.filter((course) => course.estado === "activo");
-      setCourses(filteredCourses);
-      setLoading(false);
+      try {
+        const courses = await CoursesService.getAllCoursesPerUser(user.uid);
+        // Asegurarse de que courses.data es un array
+        const coursesData = Array.isArray(courses.data) ? courses.data : [];
+        const filteredCourses = coursesData.filter((course) => course.estado === "activo");
+        setCourses(filteredCourses);
+      } catch (error) {
+        console.error("Error al cargar cursos:", error);
+        // En caso de error, establecer array vacío para evitar errores en la UI
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchCourses();
   }, [user]);

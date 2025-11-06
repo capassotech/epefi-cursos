@@ -34,8 +34,8 @@ interface RegisterData {
 }
 
 class AuthService {
-  // LOGIN - Usando Firebase SDK
   async login(data: LoginData) {
+    console.log("ENTRO AL LOGIN...")
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -44,18 +44,10 @@ class AuthService {
       );
       const firebaseUser = userCredential.user;
 
-      // 2. Obtener token para llamadas al backend
       const token = await firebaseUser.getIdToken();
 
-      // 3. Verificar/obtener datos adicionales del backend
       try {
-        const response = await api.post(
-          "/api/auth/login",
-          {
-            email: data.email,
-            // No enviar password al backend en este caso
-          },
-          {
+        const response = await api.post("/api/auth/login", { email: data.email, password: data.password }, {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -305,6 +297,7 @@ class AuthService {
       "auth/email-already-in-use": "El email ya está registrado",
       "auth/weak-password": "La contraseña es muy débil",
       "auth/invalid-email": "Email inválido",
+      "auth/invalid-credential": "Credenciales inválidas",
       "auth/user-disabled": "Usuario deshabilitado",
       "auth/too-many-requests": "Demasiados intentos. Intenta más tarde",
       "auth/network-request-failed": "Error de conexión",

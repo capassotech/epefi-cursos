@@ -144,6 +144,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (storedData && storedData.uid === firebaseUser.uid) {
             console.log("✅ Using stored data");
             setUser(storedData as UserProfile);
+            
+            // Solo buscar datos del backend si los datos almacenados son muy básicos
+            // (no tienen datos completos del backend)
+            if (!storedData.dni && !storedData.fechaRegistro) {
+              console.log("🔄 Stored data is basic, fetching complete profile...");
+              fetchUserProfileInBackground(firebaseUser);
+            }
           } else {
             console.log("📝 Creating basic profile from Firebase user");
             // Crear perfil básico con datos de Firebase
@@ -230,7 +237,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       await authService.logout();
-      // Los estados se limpiarán automáticamente por onAuthStateChanged
     } catch (error) {
       console.error("Error during logout:", error);
     }
