@@ -1,13 +1,36 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, LogOut, User } from "lucide-react";
+import { ArrowLeft, LogOut, Lock, Save, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile, forgotPassword } = useAuth();
   const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSendingPasswordEmail, setIsSendingPasswordEmail] = useState(false);
+  const [formData, setFormData] = useState({
+    nombre: user?.nombre || "",
+    apellido: user?.apellido || "",
+    dni: user?.dni || "",
+    email: user?.email || "",
+  });
+
+  // Actualizar formData cuando cambie el usuario
+  useEffect(() => {
+    if (user && !isEditing) {
+      setFormData({
+        nombre: user.nombre || "",
+        apellido: user.apellido || "",
+        dni: user.dni || "",
+        email: user.email || "",
+      });
+    }
+  }, [user, isEditing]);
 
   const handleLogout = async () => {
     try {
@@ -18,41 +41,77 @@ export default function Profile() {
     }
   };
 
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        dni: formData.dni,
+        email: formData.email,
+      });
+      
+      toast.success("Perfil actualizado", {
+        description: "Tus datos se han actualizado correctamente.",
+      });
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error al actualizar perfil:", error);
+      toast.error("Error al actualizar", {
+        description: error.message || "No se pudo actualizar el perfil. Intenta nuevamente.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (user) {
+      setFormData({
+        nombre: user.nombre || "",
+        apellido: user.apellido || "",
+        dni: user.dni || "",
+        email: user.email || "",
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (!user?.email) {
+      toast.error("Error", {
+        description: "No se pudo obtener tu email.",
+      });
+      return;
+    }
+
+    setIsSendingPasswordEmail(true);
+    try {
+      await forgotPassword(user.email);
+      toast.success("Email enviado", {
+        description: "Revisa tu bandeja de entrada para las instrucciones de cambio de contraseña.",
+      });
+    } catch (error: any) {
+      console.error("Error al enviar email:", error);
+      toast.error("Error al enviar email", {
+        description: error.message || "No se pudo enviar el email. Intenta nuevamente.",
+      });
+    } finally {
+      setIsSendingPasswordEmail(false);
+    }
+  };
+
   const getUserInitials = () => {
     if (user?.nombre && user?.apellido) {
       return `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase();
     }
     return user?.email?.charAt(0).toUpperCase() || "U";
-  };
-
-  const getRoleDisplayName = (role: any) => {
-    if (!role) return "Usuario";
-    if (typeof role === "string") {
-      if (role === "admin") return "Administrador";
-      if (role === "student" || role === "alumno") return "Estudiante";
-      return "Usuario";
-    }
-    if (typeof role === "object") {
-      if (role.admin) return "Administrador";
-      if (role.student) return "Estudiante";
-      return "Usuario";
-    }
-    return "Usuario";
-  };
-
-  const getRoleBadgeColor = (role: any) => {
-    if (!role) return "outline" as const;
-    if (typeof role === "string") {
-      if (role === "admin") return "destructive" as const;
-      if (role === "student" || role === "alumno") return "outline" as const;
-      return "outline" as const;
-    }
-    if (typeof role === "object") {
-      if (role.admin) return "destructive" as const;
-      if (role.student) return "outline" as const;
-      return "outline" as const;
-    }
-    return "outline" as const;
   };
 
   if (!user) {
@@ -83,6 +142,16 @@ export default function Profile() {
             Información personal de la cuenta
           </p>
         </div>
+        {!isEditing && (
+          <Button
+            variant="outline"
+            onClick={() => setIsEditing(true)}
+            size="sm"
+            className="gap-2"
+          >
+            <span>Editar</span>
+          </Button>
+        )}
         <Button
           variant="outline"
           onClick={handleLogout}
@@ -109,9 +178,6 @@ export default function Profile() {
               <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base mt-1">
                 {user.email}
               </p>
-              <Badge variant={getRoleBadgeColor(user.role)} className="mt-2">
-                {getRoleDisplayName(user.role)}
-              </Badge>
             </div>
           </div>
 
@@ -127,71 +193,123 @@ export default function Profile() {
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Nombre
                 </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {user.nombre || "No disponible"}
-                  </span>
-                </div>
+                {isEditing ? (
+                  <Input
+                    id="nombre"
+                    value={formData.nombre}
+                    onChange={(e) => handleInputChange("nombre", e.target.value)}
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                ) : (
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formData.nombre || "No disponible"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Apellido
                 </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {user.apellido || "No disponible"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1 sm:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Email
-                </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-900 dark:text-gray-100 break-all">
-                    {user.email || "No disponible"}
-                  </span>
-                </div>
+                {isEditing ? (
+                  <Input
+                    id="apellido"
+                    value={formData.apellido}
+                    onChange={(e) => handleInputChange("apellido", e.target.value)}
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                ) : (
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formData.apellido || "No disponible"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   DNI
                 </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {user.dni || "No disponible"}
-                  </span>
-                </div>
+                {isEditing ? (
+                  <Input
+                    id="dni"
+                    value={formData.dni}
+                    onChange={(e) => handleInputChange("dni", e.target.value)}
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                ) : (
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {formData.dni || "No disponible"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Rol
+                  Email
                 </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {getRoleDisplayName(user.role)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-1 sm:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Estado de la cuenta
-                </label>
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-gray-900 dark:text-gray-100">
-                      Activa
+                {isEditing ? (
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange("email", e.target.value)}
+                    className="w-full"
+                    disabled={isSaving}
+                  />
+                ) : (
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                    <span className="text-gray-900 dark:text-gray-100 break-all">
+                      {formData.email || "No disponible"}
                     </span>
                   </div>
-                </div>
+                )}
               </div>
             </div>
+
+            {/* Botón para cambiar contraseña */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="outline"
+                onClick={handleChangePassword}
+                disabled={isSendingPasswordEmail}
+                className="gap-2"
+              >
+                <Lock className="w-4 h-4" />
+                {isSendingPasswordEmail ? "Enviando..." : "Cambiar contraseña"}
+              </Button>
+            </div>
+
+            {/* Botones de acción cuando está editando */}
+            {isEditing && (
+              <div className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? "Guardando..." : "Guardar cambios"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className="gap-2"
+                >
+                  <X className="w-4 h-4" />
+                  Cancelar
+                </Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

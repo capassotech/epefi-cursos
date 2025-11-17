@@ -59,6 +59,7 @@ interface AuthContextType {
   googleLogin: () => Promise<AuthResponse>;
   forgotPassword: (email: string) => Promise<void>;
   changePassword: (oobCode: string, password: string) => Promise<void>;
+  updateProfile: (data: { nombre?: string; apellido?: string; dni?: string; email?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -250,6 +251,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await authService.changePassword(oobCode, password);
   };
 
+  const updateProfile = async (data: { nombre?: string; apellido?: string; dni?: string; email?: string }): Promise<void> => {
+    if (!firebaseUser) {
+      throw new Error("Usuario no autenticado");
+    }
+
+    try {
+      const token = await firebaseUser.getIdToken();
+      const response = await fetch(
+        `${API_BASE_URL}/api/users/me`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Error al actualizar el perfil");
+      }
+
+      const updatedData = await response.json();
+      
+      // Actualizar el estado local del usuario
+      if (user) {
+        const updatedProfile: UserProfile = {
+          ...user,
+          nombre: updatedData.nombre || user.nombre,
+          apellido: updatedData.apellido || user.apellido,
+          dni: updatedData.dni !== undefined ? updatedData.dni : user.dni,
+          email: updatedData.email || user.email,
+        };
+        setUser(updatedProfile);
+        authService.updateStudentDataInStorage(updatedProfile);
+      }
+
+      // Si se cambió el email, actualizar Firebase
+      if (data.email && data.email !== firebaseUser.email) {
+        await firebaseUser.updateEmail(data.email);
+      }
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      throw error;
+    }
+  };
+
     const value: AuthContextType = {
       user,
       firebaseUser,
@@ -262,6 +311,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       googleLogin,
       forgotPassword,
       changePassword,
+      updateProfile,
     };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
