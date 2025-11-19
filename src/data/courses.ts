@@ -32,6 +32,8 @@ export interface Course {
   estado: "activo" | "inactivo";
   precio: number;
   materias: string[];
+  fechaInicioDictado?: string | Date; // ISO string o Date
+  fechaFinDictado?: string | Date; // ISO string o Date
 }
 
 export const courses: Course[] = [

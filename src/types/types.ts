@@ -8,6 +8,8 @@ export interface Curso {
   imagen: string;
   precio: number;
   materias: string[]; // IDs de materias asociadas
+  fechaInicioDictado?: string | Date; // ISO string o Date
+  fechaFinDictado?: string | Date; // ISO string o Date
 }
 
 export interface Materia {

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Play,
   File,
+  Calendar,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -169,6 +170,58 @@ const CourseDetailPage = () => {
     }
   };
 
+  // Función para formatear fechas
+  const formatDate = (date: string | Date | any | undefined): string => {
+    if (!date) return "";
+    
+    try {
+      let dateObj: Date;
+      
+      // Si es un string, convertir a Date
+      if (typeof date === "string") {
+        dateObj = new Date(date);
+      }
+      // Si es un objeto Date, usar directamente
+      else if (date instanceof Date) {
+        dateObj = date;
+      }
+      // Si es un Timestamp de Firestore, usar toDate()
+      else if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate();
+      }
+      // Si es un objeto con método getTime, intentar crear Date
+      else if (date && typeof date.getTime === "function") {
+        dateObj = date;
+      }
+      // Si es un objeto con seconds (Timestamp de Firestore serializado)
+      else if (date && typeof date.seconds === "number") {
+        dateObj = new Date(date.seconds * 1000);
+      }
+      // Si tiene _seconds (otro formato de Timestamp)
+      else if (date && typeof date._seconds === "number") {
+        dateObj = new Date(date._seconds * 1000);
+      }
+      // Intentar convertir directamente
+      else {
+        dateObj = new Date(date);
+      }
+      
+      // Validar que sea una fecha válida
+      if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        return "";
+      }
+      
+      return new Intl.DateTimeFormat("es-AR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(dateObj);
+    } catch (error) {
+      console.error("Error formatting date:", error, date);
+      return "";
+    }
+  };
+
   const CourseInfoCard = ({ className = "" }) => (
     <section
       className={cn(
@@ -178,7 +231,7 @@ const CourseDetailPage = () => {
     >
       <div className="flex items-start gap-3">
         <BookOpen className="h-5 w-5 text-orange-500" />
-        <div className="space-y-1">
+        <div className="space-y-2 flex-1">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Información del curso</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
             {courseDetail?.descripcion || 'Descripción no disponible'}
@@ -187,6 +240,34 @@ const CourseDetailPage = () => {
             <p className="text-sm font-medium text-orange-600 dark:text-orange-300">
               Precio: ${courseDetail.precio}
             </p>
+          )}
+          
+          {/* Fechas de dictado */}
+          {(courseDetail?.fechaInicioDictado || courseDetail?.fechaFinDictado) && (
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-start gap-2 mt-2">
+                <Calendar className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Fechas de dictado
+                  </p>
+                  {courseDetail.fechaInicioDictado && courseDetail.fechaFinDictado ? (
+                    <div className="text-sm text-slate-700 dark:text-slate-300">
+                      <p className="font-medium">Inicio: {formatDate(courseDetail.fechaInicioDictado)}</p>
+                      <p className="font-medium">Fin: {formatDate(courseDetail.fechaFinDictado)}</p>
+                    </div>
+                  ) : courseDetail.fechaInicioDictado ? (
+                    <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      Inicio: {formatDate(courseDetail.fechaInicioDictado)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      Fin: {formatDate(courseDetail.fechaFinDictado)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
