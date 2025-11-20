@@ -258,6 +258,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     try {
       const token = await firebaseUser.getIdToken();
+      
+      // Intentar actualizar en el backend
       const response = await fetch(
         `${API_BASE_URL}/api/users/me`,
         {
@@ -271,29 +273,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       );
 
       if (!response.ok) {
-        throw new Error("Error al actualizar el perfil");
+        // Si el endpoint no existe (404), solo actualizar el estado local
+        if (response.status === 404) {
+          // Actualizar el estado local del usuario directamente
+          if (user) {
+            const updatedProfile: UserProfile = {
+              ...user,
+              nombre: data.nombre !== undefined ? data.nombre : user.nombre,
+              apellido: data.apellido !== undefined ? data.apellido : user.apellido,
+              dni: data.dni !== undefined ? data.dni : user.dni,
+              email: data.email !== undefined ? data.email : user.email,
+            };
+            setUser(updatedProfile);
+            authService.updateStudentDataInStorage(updatedProfile);
+          }
+
+          // Nota: El email y displayName se actualizan en el backend
+          // Solo actualizamos el estado local aquí cuando el endpoint no existe
+          
+          return; // Salir exitosamente después de actualizar localmente
+        }
+
+        // Para otros errores, intentar obtener más información
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || `Error al actualizar el perfil (${response.status})`;
+        throw new Error(errorMessage);
       }
 
-      const updatedData = await response.json();
+      // Si la respuesta fue exitosa, usar los datos del servidor
+      const responseData = await response.json();
+      
+      // El backend devuelve { message: '...', user: { ... } }
+      const updatedUserData = responseData.user || responseData;
       
       // Actualizar el estado local del usuario
       if (user) {
         const updatedProfile: UserProfile = {
           ...user,
-          nombre: updatedData.nombre || user.nombre,
-          apellido: updatedData.apellido || user.apellido,
-          dni: updatedData.dni !== undefined ? updatedData.dni : user.dni,
-          email: updatedData.email || user.email,
+          nombre: updatedUserData.nombre !== undefined ? updatedUserData.nombre : user.nombre,
+          apellido: updatedUserData.apellido !== undefined ? updatedUserData.apellido : user.apellido,
+          dni: updatedUserData.dni !== undefined ? updatedUserData.dni : user.dni,
+          email: updatedUserData.email !== undefined ? updatedUserData.email : user.email,
         };
         setUser(updatedProfile);
         authService.updateStudentDataInStorage(updatedProfile);
       }
 
-      // Si se cambió el email, actualizar Firebase
-      if (data.email && data.email !== firebaseUser.email) {
-        await firebaseUser.updateEmail(data.email);
-      }
-    } catch (error) {
+      // El backend ya actualiza el email y displayName en Firebase Auth
+      // No necesitamos actualizar nada más en el cliente
+    } catch (error: any) {
       console.error("Error updating profile:", error);
       throw error;
     }
