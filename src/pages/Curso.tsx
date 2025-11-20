@@ -7,6 +7,10 @@ import {
   ChevronDown,
   Play,
   File,
+  FileText,
+  Calendar,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -169,6 +173,58 @@ const CourseDetailPage = () => {
     }
   };
 
+  const handleViewPDF = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  const handleDownloadPDF = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Función para formatear fechas
+  const formatDate = (date: string | Date | any | undefined): string => {
+    if (!date) return "";
+    
+    try {
+      let dateObj: Date;
+      
+      if (typeof date === "string") {
+        dateObj = new Date(date);
+      } else if (date instanceof Date) {
+        dateObj = date;
+      } else if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate();
+      } else if (date && typeof date.getTime === "function") {
+        dateObj = date;
+      } else if (date && typeof date.seconds === "number") {
+        dateObj = new Date(date.seconds * 1000);
+      } else if (date && typeof date._seconds === "number") {
+        dateObj = new Date(date._seconds * 1000);
+      } else {
+        dateObj = new Date(date);
+      }
+      
+      if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        return "";
+      }
+      
+      return new Intl.DateTimeFormat("es-AR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(dateObj);
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "";
+    }
+  };
+
   const CourseInfoCard = ({ className = "" }) => (
     <section
       className={cn(
@@ -238,6 +294,92 @@ const CourseDetailPage = () => {
       <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
           <section className="space-y-4 lg:col-start-1 lg:row-start-1">
+            {/* Documentos PDF */}
+            {(courseDetail?.planDeEstudiosUrl || courseDetail?.fechasDeExamenesUrl) && (
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="h-4 w-4 text-orange-500" />
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Documentos del curso</h2>
+                </div>
+                
+                <div className="space-y-4">
+                  {courseDetail.planDeEstudiosUrl && (
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            Plan de Estudios
+                          </p>
+                          {courseDetail.planDeEstudiosFechaActualizacion && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Actualizado: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleViewPDF(courseDetail.planDeEstudiosUrl!)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Ver PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleDownloadPDF(courseDetail.planDeEstudiosUrl!, `plan-de-estudios-${courseDetail.titulo}.pdf`)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Descargar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {courseDetail.fechasDeExamenesUrl && (
+                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                            Fechas de Exámenes
+                          </p>
+                          {courseDetail.fechasDeExamenesFechaActualizacion && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              Actualizado: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleViewPDF(courseDetail.fechasDeExamenesUrl!)}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Ver PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => handleDownloadPDF(courseDetail.fechasDeExamenesUrl!, `fechas-examenes-${courseDetail.titulo}.pdf`)}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Descargar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <School className="h-4 w-4 text-orange-500" />
               <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Contenido del curso</h2>
