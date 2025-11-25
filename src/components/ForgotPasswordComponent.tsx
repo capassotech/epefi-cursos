@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordRequirements } from "./PasswordRequirements";
+import { useTheme } from "@/components/ThemeProvider";
 
 export default function ForgotPasswordComponent() {
   const [email, setEmail] = useState("");
@@ -24,6 +25,8 @@ export default function ForgotPasswordComponent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const { forgotPassword, changePassword } = useAuth();
 
@@ -86,9 +89,13 @@ export default function ForgotPasswordComponent() {
               <div className="flex items-center space-x-2">
                 <div className="h-10 rounded-lg flex items-center justify-center">
                   <img
-                    src="/logo-blanco.png"
-                    alt="INEE Logo"
-                    className="h-20"
+                    src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
+                    alt="EPEFI Logo"
+                    className="h-20 transition-opacity duration-300"
+                    onError={(e) => {
+                      // Fallback en caso de error al cargar la imagen
+                      (e.target as HTMLImageElement).src = "/logo.webp";
+                    }}
                   />
                 </div>
               </div>
@@ -149,7 +156,15 @@ export default function ForgotPasswordComponent() {
           <Link to="/" className="inline-flex items-center space-x-2 mb-8">
             <div className="flex items-center space-x-2">
               <div className="h-10 rounded-lg flex items-center justify-center">
-                <img src="/logo-blanco.png" alt="INEE Logo" className="h-20" />
+                <img
+                  src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
+                  alt="EPEFI Logo"
+                  className="h-20 transition-opacity duration-300"
+                  onError={(e) => {
+                    // Fallback en caso de error al cargar la imagen
+                    (e.target as HTMLImageElement).src = "/logo.webp";
+                  }}
+                />
               </div>
             </div>
           </Link>
