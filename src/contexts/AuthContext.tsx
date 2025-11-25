@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://epefi-backend.onrender.com";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
   // isAuthenticated SOLO depende de firebaseUser
   const isAuthenticated = !!firebaseUser;
