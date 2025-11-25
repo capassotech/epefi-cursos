@@ -339,34 +339,27 @@ const ModuleItem = ({ modulo, handleDownloadFile, handleOpenVideo }: { modulo: M
         </h4>
         {descripcion && (
           <div className="mt-1.5 sm:mt-2">
-            {/* Versión completa en desktop */}
-            <p className="hidden sm:block text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              {descripcion}
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              {displayDesc}
             </p>
-            {/* Versión con desplegable en móvil */}
-            <div className="sm:hidden">
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                {displayDesc}
-              </p>
-              {shouldTruncate && (
-                <button
-                  onClick={() => setIsDescExpanded(!isDescExpanded)}
-                  className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
-                >
-                  {isDescExpanded ? (
-                    <>
-                      Ver menos
-                      <ChevronDown className="h-3 w-3 rotate-180" />
-                    </>
-                  ) : (
-                    <>
-                      Ver más
-                      <ChevronDown className="h-3 w-3" />
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
+            {shouldTruncate && (
+              <button
+                onClick={() => setIsDescExpanded(!isDescExpanded)}
+                className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
+              >
+                {isDescExpanded ? (
+                  <>
+                    Ver menos
+                    <ChevronDown className="h-3 w-3 rotate-180" />
+                  </>
+                ) : (
+                  <>
+                    Ver más
+                    <ChevronDown className="h-3 w-3" />
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-3 sm:mt-4">
