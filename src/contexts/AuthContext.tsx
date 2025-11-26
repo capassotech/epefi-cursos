@@ -92,7 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch(
-        `${API_BASE_URL}/api/users/me`,
+        `${API_BASE_URL}/api/usuarios/me`,
         {
           method: "GET",
           headers: {
@@ -261,7 +261,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Intentar actualizar en el backend
       const response = await fetch(
-        `${API_BASE_URL}/api/users/me`,
+        `${API_BASE_URL}/api/usuarios/me`,
         {
           method: "PUT",
           headers: {
