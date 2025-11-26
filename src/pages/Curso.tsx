@@ -245,7 +245,7 @@ const CourseDetailPage = () => {
 
             {materias.length > 0 ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                <div className="rounded-2xl bg-white/90 p-4 shadow-sm dark:bg-slate-900/70">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Materias y Módulos:</h3>
 
                   <Accordion type="multiple" className="w-full space-y-2">
