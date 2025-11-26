@@ -242,10 +242,8 @@ const CourseDetailPage = () => {
 
             {materias.length > 0 ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                  <h3 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 mb-4 sm:mb-5">
-                    Materias y Módulos
-                  </h3>
+                <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-4">Materias y Módulos:</h3>
 
                   <Accordion type="multiple" className="w-full space-y-2.5 sm:space-y-3">
                     {materias.map((materia) => {
