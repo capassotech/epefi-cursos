@@ -120,7 +120,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
         const studentData = authService.getStudentDataFromStorage();
         const userName = studentData?.nombre || "Usuario";
 
-        toast.success(`¡Bienvenido a INEE, ${userName}!`, {
+        toast.success(`¡Bienvenido a EPEFI, ${userName}!`, {
           description: "Tu cuenta ha sido creada exitosamente",
           duration: 4000,
         });
