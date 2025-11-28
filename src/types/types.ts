@@ -10,6 +10,10 @@ export interface Curso {
   materias: string[]; // IDs de materias asociadas
   fechaInicioDictado?: string | Date; // ISO string o Date
   fechaFinDictado?: string | Date; // ISO string o Date
+  planDeEstudiosUrl?: string; // URL del PDF del plan de estudios
+  fechasDeExamenesUrl?: string; // URL del PDF de fechas de exámenes
+  planDeEstudiosFechaActualizacion?: string | Date; // Fecha de última actualización
+  fechasDeExamenesFechaActualizacion?: string | Date; // Fecha de última actualización
 }
 
 export interface Materia {
