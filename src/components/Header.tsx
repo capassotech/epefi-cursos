@@ -1,4 +1,4 @@
-import { Search, User, LogOut } from "lucide-react";
+import { Search, User, LogOut, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -48,6 +48,17 @@ const Header = () => {
       return `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase();
     }
     return user?.email?.charAt(0).toUpperCase() || "U";
+  };
+
+  const isAdmin = () => {
+    if (!user) return false;
+    if (typeof user.role === "string") {
+      return user.role === "admin";
+    }
+    if (typeof user.role === "object" && user.role !== null) {
+      return (user.role as any).admin === true;
+    }
+    return false;
   };
 
   return (
@@ -115,6 +126,18 @@ const Header = () => {
                     <User className="mr-2 h-4 w-4" />
                     <span>Perfil</span>
                   </DropdownMenuItem>
+                  {isAdmin() && (
+                    <>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() => navigate("/admin")}
+                      >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Administración</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="cursor-pointer text-red-600 dark:text-red-400"
