@@ -40,8 +40,6 @@ interface RegisterUserData {
   dni: string;
 }
 
-
-
 interface AuthContextType {
   user: UserProfile | null;
   firebaseUser: User | null;
@@ -59,7 +57,12 @@ interface AuthContextType {
   googleLogin: () => Promise<AuthResponse>;
   forgotPassword: (email: string) => Promise<void>;
   changePassword: (oobCode: string, password: string) => Promise<void>;
-  updateProfile: (data: { nombre?: string; apellido?: string; dni?: string; email?: string }) => Promise<void>;
+  updateProfile: (data: {
+    nombre?: string;
+    apellido?: string;
+    dni?: string;
+    email?: string;
+  }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -80,52 +83,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+  const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL || "https://epefi-backend.onrender.com";
 
   // isAuthenticated SOLO depende de firebaseUser
   const isAuthenticated = !!firebaseUser;
 
   // Función para obtener perfil del backend sin bloquear la UI
-  const fetchUserProfileInBackground = useCallback(async (firebaseUser: User) => {
-    try {
-      console.log("🌐 Fetching profile from backend...");
-      const token = await firebaseUser.getIdToken();
+  const fetchUserProfileInBackground = useCallback(
+    async (firebaseUser: User) => {
+      try {
+        console.log("🌐 Fetching profile from backend...");
+        const token = await firebaseUser.getIdToken();
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuarios/me`,
-        {
+        const response = await fetch(`${API_BASE_URL}/api/usuarios/me`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+        });
+
+        if (response.ok) {
+          const profileData = await response.json();
+          console.log("✅ Backend profile fetched:", profileData);
+
+          const updatedProfile: UserProfile = {
+            uid: profileData.uid || firebaseUser.uid,
+            email: profileData.email || firebaseUser.email || "",
+            nombre: profileData.nombre || "Usuario",
+            apellido: profileData.apellido || "",
+            dni: profileData.dni,
+            role: profileData.role || { admin: false, student: true },
+            fechaRegistro:
+              profileData.fechaRegistro || profileData.fechaCreacion,
+          };
+
+          setUser(updatedProfile);
+          authService.updateStudentDataInStorage(updatedProfile);
+        } else {
+          console.warn("Backend profile fetch failed:", response.status);
         }
-      );
-
-      if (response.ok) {
-        const profileData = await response.json();
-        console.log("✅ Backend profile fetched:", profileData);
-
-        const updatedProfile: UserProfile = {
-          uid: profileData.uid || firebaseUser.uid,
-          email: profileData.email || firebaseUser.email || "",
-          nombre: profileData.nombre || "Usuario",
-          apellido: profileData.apellido || "",
-          dni: profileData.dni,
-          role: profileData.role || { admin: false, student: true },
-          fechaRegistro: profileData.fechaRegistro || profileData.fechaCreacion,
-        };
-
-        setUser(updatedProfile);
-        authService.updateStudentDataInStorage(updatedProfile);
-      } else {
-        console.warn("Backend profile fetch failed:", response.status);
+      } catch (error) {
+        console.warn("Backend profile fetch error:", error);
+        // No hacer nada - seguir con el perfil básico
       }
-    } catch (error) {
-      console.warn("Backend profile fetch error:", error);
-      // No hacer nada - seguir con el perfil básico
-    }
-  }, [API_BASE_URL]);
+    },
+    [API_BASE_URL]
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -145,11 +150,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (storedData && storedData.uid === firebaseUser.uid) {
             console.log("✅ Using stored data");
             setUser(storedData as UserProfile);
-            
+
             // Solo buscar datos del backend si los datos almacenados son muy básicos
             // (no tienen datos completos del backend)
             if (!storedData.dni && !storedData.fechaRegistro) {
-              console.log("🔄 Stored data is basic, fetching complete profile...");
+              console.log(
+                "🔄 Stored data is basic, fetching complete profile..."
+              );
               fetchUserProfileInBackground(firebaseUser);
             }
           } else {
@@ -195,13 +202,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, [fetchUserProfileInBackground]);
 
-  const login = async (email: string, password: string): Promise<AuthResponse> => {
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<AuthResponse> => {
     // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
     const response = await authService.login({ email, password });
     return response;
   };
 
-  const register = async (userData: RegisterUserData): Promise<AuthResponse> => {
+  const register = async (
+    userData: RegisterUserData
+  ): Promise<AuthResponse> => {
     // ✅ NO establecer isLoading aquí - lo maneja onAuthStateChanged
     const response = await authService.register({
       email: userData.email,
@@ -247,30 +259,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await authService.forgotPassword(email);
   };
 
-  const changePassword = async (oobCode: string, password: string): Promise<void> => {
+  const changePassword = async (
+    oobCode: string,
+    password: string
+  ): Promise<void> => {
     await authService.changePassword(oobCode, password);
   };
 
-  const updateProfile = async (data: { nombre?: string; apellido?: string; dni?: string; email?: string }): Promise<void> => {
+  const updateProfile = async (data: {
+    nombre?: string;
+    apellido?: string;
+    dni?: string;
+    email?: string;
+  }): Promise<void> => {
     if (!firebaseUser) {
       throw new Error("Usuario no autenticado");
     }
 
     try {
       const token = await firebaseUser.getIdToken();
-      
+
       // Intentar actualizar en el backend
-      const response = await fetch(
-        `${API_BASE_URL}/api/usuarios/me`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/usuarios/me`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
 
       if (!response.ok) {
         // Si el endpoint no existe (404), solo actualizar el estado local
@@ -280,7 +297,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const updatedProfile: UserProfile = {
               ...user,
               nombre: data.nombre !== undefined ? data.nombre : user.nombre,
-              apellido: data.apellido !== undefined ? data.apellido : user.apellido,
+              apellido:
+                data.apellido !== undefined ? data.apellido : user.apellido,
               dni: data.dni !== undefined ? data.dni : user.dni,
               email: data.email !== undefined ? data.email : user.email,
             };
@@ -290,30 +308,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           // Nota: El email y displayName se actualizan en el backend
           // Solo actualizamos el estado local aquí cuando el endpoint no existe
-          
+
           return; // Salir exitosamente después de actualizar localmente
         }
 
         // Para otros errores, intentar obtener más información
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.message || `Error al actualizar el perfil (${response.status})`;
+        const errorMessage =
+          errorData.error ||
+          errorData.message ||
+          `Error al actualizar el perfil (${response.status})`;
         throw new Error(errorMessage);
       }
 
       // Si la respuesta fue exitosa, usar los datos del servidor
       const responseData = await response.json();
-      
+
       // El backend devuelve { message: '...', user: { ... } }
       const updatedUserData = responseData.user || responseData;
-      
+
       // Actualizar el estado local del usuario
       if (user) {
         const updatedProfile: UserProfile = {
           ...user,
-          nombre: updatedUserData.nombre !== undefined ? updatedUserData.nombre : user.nombre,
-          apellido: updatedUserData.apellido !== undefined ? updatedUserData.apellido : user.apellido,
-          dni: updatedUserData.dni !== undefined ? updatedUserData.dni : user.dni,
-          email: updatedUserData.email !== undefined ? updatedUserData.email : user.email,
+          nombre:
+            updatedUserData.nombre !== undefined
+              ? updatedUserData.nombre
+              : user.nombre,
+          apellido:
+            updatedUserData.apellido !== undefined
+              ? updatedUserData.apellido
+              : user.apellido,
+          dni:
+            updatedUserData.dni !== undefined ? updatedUserData.dni : user.dni,
+          email:
+            updatedUserData.email !== undefined
+              ? updatedUserData.email
+              : user.email,
         };
         setUser(updatedProfile);
         authService.updateStudentDataInStorage(updatedProfile);
@@ -327,20 +358,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-    const value: AuthContextType = {
-      user,
-      firebaseUser,
-      isAuthenticated,
-      isLoading,
-      login,
-      register,
-      logout,
-      googleRegister,
-      googleLogin,
-      forgotPassword,
-      changePassword,
-      updateProfile,
-    };
+  const value: AuthContextType = {
+    user,
+    firebaseUser,
+    isAuthenticated,
+    isLoading,
+    login,
+    register,
+    logout,
+    googleRegister,
+    googleLogin,
+    forgotPassword,
+    changePassword,
+    updateProfile,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

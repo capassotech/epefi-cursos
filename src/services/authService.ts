@@ -11,7 +11,8 @@ import { auth } from "../../config/firebase-client";
 import axios from "axios";
 
 // Configuración de axios
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://epefi-backend.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -35,7 +36,7 @@ interface RegisterData {
 
 class AuthService {
   async login(data: LoginData) {
-    console.log("ENTRO AL LOGIN...")
+    console.log("ENTRO AL LOGIN...");
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -47,7 +48,10 @@ class AuthService {
       const token = await firebaseUser.getIdToken();
 
       try {
-        const response = await api.post("/api/auth/login", { email: data.email, password: data.password }, {
+        const response = await api.post(
+          "/api/auth/login",
+          { email: data.email, password: data.password },
+          {
             headers: {
               Authorization: `Bearer ${token}`,
             },
