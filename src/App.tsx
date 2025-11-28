@@ -10,11 +10,13 @@ import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
 import Curso from "./pages/Curso";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRoute from "./components/AdminRoute";
 import AuthRedirectRoute from "./components/AuthRedirectRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import ForgotPassword from "./pages/ForgotPassword";
+import Admin from "./pages/Admin";
 import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
@@ -50,8 +52,12 @@ const App = () => (
                   <Route path="/search" element={<Search />} />
                   {/* Nueva ruta de perfil */}
                   <Route path="/profile" element={<Profile />} />
-                  <Route path="*" element={<NotFound />} />
                 </Route>
+                {/* Rutas de administración - Solo para admins */}
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin" element={<Admin />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
           </AuthProvider>
