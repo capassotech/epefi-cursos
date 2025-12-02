@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRight, Loader2, Play } from "lucide-react";
+import { ChevronRight, Loader2, Play, Calendar } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
@@ -34,6 +34,58 @@ const Index = () => {
     theme === "dark" ||
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  // Función para formatear fechas
+  const formatDate = (date: string | Date | any | undefined): string => {
+    if (!date) return "";
+    
+    try {
+      let dateObj: Date;
+      
+      // Si es un string, convertir a Date
+      if (typeof date === "string") {
+        dateObj = new Date(date);
+      }
+      // Si es un objeto Date, usar directamente
+      else if (date instanceof Date) {
+        dateObj = date;
+      }
+      // Si es un Timestamp de Firestore, usar toDate()
+      else if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate();
+      }
+      // Si es un objeto con método getTime, intentar crear Date
+      else if (date && typeof date.getTime === "function") {
+        dateObj = date;
+      }
+      // Si es un objeto con seconds (Timestamp de Firestore serializado)
+      else if (date && typeof date.seconds === "number") {
+        dateObj = new Date(date.seconds * 1000);
+      }
+      // Si tiene _seconds (otro formato de Timestamp)
+      else if (date && typeof date._seconds === "number") {
+        dateObj = new Date(date._seconds * 1000);
+      }
+      // Intentar convertir directamente
+      else {
+        dateObj = new Date(date);
+      }
+      
+      // Validar que sea una fecha válida
+      if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        return "";
+      }
+      
+      return new Intl.DateTimeFormat("es-AR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(dateObj);
+    } catch (error) {
+      console.error("Error formatting date:", error, date);
+      return "";
+    }
+  };
 
   const handleOpenVideoModal = (course: Course) => {
     setSelectedVideo({
@@ -198,6 +250,23 @@ const Index = () => {
                               <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
                                 {course.descripcion}
                               </p>
+                              
+                              {/* Fechas de dictado */}
+                              {(course.fechaInicioDictado || course.fechaFinDictado) && (
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                  {course.fechaInicioDictado && course.fechaFinDictado ? (
+                                    <span>
+                                      {formatDate(course.fechaInicioDictado)} - {formatDate(course.fechaFinDictado)}
+                                    </span>
+                                  ) : course.fechaInicioDictado ? (
+                                    <span>Inicio: {formatDate(course.fechaInicioDictado)}</span>
+                                  ) : (
+                                    <span>Fin: {formatDate(course.fechaFinDictado)}</span>
+                                  )}
+                                </div>
+                              )}
+                              
                               <button 
                                 className="text-sm hover:underline text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 break-words flex items-center gap-1 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200"
                                 onClick={(e) => {
