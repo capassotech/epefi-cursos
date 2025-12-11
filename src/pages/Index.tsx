@@ -7,6 +7,114 @@ import { buildCourseUrl, Course } from "@/data/courses";
 import CoursesService from "@/services/coursesService";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoModal from "@/components/video-modal";
+import CourseLoader from "@/components/CourseLoader";
+
+// Componente para la tarjeta de curso con manejo de carga de imagen
+const CourseCard = ({ course, onNavigate, onOpenVideo, formatDate }: { 
+  course: Course; 
+  onNavigate: (url: string) => void;
+  onOpenVideo: (course: Course) => void;
+  formatDate: (date: string | Date | any | undefined) => string;
+}) => {
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  
+  const imageSrc = course.imagen === "" || imageError ? "/placeholder.svg" : course.imagen;
+  
+  return (
+    <Card
+      className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
+      onClick={() => onNavigate(buildCourseUrl(course.id))}
+    >
+      <CardContent className="p-0 flex flex-row sm:flex-row h-auto sm:h-[200px]">
+        {/* Imagen del curso - pequeña en mobile */}
+        <div className="w-24 sm:w-1/3 h-24 sm:h-full relative overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+          {imageLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+              <img
+                src="/placeholder.svg"
+                alt="Cargando..."
+                className="w-full h-full object-cover opacity-50"
+              />
+            </div>
+          )}
+          <img
+            src={imageSrc}
+            alt={course.titulo}
+            className={`object-cover w-full h-full transition-opacity duration-300 hover:scale-105 ${
+              imageLoading ? "opacity-0" : "opacity-100"
+            }`}
+            onLoad={() => setImageLoading(false)}
+            onError={() => {
+              setImageError(true);
+              setImageLoading(false);
+            }}
+          />
+        </div>
+        {/* Contenido del curso */}
+        <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between min-w-0">
+          <div className="mb-2 sm:mb-4">
+            <h3 className="font-bold text-sm sm:text-lg text-gray-900 dark:text-gray-100 break-words line-clamp-2">
+              {course.titulo}
+            </h3>
+            
+            {/* Fechas de dictado - siempre visibles en mobile */}
+            {(course.fechaInicioDictado || course.fechaFinDictado) && (
+              <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-0">
+                {course.fechaInicioDictado && (
+                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                    <span className="font-medium">Inicio:</span>
+                    <span>{formatDate(course.fechaInicioDictado)}</span>
+                  </div>
+                )}
+                {course.fechaFinDictado && (
+                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 opacity-0 sm:opacity-100" />
+                    <span className="font-medium">Fin:</span>
+                    <span>{formatDate(course.fechaFinDictado)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Botón de video - siempre visible en mobile */}
+            <button 
+              className="text-xs sm:text-sm hover:underline text-gray-600 dark:text-gray-300 mt-1.5 sm:mt-2 flex items-center gap-1 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenVideo(course);
+              }}
+            >
+              <Play className="w-3 h-3 sm:w-4 sm:h-5 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 transition-colors duration-200" />
+              <span>Ver video</span>
+            </button>
+            
+            {/* Descripción solo en desktop */}
+            <p className="hidden sm:block text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
+              {course.descripcion}
+            </p>
+          </div>
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-4">
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
+            </div>
+            {/* Barra de progreso - naranja solo como detalle */}
+            <div className="hidden sm:flex items-center gap-2 mt-3 sm:mt-4">
+              <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
+                <div
+                  className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
+                ></div>
+              </div>
+              <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const Index = () => {
   const navigate = useNavigate();
@@ -214,9 +322,7 @@ const Index = () => {
         </h2>
         <div className="grid grid-cols-1 gap-4">
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-10 h-10 animate-spin" />
-            </div>
+            <CourseLoader />
           ) : (
             <>
               {courses.length === 0
@@ -225,86 +331,16 @@ const Index = () => {
                     <p className="text-gray-500 dark:text-gray-400">No hay cursos asignados</p>
                   </div>
                 ) : (
-                  courses.map((course) => {
-                    return (
-                      <Card
-                        key={course.id}
-                        className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden cursor-pointer"
-                        onClick={() => navigate(buildCourseUrl(course.id))}
-                      >
-                        <CardContent className="p-0 flex flex-col sm:flex-row h-[200px]">
-                          {/* Imagen del curso */}
-                          <div className="w-full sm:w-1/3 h-[200px] sm:h-full relative overflow-hidden flex-shrink-0">
-                            <img
-                              src={course.imagen === "" ? "/placeholder.svg" : course.imagen}
-                              alt={course.titulo}
-                              className="object-cover w-full h-full transition-transform hover:scale-105"
-                            />
-                          </div>
-                          {/* Contenido del curso */}
-                          <div className="p-4 flex-1 flex flex-col justify-between min-w-0">
-                            <div className="mb-3 sm:mb-4">
-                              <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-gray-100 break-words">
-                                {course.titulo}
-                              </h3>
-                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
-                                {course.descripcion}
-                              </p>
-                              
-                              {/* Fechas de dictado */}
-                              {(course.fechaInicioDictado || course.fechaFinDictado) && (
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                                  {course.fechaInicioDictado && course.fechaFinDictado ? (
-                                    <span>
-                                      {formatDate(course.fechaInicioDictado)} - {formatDate(course.fechaFinDictado)}
-                                    </span>
-                                  ) : course.fechaInicioDictado ? (
-                                    <span>Inicio: {formatDate(course.fechaInicioDictado)}</span>
-                                  ) : (
-                                    <span>Fin: {formatDate(course.fechaFinDictado)}</span>
-                                  )}
-                                </div>
-                              )}
-                              
-                              <button 
-                                className="text-sm hover:underline text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 break-words flex items-center gap-1 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenVideoModal(course);
-                                }}
-                              >
-                                <Play className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200" />
-                                Ver video
-                              </button>
-                            </div>
-                            <div>
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                                  <span className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-1 rounded-full whitespace-nowrap border border-slate-200 dark:border-slate-600">
-                                    {course.estado}
-                                  </span>
-                                </div>
-                                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
-                              </div>
-                              {/* Barra de progreso - naranja solo como detalle */}
-                              <div className="flex items-center gap-2 mt-3 sm:mt-4">
-                                <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
-                                  <div
-                                    className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
-                                  // style={{ width: `${course.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
-                                  {/* {course.progress}% */}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  }))}
+                  courses.map((course) => (
+                    <CourseCard
+                      key={course.id}
+                      course={course}
+                      onNavigate={navigate}
+                      onOpenVideo={handleOpenVideoModal}
+                      formatDate={formatDate}
+                    />
+                  ))
+                )}
             </>
           )}
 
@@ -327,7 +363,7 @@ const Index = () => {
               Adquirir más formaciones
             </h3>
             <p className="text-gray-600 dark:text-gray-300 mt-2 text-sm sm:text-base">
-              Explora nuestra plataforma de formaciones completas
+              Explorá toda nuestra oferta de formaciones
             </p>
 
             {/* Ícono con detalle naranja */}

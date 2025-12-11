@@ -136,7 +136,7 @@ export default function Profile() {
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            Mi Perfil
+            Mi perfil
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm hidden sm:block">
             Información personal de la cuenta

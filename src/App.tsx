@@ -23,8 +23,8 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    {/* Cambiamos a "system" para detectar automáticamente el tema del dispositivo */}
-    <ThemeProvider defaultTheme="system" storageKey="epefi-edu-theme">
+    {/* Tema oscuro por defecto */}
+    <ThemeProvider defaultTheme="dark" storageKey="epefi-edu-theme">
       <TooltipProvider>
         <Toaster />
         <Sonner position="top-right" />

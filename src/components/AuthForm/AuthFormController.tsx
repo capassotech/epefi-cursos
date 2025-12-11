@@ -111,8 +111,10 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
           duration: 4000,
         });
 
+        // Mantener el loader visible durante el delay antes de navegar
         setTimeout(() => {
           navigate("/");
+          // El loader se ocultará cuando el componente se desmonte al navegar
         }, 1000);
       } else {
         await register(formData);
@@ -125,19 +127,21 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
           duration: 4000,
         });
 
+        // Mantener el loader visible durante el delay antes de navegar
         setTimeout(() => {
           navigate("/");
+          // El loader se ocultará cuando el componente se desmonte al navegar
         }, 1000);
       }
     } catch (error: any) {
-      toast.error(error.error);
-    } finally {
       setIsSubmitting(false);
+      toast.error(error.error);
     }
   };
 
   const handleGoogleAuth = async () => {
     if (isLogin) {
+      setIsSubmitting(true);
       try {
         await googleLogin();
 
@@ -146,11 +150,14 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
           duration: 4000,
         });
 
+        // Mantener el loader visible durante el delay antes de navegar
         setTimeout(() => {
           navigate("/");
+          // El loader se ocultará cuando el componente se desmonte al navegar
         }, 2000);
         return;
       } catch (error: unknown) {
+        setIsSubmitting(false);
         const errorMessage =
           error instanceof Error
             ? error.message
@@ -165,6 +172,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await googleRegister(
         formData.firstName,
@@ -178,10 +186,13 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
         duration: 4000,
       });
 
+      // Mantener el loader visible durante el delay antes de navegar
       setTimeout(() => {
         navigate("/");
+        // El loader se ocultará cuando el componente se desmonte al navegar
       }, 2000);
     } catch (error: unknown) {
+      setIsSubmitting(false);
       const errorMessage =
         error instanceof Error
           ? error.message

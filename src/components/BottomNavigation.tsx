@@ -181,28 +181,51 @@ const BottomNavigation = () => {
       ? `Continuar curso ${continueTarget.courseTitle}`
       : "Continuar con tus clases";
 
+  const handleContinueClick = () => {
+    // Si el path es solo "/curso" sin ID, redirigir a inicio
+    if (continueTarget.path === "/curso") {
+      navigate("/");
+    } else {
+      navigate(continueTarget.path);
+    }
+  };
+
+  // Verificar si hay un curso válido guardado
+  const hasValidCourse = continueTarget.path !== "/curso" && continueTarget.path !== "/";
+
   const navItems = [
-    { icon: Home, label: "Inicio", path: "/", activePath: "/" },
-    {
-      icon: Play,
-      label: "Continuar",
-      path: continueTarget.path,
-      activePath: "/curso",
-      ariaLabel: continueAriaLabel,
-    },
+    { icon: Home, label: "Inicio", path: "/", activePath: "/", id: "home" },
+    // Solo mostrar el botón Continuar si hay un curso válido guardado
+    ...(hasValidCourse
+      ? [
+          {
+            icon: Play,
+            label: "Continuar",
+            path: continueTarget.path,
+            activePath: "/curso",
+            ariaLabel: continueAriaLabel,
+            onClick: handleContinueClick,
+            id: "continue",
+          },
+        ]
+      : []),
     {
       icon: Search,
       label: "Buscar",
       path: "/search",
       activePath: "/search",
       ariaLabel: "Buscar clases o teoría",
+      id: "search",
     },
-  ];
+  ].filter((item, index, self) => 
+    // Filtrar duplicados por path
+    index === self.findIndex((t) => t.path === item.path)
+  );
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-700 md:hidden">
       <div className="flex items-center justify-around py-2">
-        {navItems.map(({ icon: Icon, label, path, activePath, ariaLabel }) => {
+        {navItems.map(({ icon: Icon, label, path, activePath, ariaLabel, onClick, id }) => {
           const basePath = activePath ?? path;
           const isActive =
             basePath === "/"
@@ -212,8 +235,8 @@ const BottomNavigation = () => {
 
           return (
             <button
-              key={path}
-              onClick={() => navigate(path)}
+              key={id || label}
+              onClick={onClick || (() => navigate(path))}
               className={cn(
                 "flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all duration-200",
                 isActive

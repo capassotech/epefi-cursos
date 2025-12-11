@@ -9,9 +9,13 @@ import {
   BookOpen,
   Filter,
   School,
+  Loader2,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { buildCourseUrl, courses } from "@/data/courses";
+import { buildCourseUrl } from "@/data/courses";
+import CoursesService from "@/services/coursesService";
+import { useAuth } from "@/contexts/AuthContext";
+import { Curso, Materia, Modulo } from "@/types/types";
 
 type FilterType = "all" | "course" | "materia" | "modulo";
 type SearchResultType = Exclude<FilterType, "all">;
@@ -66,86 +70,136 @@ const filterOptions: { value: FilterType; label: string }[] = [
 
 const Search = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [loading, setLoading] = useState(true);
+  const [searchIndex, setSearchIndex] = useState<SearchResult[]>([]);
 
   useEffect(() => {
     setQuery(searchParams.get("q") || "");
   }, [searchParams]);
 
-  const searchIndex = useMemo<SearchResult[]>(() => {
-    return courses.flatMap((course) => {
-      const totalModules = course.subjects.reduce(
-        (acc, subject) => acc + subject.modules.length,
-        0
-      );
-      const totalItems = course.subjects.reduce(
-        (acc, subject) =>
-          acc + subject.modules.reduce((count, module) => count + module.items.length, 0),
-        0
-      );
+  // Cargar datos del backend
+  useEffect(() => {
+    const loadSearchData = async () => {
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
 
-      const courseResult: SearchResult = {
-        id: `course-${course.id}`,
-        type: "course",
-        title: course.title,
-        description: course.summary,
-        path: buildCourseUrl(course.id),
-        meta: [
-          `${course.subjects.length} materias`,
-          `${totalModules} módulos`,
-          `${totalItems} contenidos`,
-        ],
-      };
+      try {
+        setLoading(true);
+        // Obtener cursos del usuario
+        const coursesResponse = await CoursesService.getAllCoursesPerUser(user.uid);
+        const courses: Curso[] = Array.isArray(coursesResponse.data) 
+          ? coursesResponse.data.filter((c: Curso) => c.estado === "activo")
+          : [];
 
-      const subjectResults: SearchResult[] = course.subjects.flatMap((subject) => {
-        const subjectModuleCount = subject.modules.length;
-        const subjectItemCount = subject.modules.reduce(
-          (acc, module) => acc + module.items.length,
-          0
-        );
+        const results: SearchResult[] = [];
 
-        const baseSubject: SearchResult = {
-          id: `materia-${course.id}-${subject.id}`,
-          type: "materia",
-          title: subject.name,
-          description: subject.description,
-          courseTitle: course.title,
-          path: buildCourseUrl(course.id, subject.id),
-          meta: [
-            `${subjectModuleCount} módulos`,
-            `${subjectItemCount} contenidos`,
-          ],
-        };
-
-        const moduleResults: SearchResult[] = subject.modules.map((module) => {
-          const moduleItemCount = module.items.length;
-          const completedCount = module.items.filter((item) => item.completed).length;
-
-          const moduleMeta = [
-            `${moduleItemCount} contenidos`,
-            `${completedCount} completados`,
-          ];
-
-          return {
-            id: `modulo-${course.id}-${subject.id}-${module.id}`,
-            type: "modulo",
-            title: module.name,
-            description: module.description,
-            courseTitle: course.title,
-            subjectName: subject.name,
-            path: buildCourseUrl(course.id, subject.id, module.id),
-            meta: moduleMeta,
+        // Para cada curso, obtener materias y módulos
+        for (const course of courses) {
+          // Agregar el curso a los resultados
+          const courseResult: SearchResult = {
+            id: `course-${course.id}`,
+            type: "course",
+            title: course.titulo,
+            description: course.descripcion || "",
+            path: buildCourseUrl(course.id),
+            meta: [],
           };
-        });
 
-        return [baseSubject, ...moduleResults];
-      });
+          // Obtener materias del curso
+          const materias: Materia[] = [];
+          if (course.materias && course.materias.length > 0) {
+            for (const materiaId of course.materias) {
+              try {
+                const materiaResponse = await CoursesService.getMateriasByCourseId(materiaId);
+                const materiaData = materiaResponse.data;
+                const materiasArray = Array.isArray(materiaData) ? materiaData : [materiaData];
+                materias.push(...materiasArray);
+              } catch (error) {
+                console.error(`Error loading materia ${materiaId}:`, error);
+              }
+            }
+          }
 
-      return [courseResult, ...subjectResults];
-    });
-  }, []);
+          courseResult.meta.push(`${materias.length} materias`);
+
+          // Agregar materias y módulos a los resultados
+          for (const materia of materias) {
+            // Agregar la materia
+            const materiaResult: SearchResult = {
+              id: `materia-${course.id}-${materia.id}`,
+              type: "materia",
+              title: materia.nombre,
+              description: "",
+              courseTitle: course.titulo,
+              path: buildCourseUrl(course.id, materia.id),
+              meta: [],
+            };
+
+            // Obtener módulos de la materia
+            const modulos: Modulo[] = [];
+            if (materia.modulos && materia.modulos.length > 0) {
+              for (const moduloId of materia.modulos) {
+                try {
+                  const moduloResponse = await CoursesService.getModulosByMateriaId(moduloId);
+                  const moduloData = moduloResponse.data;
+                  const modulosArray = Array.isArray(moduloData) ? moduloData : [moduloData];
+                  modulos.push(...modulosArray);
+                } catch (error) {
+                  console.error(`Error loading modulo ${moduloId}:`, error);
+                }
+              }
+            }
+
+            materiaResult.meta.push(`${modulos.length} módulos`);
+
+            // Agregar módulos
+            for (const modulo of modulos) {
+              const moduloResult: SearchResult = {
+                id: `modulo-${course.id}-${materia.id}-${modulo.id}`,
+                type: "modulo",
+                title: modulo.titulo,
+                description: modulo.descripcion || "",
+                courseTitle: course.titulo,
+                subjectName: materia.nombre,
+                path: buildCourseUrl(course.id, materia.id, modulo.id),
+                meta: [],
+              };
+              results.push(moduloResult);
+            }
+
+            results.push(materiaResult);
+          }
+
+          const totalModulos = materias.reduce((acc, m) => acc + (m.modulos?.length || 0), 0);
+          courseResult.meta.push(`${totalModulos} módulos`);
+          results.push(courseResult);
+        }
+
+        setSearchIndex(results);
+      } catch (error) {
+        console.error("Error loading search data:", error);
+        setSearchIndex([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSearchData();
+  }, [user]);
+
+  // Función para normalizar texto (eliminar acentos y convertir a minúsculas)
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""); // Eliminar diacríticos (acentos)
+  };
 
   const filteredResults = useMemo(() => {
     let results = searchIndex;
@@ -155,18 +209,19 @@ const Search = () => {
     }
 
     if (query.trim()) {
-      const searchTerm = query.toLowerCase();
+      const searchTerm = normalizeText(query);
       results = results.filter((item) => {
-        const haystack = [
-          item.title,
-          item.description,
-          item.courseTitle,
-          item.subjectName,
-          ...item.meta,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
+        const haystack = normalizeText(
+          [
+            item.title,
+            item.description,
+            item.courseTitle,
+            item.subjectName,
+            ...item.meta,
+          ]
+            .filter(Boolean)
+            .join(" ")
+        );
 
         return haystack.includes(searchTerm);
       });
@@ -179,7 +234,7 @@ const Search = () => {
     <div className="container mx-auto px-4 py-6 space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Buscar Contenido
+          Buscar contenido
         </h1>
         <p className="text-gray-600 dark:text-gray-300">
           Encontrá cursos, materias y módulos del campus
@@ -213,7 +268,14 @@ const Search = () => {
       </div>
 
       <div className="space-y-3">
-        {filteredResults.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <p className="text-gray-600 dark:text-gray-400">Cargando contenido...</p>
+            </div>
+          </div>
+        ) : filteredResults.length > 0 ? (
           <>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {filteredResults.length} resultado{filteredResults.length !== 1 ? "s" : ""} encontrado{filteredResults.length !== 1 ? "s" : ""}

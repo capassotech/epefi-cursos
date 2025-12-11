@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { PasswordRequirements } from "../PasswordRequirements";
 import ThemeToggle from "../ThemeToggle";
+import AuthLoader from "../AuthLoader";
 
 export default function AuthFormView({
   isLogin = false,
@@ -72,7 +73,7 @@ export default function AuthFormView({
   };
 
   const getStepTitle = () => {
-    if (isLogin) return "Iniciar Sesión";
+    if (isLogin) return "Iniciar sesión";
 
     switch (currentStep) {
       case 1:
@@ -501,7 +502,7 @@ export default function AuthFormView({
               Iniciando sesión...
             </>
           ) : (
-            "Iniciar Sesión"
+            "Iniciar sesión"
           )}
         </Button>
       </form>
@@ -559,35 +560,41 @@ export default function AuthFormView({
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {isLogin
-              ? renderLogin()
-              : currentStep === 1
-              ? renderStep1()
-              : currentStep === 2
-              ? renderStep2()
-              : renderStep1()}
+            {isSubmitting ? (
+              <AuthLoader isLogin={isLogin} />
+            ) : (
+              <>
+                {isLogin
+                  ? renderLogin()
+                  : currentStep === 1
+                  ? renderStep1()
+                  : currentStep === 2
+                  ? renderStep2()
+                  : renderStep1()}
 
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">
-                {isLogin ? "¿No tienes una cuenta?" : "¿Ya tienes una cuenta?"}{" "}
-                <Link
-                  to={isLogin ? "/registro" : "/login"}
-                  className="text-primary hover:underline font-medium transition-colors"
-                >
-                  {isLogin ? "Regístrate" : "Inicia sesión"}
-                </Link>
-              </p>
-            </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">
+                    {isLogin ? "¿No tienes una cuenta?" : "¿Ya tienes una cuenta?"}{" "}
+                    <Link
+                      to={isLogin ? "/registro" : "/login"}
+                      className="text-primary hover:underline font-medium transition-colors"
+                    >
+                      {isLogin ? "Regístrate" : "Inicia sesión"}
+                    </Link>
+                  </p>
+                </div>
 
-            {isLogin && (
-              <div className="text-center">
-                <Link
-                  to="/recuperar-contrasena"
-                  className="text-sm text-primary hover:underline transition-colors"
-                >
-                  ¿Olvidaste tu contraseña?
-                </Link>
-              </div>
+                {isLogin && (
+                  <div className="text-center">
+                    <Link
+                      to="/recuperar-contrasena"
+                      className="text-sm text-primary hover:underline transition-colors"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
