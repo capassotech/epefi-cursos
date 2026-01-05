@@ -68,18 +68,97 @@ const filterOptions: { value: FilterType; label: string }[] = [
   { value: "modulo", label: "Módulos" },
 ];
 
+const SEARCH_FILTER_KEY = "search_filter";
+const SEARCH_QUERY_KEY = "search_query";
+
 const Search = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get("q") || "");
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Inicializar desde URL params, si no hay, usar localStorage, si no hay, usar valores por defecto
+  const getInitialQuery = () => {
+    const urlQuery = searchParams.get("q");
+    if (urlQuery) return urlQuery;
+    const storedQuery = localStorage.getItem(SEARCH_QUERY_KEY);
+    return storedQuery || "";
+  };
+
+  const getInitialFilter = (): FilterType => {
+    const urlFilter = searchParams.get("filter") as FilterType;
+    if (urlFilter && ["all", "course", "materia", "modulo"].includes(urlFilter)) {
+      return urlFilter;
+    }
+    const storedFilter = localStorage.getItem(SEARCH_FILTER_KEY) as FilterType;
+    if (storedFilter && ["all", "course", "materia", "modulo"].includes(storedFilter)) {
+      return storedFilter;
+    }
+    return "all";
+  };
+
+  const [query, setQuery] = useState(getInitialQuery());
+  const [filter, setFilter] = useState<FilterType>(getInitialFilter());
   const [loading, setLoading] = useState(true);
   const [searchIndex, setSearchIndex] = useState<SearchResult[]>([]);
 
+  // Sincronizar query y filter con URL params cuando cambian los searchParams (ej: al volver con botón atrás)
   useEffect(() => {
-    setQuery(searchParams.get("q") || "");
-  }, [searchParams]);
+    const urlQuery = searchParams.get("q") || "";
+    const urlFilter = searchParams.get("filter") as FilterType;
+    
+    // Actualizar query desde URL
+    if (urlQuery !== query) {
+      setQuery(urlQuery);
+      if (urlQuery) {
+        localStorage.setItem(SEARCH_QUERY_KEY, urlQuery);
+      } else {
+        localStorage.removeItem(SEARCH_QUERY_KEY);
+      }
+    }
+    
+    // Actualizar filter desde URL
+    const validFilter = urlFilter && ["all", "course", "materia", "modulo"].includes(urlFilter) 
+      ? urlFilter 
+      : (localStorage.getItem(SEARCH_FILTER_KEY) as FilterType) || "all";
+    
+    if (validFilter !== filter) {
+      setFilter(validFilter);
+      if (validFilter !== "all") {
+        localStorage.setItem(SEARCH_FILTER_KEY, validFilter);
+      } else {
+        localStorage.removeItem(SEARCH_FILTER_KEY);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]);
+
+  // Actualizar URL y localStorage cuando cambia el filtro
+  const handleFilterChange = (newFilter: FilterType) => {
+    setFilter(newFilter);
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (newFilter === "all") {
+      newSearchParams.delete("filter");
+      localStorage.removeItem(SEARCH_FILTER_KEY);
+    } else {
+      newSearchParams.set("filter", newFilter);
+      localStorage.setItem(SEARCH_FILTER_KEY, newFilter);
+    }
+    setSearchParams(newSearchParams, { replace: true });
+  };
+
+  // Actualizar URL y localStorage cuando cambia la query
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (newQuery.trim()) {
+      newSearchParams.set("q", newQuery);
+      localStorage.setItem(SEARCH_QUERY_KEY, newQuery);
+    } else {
+      newSearchParams.delete("q");
+      localStorage.removeItem(SEARCH_QUERY_KEY);
+    }
+    setSearchParams(newSearchParams, { replace: true });
+  };
 
   // Cargar datos del backend
   useEffect(() => {
@@ -247,7 +326,7 @@ const Search = () => {
           type="search"
           placeholder="Buscar por título, materia, módulo o descripción..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleQueryChange(e.target.value)}
           className="pl-12 h-12 text-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
         />
       </div>
@@ -259,7 +338,7 @@ const Search = () => {
             key={option.value}
             variant={filter === option.value ? "default" : "outline"}
             size="sm"
-            onClick={() => setFilter(option.value)}
+            onClick={() => handleFilterChange(option.value)}
             className="whitespace-nowrap"
           >
             {option.label}
