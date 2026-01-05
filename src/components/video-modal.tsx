@@ -162,38 +162,43 @@ const VideoModal = ({ isOpen, onClose, content }: VideoModalProps) => {
                 msAllowFullScreen: true,
               } as React.CSSProperties}
               onLoad={() => {
-                // En iOS, ocultar el overlay después de que el iframe cargue
-                // para permitir interacción con los controles del video
-                if (isIOS) {
-                  setTimeout(() => setShowIOSOverlay(false), 3000);
-                }
+                // El overlay permanecerá visible hasta que el usuario elija una opción
+                // No se oculta automáticamente para evitar que quede el reproductor embebido sin pantalla completa
               }}
             />
             {isIOS && showIOSOverlay && (
               <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-10"
-                onClick={() => setShowIOSOverlay(false)}
+                className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-10"
+                // NO cerrar al hacer click fuera - solo con los botones
               >
-                <div className="text-center space-y-4 p-4">
-                  <p className="text-white text-sm mb-4">
-                    Toca el video para usar los controles de pantalla completa
+                <div className="text-center space-y-4 p-4 max-w-sm mx-auto">
+                  <p className="text-white text-sm sm:text-base mb-4 leading-relaxed">
+                    Usa la opción "Abrir en nueva ventana" para usar los controles de pantalla completa
                   </p>
-                  <Button
-                    onClick={handleIOSVideo}
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
-                    size="lg"
-                  >
-                    <Maximize2 className="h-5 w-5 mr-2" />
-                    Abrir en nueva ventana
-                  </Button>
-                  <Button
-                    onClick={() => setShowIOSOverlay(false)}
-                    variant="outline"
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                    size="sm"
-                  >
-                    Usar controles del reproductor
-                  </Button>
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleIOSVideo();
+                      }}
+                      className="bg-orange-500 hover:bg-orange-600 text-white w-full"
+                      size="lg"
+                    >
+                      <Maximize2 className="h-5 w-5 mr-2" />
+                      Abrir en nueva ventana
+                    </Button>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowIOSOverlay(false);
+                      }}
+                      variant="outline"
+                      className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-full"
+                      size="sm"
+                    >
+                      Usar controles del reproductor
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
