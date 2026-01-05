@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
@@ -36,12 +36,16 @@ import VideoModal from "@/components/video-modal";
 const CourseDetailPage = () => {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams] = useSearchParams();
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
+  const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
+  const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{
     id: string;
     title: string;
@@ -148,6 +152,57 @@ const CourseDetailPage = () => {
 
     fetchModulos();
   }, [materias]);
+
+  // Efecto para manejar el filtro de módulo desde la URL
+  useEffect(() => {
+    // Soporta tanto "modulo" como "module" para compatibilidad
+    const moduloId = searchParams.get("modulo") || searchParams.get("module");
+    
+    if (!moduloId || modulos.length === 0 || materias.length === 0) {
+      return;
+    }
+
+    // Encontrar el módulo y su materia correspondiente
+    const modulo = modulos.find(m => m.id === moduloId);
+    if (!modulo) {
+      return;
+    }
+
+    const materiaId = modulo.id_materia;
+    const materia = materias.find(m => m.id === materiaId);
+    if (!materia) {
+      return;
+    }
+
+    // Abrir automáticamente la materia si no está abierta
+    setExpandedMaterias(prev => {
+      if (!prev.includes(materiaId)) {
+        return [...prev, materiaId];
+      }
+      return prev;
+    });
+
+    // Hacer scroll al módulo después de un pequeño delay para asegurar que el DOM esté actualizado
+    const scrollTimeout = setTimeout(() => {
+      const moduloElement = moduloRefs.current[moduloId];
+      if (moduloElement) {
+        moduloElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+        
+        // Resaltar el módulo
+        setHighlightedModuloId(moduloId);
+        
+        // Remover el resaltado después de 3 segundos
+        setTimeout(() => {
+          setHighlightedModuloId(null);
+        }, 3000);
+      }
+    }, 500);
+
+    return () => clearTimeout(scrollTimeout);
+  }, [searchParams, modulos, materias]);
 
 
   const handleOpenVideo = (modulo: Modulo) => {
@@ -378,7 +433,12 @@ const CourseDetailPage = () => {
             </div>
 
             {materias.length > 0 ? (
-              <Accordion type="multiple" className="w-full space-y-2.5 sm:space-y-3">
+              <Accordion 
+                type="multiple" 
+                className="w-full space-y-2.5 sm:space-y-3"
+                value={expandedMaterias}
+                onValueChange={setExpandedMaterias}
+              >
                 {materias.map((materia) => {
                   const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
 
@@ -426,7 +486,19 @@ const CourseDetailPage = () => {
                             ) : materiasModulos.length > 0 ? (
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
                                 {materiasModulos.map((modulo, index) => (
-                                  <ModuleItem key={modulo.id} modulo={modulo} handleOpenDocument={handleOpenDocument} handleOpenVideo={handleOpenVideo} />
+                                  <div
+                                    key={modulo.id}
+                                    ref={(el) => {
+                                      moduloRefs.current[modulo.id] = el;
+                                    }}
+                                  >
+                                    <ModuleItem 
+                                      modulo={modulo} 
+                                      handleOpenDocument={handleOpenDocument} 
+                                      handleOpenVideo={handleOpenVideo}
+                                      isHighlighted={highlightedModuloId === modulo.id}
+                                    />
+                                  </div>
                                 ))}
                               </div>
                             ) : (
@@ -634,7 +706,7 @@ const CourseDetailPage = () => {
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo) => void; handleOpenVideo: (modulo: Modulo) => void }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo) => void; handleOpenVideo: (modulo: Modulo) => void; isHighlighted?: boolean }) => {
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
   const maxLength = 150; // Caracteres para mostrar antes del "Ver más"
@@ -644,7 +716,12 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo }: { modulo: M
     : descripcion;
 
   return (
-    <div className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-md bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50">
+    <div className={cn(
+      "flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-md border transition-all duration-500",
+      isHighlighted 
+        ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700 shadow-md ring-2 ring-orange-400 dark:ring-orange-500 ring-opacity-50" 
+        : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50"
+    )}>
       <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0"></div>
       <div className="flex-1 min-w-0">
         <h4 className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
