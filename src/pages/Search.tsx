@@ -10,6 +10,8 @@ import {
   Filter,
   School,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { buildCourseUrl } from "@/data/courses";
@@ -67,7 +69,7 @@ const filterOptions: { value: FilterType; label: string }[] = [
   { value: "materia", label: "Materias" },
   { value: "modulo", label: "Módulos" },
 ];
-
+const ITEMS_PER_PAGE = 5;
 const SEARCH_FILTER_KEY = "search_filter";
 const SEARCH_QUERY_KEY = "search_query";
 
@@ -100,6 +102,7 @@ const Search = () => {
   const [filter, setFilter] = useState<FilterType>(getInitialFilter());
   const [loading, setLoading] = useState(true);
   const [searchIndex, setSearchIndex] = useState<SearchResult[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Sincronizar query y filter con URL params cuando cambian los searchParams (ej: al volver con botón atrás)
   useEffect(() => {
@@ -159,6 +162,11 @@ const Search = () => {
     }
     setSearchParams(newSearchParams, { replace: true });
   };
+
+  // Resetear página cuando cambia el filtro o la búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, query]);
 
   // Cargar datos del backend
   useEffect(() => {
@@ -309,6 +317,31 @@ const Search = () => {
     return results;
   }, [filter, query, searchIndex]);
 
+  // Calcular resultados paginados
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedResults = filteredResults.slice(startIndex, endIndex);
+
+  // Funciones de navegación
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    // Scroll al inicio de los resultados
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <div className="text-center space-y-2">
@@ -356,10 +389,17 @@ const Search = () => {
           </div>
         ) : filteredResults.length > 0 ? (
           <>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {filteredResults.length} resultado{filteredResults.length !== 1 ? "s" : ""} encontrado{filteredResults.length !== 1 ? "s" : ""}
-            </p>
-            {filteredResults.map((item) => {
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {filteredResults.length} resultado{filteredResults.length !== 1 ? "s" : ""} encontrado{filteredResults.length !== 1 ? "s" : ""}
+                {totalPages > 1 && (
+                  <span className="ml-2">
+                    (Página {currentPage} de {totalPages})
+                  </span>
+                )}
+              </p>
+            </div>
+            {paginatedResults.map((item) => {
               const config = TYPE_CONFIG[item.type];
               const infoLine = [
                 item.type !== "course" ? item.courseTitle : null,
@@ -413,6 +453,70 @@ const Search = () => {
                 </Card>
               );
             })}
+
+            {/* Controles de paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Mostrar solo algunas páginas alrededor de la actual
+                    const showPage =
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1);
+
+                    if (!showPage) {
+                      // Mostrar puntos suspensivos
+                      if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <span
+                            key={page}
+                            className="px-2 text-gray-500 dark:text-gray-400"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
+
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(page)}
+                        className="min-w-[2.5rem]"
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-12">
