@@ -1,48 +1,55 @@
-# Welcome to your project
+# EPEFI Cursos
 
-## Project info
+Portal de cursos de la plataforma EPEFI.
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-
-Follow these steps:
+## 🚀 Inicio Rápido
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+cp env.local .env  # Usa env.qa o env.production según necesites
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Configuración de Entornos
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+El proyecto soporta **QA** y **Producción** mediante variables de entorno.
 
-**Use GitHub Codespaces**
+### Archivos de Configuración
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `env.local` - Configuración para desarrollo local (usa datos de QA)
+- `env.qa` - Configuración para entorno QA
+- `env.production` - Configuración para producción
 
-## What technologies are used for this project?
+**Para desarrollo local:** Copia `env.local` a `.env`:
+```sh
+cp env.local .env
+```
 
-This project is built with:
+### Variables Requeridas
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `VITE_FIREBASE_API_KEY_QA` / `VITE_FIREBASE_API_KEY_PROD`
+- `VITE_FIREBASE_AUTH_DOMAIN_QA` / `VITE_FIREBASE_AUTH_DOMAIN_PROD`
+- `VITE_FIREBASE_PROJECT_ID_QA` / `VITE_FIREBASE_PROJECT_ID_PROD`
+- `VITE_FIREBASE_STORAGE_BUCKET_QA` / `VITE_FIREBASE_STORAGE_BUCKET_PROD`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID_QA` / `VITE_FIREBASE_MESSAGING_SENDER_ID_PROD`
+- `VITE_FIREBASE_APP_ID_QA` / `VITE_FIREBASE_APP_ID_PROD`
+- `VITE_FIREBASE_MEASUREMENT_ID_QA` / `VITE_FIREBASE_MEASUREMENT_ID_PROD`
+- `VITE_API_URL` - URL del backend
+- `VITE_ENVIRONMENT` - `qa` o `prod` (se establece automáticamente en CI/CD)
+
+### Indicador Visual
+
+Cuando el entorno es **QA**, se muestra un banner "ENTORNO PARA PRUEBAS" en la esquina superior derecha.
+
+### CI/CD (GitHub Actions)
+
+Los despliegues automáticos usan GitHub Secrets con sufijos `_QA` y `_PROD`:
+- `VITE_FIREBASE_API_KEY_QA`, `VITE_FIREBASE_API_KEY_PROD`
+- `VITE_FIREBASE_AUTH_DOMAIN_QA`, `VITE_FIREBASE_AUTH_DOMAIN_PROD`
+- ... (mismo patrón para todas las variables)
+
+## 📦 Tecnologías
+
+- Vite + TypeScript + React
+- shadcn-ui + Tailwind CSS
+- Firebase (Auth, Storage, Firestore)

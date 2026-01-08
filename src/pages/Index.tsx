@@ -8,6 +8,7 @@ import CoursesService from "@/services/coursesService";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoModal from "@/components/video-modal";
 import CourseLoader from "@/components/CourseLoader";
+import EnvironmentBanner from "@/components/EnvironmentBanner";
 
 // Componente para la tarjeta de curso con manejo de carga de imagen
 const CourseCard = ({ course, onNavigate, onOpenVideo, formatDate }: { 
@@ -271,7 +272,9 @@ const Index = () => {
 
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
+    <>
+      <EnvironmentBanner />
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
       {!isMobile && (
         <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
           <div
@@ -380,6 +383,7 @@ const Index = () => {
         content={selectedVideo}
       />
     </div>
+    </>
   );
 };
 

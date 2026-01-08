@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordRequirements } from "./PasswordRequirements";
 import { useTheme } from "@/components/ThemeProvider";
+import EnvironmentBanner from "./EnvironmentBanner";
 
 export default function ForgotPasswordComponent() {
   const [email, setEmail] = useState("");
@@ -82,7 +83,9 @@ export default function ForgotPasswordComponent() {
 
   if (emailSent) {
     return (
-      <div className="min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <>
+        <EnvironmentBanner />
+        <div className="min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <Link to="/" className="inline-flex items-center space-x-2 mb-8">
@@ -146,11 +149,14 @@ export default function ForgotPasswordComponent() {
           </Card>
         </div>
       </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <>
+      <EnvironmentBanner />
+      <div className="min-h-screen bg-gradient-hero dark:bg-gradient-hero-dark flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Link to="/" className="inline-flex items-center space-x-2 mb-8">
@@ -269,5 +275,6 @@ export default function ForgotPasswordComponent() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
