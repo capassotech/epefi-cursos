@@ -42,7 +42,7 @@ jobs:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_QA }}"
           channelId: live
-          projectId: epefi-admin-qa
+          projectId: epefi-cursos-qa
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -79,5 +79,5 @@ jobs:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}"
           channelId: live
-          projectId: epefi-admin
+          projectId: epefi-cursos
 
