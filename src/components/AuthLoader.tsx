@@ -17,7 +17,7 @@ const AuthLoader: React.FC<AuthLoaderProps> = ({
     ? "Iniciando sesión, por favor aguarde" 
     : "Creando tu cuenta, por favor aguarde";
 
-  const longWaitMessage = "Por favor aguarde, estamos conectandonos con el servidor";
+  const longWaitMessage = "Estamos conectandonos con el servidor, esto puede tardar unos minutos";
 
   useEffect(() => {
     // Establecer el mensaje inicial
