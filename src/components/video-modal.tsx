@@ -5,7 +5,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ExternalLink, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface VideoModalProps {
@@ -24,13 +24,25 @@ interface VideoModalProps {
   } | null;
   onNextVideo?: () => void;
   onPreviousVideo?: () => void;
+  onMarkAsCompleted?: () => void;
+  isCompleted?: boolean;
 }
 
-const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo }: VideoModalProps) => {
+const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, onMarkAsCompleted, isCompleted = false }: VideoModalProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -241,6 +253,26 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo }: 
                         Expandir
                       </>
                     )}
+                  </Button>
+                )}
+                {onMarkAsCompleted && (
+                  <Button
+                    type="button"
+                    variant={isCompleted ? "default" : "default"}
+                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all ${
+                      isCompleted 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    }`}
+                    onClick={onMarkAsCompleted}
+                  >
+                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
+                    <span className={isMobile ? 'hidden' : ''}>
+                      {isCompleted ? 'Completado' : 'Marcar como completado'}
+                    </span>
+                    <span className={isMobile ? '' : 'hidden'}>
+                      {isCompleted ? 'VISTO' : 'VISTO'}
+                    </span>
                   </Button>
                 )}
                 <Button

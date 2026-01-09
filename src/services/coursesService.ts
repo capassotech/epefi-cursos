@@ -52,6 +52,19 @@ class CoursesService {
   getStudentModules(userId: string) {
     return api.get(`/usuarios/${userId}/modulos`);
   }
+
+  markContentAsCompleted(userId: string, moduleId: string, contentIndex: number, contentType: 'video' | 'document', completed: boolean) {
+    return api.post(`/usuarios/${userId}/progreso`, {
+      moduleId,
+      contentIndex,
+      contentType,
+      completed
+    });
+  }
+
+  getStudentProgress(userId: string) {
+    return api.get(`/usuarios/${userId}/progreso`);
+  }
 }
 
 export default new CoursesService();

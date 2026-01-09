@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ const CourseDetailPage = () => {
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
   const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
+  const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [loadingProgress, setLoadingProgress] = useState(true);
   const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<{
@@ -73,11 +76,22 @@ const CourseDetailPage = () => {
   } | null>(null);
   const [isDocumentLoading, setIsDocumentLoading] = useState(true);
   const [isIOS, setIsIOS] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Detectar iOS
   useEffect(() => {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
+  }, []);
+
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Redirigir si el usuario está deshabilitado
@@ -202,6 +216,37 @@ const CourseDetailPage = () => {
     };
 
     fetchEnabledModules();
+  }, [user?.uid]);
+
+  // Cargar progreso del estudiante
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!user?.uid) {
+        setProgress({});
+        setLoadingProgress(false);
+        return;
+      }
+
+      try {
+        setLoadingProgress(true);
+        const response = await CoursesService.getStudentProgress(user.uid);
+        const progressData = response.data?.progreso || {};
+        setProgress(progressData);
+      } catch (error: any) {
+        // Si el endpoint no existe (404), simplemente inicializar con objeto vacío
+        if (error?.response?.status === 404) {
+          console.log('Endpoint de progreso no disponible todavía, inicializando vacío');
+          setProgress({});
+        } else {
+          console.error('Error fetching progress:', error);
+          setProgress({});
+        }
+      } finally {
+        setLoadingProgress(false);
+      }
+    };
+
+    fetchProgress();
   }, [user?.uid]);
 
   // Efecto para manejar el filtro de módulo desde la URL
@@ -529,6 +574,90 @@ const CourseDetailPage = () => {
     setIsDocumentLoading(false);
   };
 
+  // Función para marcar contenido como completado
+  const handleMarkAsCompleted = async (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => {
+    if (!user?.uid) return;
+
+    try {
+      const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+      const moduleProgress = progress[moduleId] || {};
+      const isCompleted = moduleProgress[contentKey] === true;
+
+      // Actualizar el estado local primero para feedback inmediato
+      setProgress(prev => ({
+        ...prev,
+        [moduleId]: {
+          ...prev[moduleId],
+          [contentKey]: !isCompleted
+        }
+      }));
+
+      // Llamar al backend
+      await CoursesService.markContentAsCompleted(user.uid, moduleId, contentIndex, contentType, !isCompleted);
+    } catch (error) {
+      console.error('Error marking content as completed:', error);
+      // Revertir el cambio en caso de error
+      const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+      const moduleProgress = progress[moduleId] || {};
+      const isCompleted = moduleProgress[contentKey] === true;
+      setProgress(prev => ({
+        ...prev,
+        [moduleId]: {
+          ...prev[moduleId],
+          [contentKey]: isCompleted
+        }
+      }));
+    }
+  };
+
+  // Función para verificar si un contenido está completado
+  const isContentCompleted = (moduleId: string, contentIndex: number, contentType: 'video' | 'document'): boolean => {
+    const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+    const moduleProgress = progress[moduleId] || {};
+    return moduleProgress[contentKey] === true;
+  };
+
+  // Calcular progreso del curso
+  const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
+    let completed = 0;
+    let total = 0;
+
+    materias.forEach(materia => {
+      const materiasModulos = modulos
+        .filter(modulo => modulo.id_materia === materia.id)
+        .filter(modulo => enabledModules[modulo.id] !== false);
+
+      materiasModulos.forEach(modulo => {
+        // Contar videos
+        if (modulo.url_video) {
+          const videos = Array.isArray(modulo.url_video) ? modulo.url_video : [modulo.url_video];
+          videos.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'video')) {
+              completed++;
+            }
+          });
+        }
+
+        // Contar documentos
+        if (modulo.url_archivo) {
+          const documents = modulo.url_archivo.includes('|||') 
+            ? modulo.url_archivo.split('|||').filter(url => url.trim())
+            : [modulo.url_archivo];
+          documents.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'document')) {
+              completed++;
+            }
+          });
+        }
+      });
+    });
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
+  };
+
   // Verificar si el documento es de Google Drive cuando se selecciona
   useEffect(() => {
     if (selectedDocument && isGoogleDriveUrl(selectedDocument.url)) {
@@ -757,6 +886,30 @@ const CourseDetailPage = () => {
 
       <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
         <div className="flex flex-col gap-4 sm:gap-6">
+          {/* Barra de progreso */}
+          {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
+            const courseProgress = calculateCourseProgress();
+            return (
+              <section className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
+                  <span className="text-slate-600 dark:text-slate-400">
+                    {courseProgress.completed} de {courseProgress.total} completados
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-500 ease-out rounded-full"
+                    style={{ width: `${courseProgress.percentage}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                  {courseProgress.percentage}% completado
+                </p>
+              </section>
+            );
+          })()}
+
           <section className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 px-1">
               <School className="h-4 w-4 text-orange-500" />
@@ -860,6 +1013,7 @@ const CourseDetailPage = () => {
                                       handleOpenVideo={handleOpenVideo}
                                       isHighlighted={highlightedModuloId === modulo.id}
                                       isEnabled={enabledModules[modulo.id] !== false}
+                                      isContentCompleted={isContentCompleted}
                                     />
                                   </div>
                                 ))}
@@ -1054,6 +1208,12 @@ const CourseDetailPage = () => {
         content={selectedVideo}
         onNextVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handleNextVideo : undefined}
         onPreviousVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handlePreviousVideo : undefined}
+        onMarkAsCompleted={selectedVideo ? () => {
+          if (selectedVideo.currentIndex !== undefined) {
+            handleMarkAsCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video');
+          }
+        } : undefined}
+        isCompleted={selectedVideo && selectedVideo.currentIndex !== undefined ? isContentCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video') : false}
       />
 
       {/* Modal de documento a pantalla completa */}
@@ -1110,6 +1270,35 @@ const CourseDetailPage = () => {
                     Abrir en Safari
                   </Button>
                 )}
+                {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
+                  const modulo = modulos.find(m => m.titulo === selectedDocument.title);
+                  const moduleId = modulo?.id || '';
+                  const isDocCompleted = isContentCompleted(moduleId, selectedDocument.currentIndex, 'document');
+                  return (
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={() => {
+                        if (modulo && selectedDocument.currentIndex !== undefined) {
+                          handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
+                        }
+                      }}
+                      className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all ${
+                        isDocCompleted 
+                          ? 'bg-green-600 hover:bg-green-700 text-white' 
+                          : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                      }`}
+                    >
+                      <CheckCircle2 className="h-5 w-5 sm:mr-2" />
+                      <span className={isMobile ? 'hidden' : ''}>
+                        {isDocCompleted ? 'Completado' : 'Marcar como completado'}
+                      </span>
+                      <span className={isMobile ? '' : 'hidden'}>
+                        {isDocCompleted ? 'LEIDO' : 'LEIDO'}
+                      </span>
+                    </Button>
+                  );
+                })()}
                 <Button
                   variant="outline"
                   size="lg"
@@ -1228,7 +1417,7 @@ const CourseDetailPage = () => {
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean }) => {
   const [isModuleExpanded, setIsModuleExpanded] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
@@ -1321,34 +1510,63 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
               return `Documento`;
             };
             const fileName = getFileName(doc);
+            const isDocCompleted = isContentCompleted(modulo.id, index, 'document');
             
             return (
               <div key={`doc-${index}`}>
                 {/* Botón para móvil - solo botón sin card */}
                 <Button
-                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
+                  className={`w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    isDocCompleted
+                      ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                      : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                  }`}
                   onClick={() => handleOpenDocument(modulo, index)}
                 >
-                  <FileText className="h-4 w-4" />
+                  {isDocCompleted ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <FileText className="h-4 w-4" />
+                  )}
                   {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
                 </Button>
                 {/* Card para desktop */}
                 <div 
-                  className="hidden sm:flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    isDocCompleted
+                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
                 >
-                  <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  {isDocCompleted ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  ) : (
+                    <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  )}
                   <span 
-                    className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate min-w-0" 
+                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                      isDocCompleted
+                        ? 'text-green-800 dark:text-green-200'
+                        : 'text-slate-800 dark:text-slate-200'
+                    }`}
                     title={fileName}
                   >
                     {fileName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDocCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
                     onClick={() => handleOpenDocument(modulo, index)}
                     disabled={!isEnabled}
                   >
-                    <FileText className="h-3.5 w-3.5" />
+                    {isDocCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
                     Ver
                   </Button>
                 </div>
@@ -1365,35 +1583,64 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
               return `Video`;
             };
             const videoName = getVideoName(video);
+            const isVideoCompleted = isContentCompleted(modulo.id, index, 'video');
             
             return (
               <div key={`video-${index}`}>
                 {/* Botón para móvil - solo botón sin card */}
                 <Button
-                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isVideoCompleted
+                      ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                      : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                  }`}
                   onClick={() => handleOpenVideo(modulo, index)}
                   disabled={!isEnabled}
                 >
-                  <Play className="h-4 w-4" />
+                  {isVideoCompleted ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
                   {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
                 </Button>
                 {/* Card para desktop */}
                 <div 
-                  className="hidden sm:flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    isVideoCompleted
+                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
                 >
-                  <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  {isVideoCompleted ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  ) : (
+                    <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  )}
                   <span 
-                    className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate min-w-0" 
+                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                      isVideoCompleted
+                        ? 'text-green-800 dark:text-green-200'
+                        : 'text-slate-800 dark:text-slate-200'
+                    }`}
                     title={videoName}
                   >
                     {videoName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isVideoCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
                     onClick={() => handleOpenVideo(modulo, index)}
                     disabled={!isEnabled}
                   >
-                    <Play className="h-3.5 w-3.5" />
+                    {isVideoCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
                     Ver
                   </Button>
                 </div>
