@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAuth } from "firebase/auth";
 
 // Configuración de axios
 const API_BASE_URL =
@@ -10,6 +11,26 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Interceptor para agregar el token de autenticación
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 class CoursesService {
   getAllCoursesPerUser(id: string) {
@@ -26,6 +47,10 @@ class CoursesService {
 
   getModulosByMateriaId(id: string) {
     return api.get(`/modulos/${id}`);
+  }
+
+  getStudentModules(userId: string) {
+    return api.get(`/usuarios/${userId}/modulos`);
   }
 }
 

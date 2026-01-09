@@ -14,6 +14,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ const CourseDetailPage = () => {
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
+  const [loadingEnabledModules, setLoadingEnabledModules] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
@@ -175,6 +178,32 @@ const CourseDetailPage = () => {
     fetchModulos();
   }, [materias]);
 
+  // Cargar módulos habilitados del estudiante
+  useEffect(() => {
+    const fetchEnabledModules = async () => {
+      if (!user?.uid) {
+        setEnabledModules({});
+        setLoadingEnabledModules(false);
+        return;
+      }
+
+      try {
+        setLoadingEnabledModules(true);
+        const response = await CoursesService.getStudentModules(user.uid);
+        const modulosHabilitados = response.data?.modulos_habilitados || {};
+        setEnabledModules(modulosHabilitados);
+      } catch (error) {
+        console.error('Error fetching enabled modules:', error);
+        // Si hay error, asumir que todos los módulos están habilitados por defecto
+        setEnabledModules({});
+      } finally {
+        setLoadingEnabledModules(false);
+      }
+    };
+
+    fetchEnabledModules();
+  }, [user?.uid]);
+
   // Efecto para manejar el filtro de módulo desde la URL
   useEffect(() => {
     // Soporta tanto "modulo" como "module" para compatibilidad
@@ -300,6 +329,11 @@ const CourseDetailPage = () => {
   };
 
   const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) => {
+    // Verificar si el módulo está habilitado
+    if (enabledModules[modulo.id] === false) {
+      return; // No permitir abrir si está deshabilitado
+    }
+    
     // Obtener array de videos (puede ser string, array, o undefined)
     let videos: string[] = [];
     if (modulo.url_video) {
@@ -391,6 +425,10 @@ const CourseDetailPage = () => {
   };
 
   const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) => {
+    // Verificar si el módulo está habilitado
+    if (enabledModules[modulo.id] === false) {
+      return; // No permitir abrir si está deshabilitado
+    }
     if (!modulo.url_archivo) {
       console.error('No hay URL de archivo disponible');
       return;
@@ -732,8 +770,35 @@ const CourseDetailPage = () => {
                 value={expandedMaterias}
                 onValueChange={setExpandedMaterias}
               >
-                {materias.map((materia) => {
-                  const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
+                {materias
+                  .filter((materia) => {
+                    // Obtener todos los módulos de esta materia
+                    const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
+                    
+                    // Si la materia no tiene módulos, mostrarla
+                    if (materiasModulos.length === 0) {
+                      return true;
+                    }
+                    
+                    // Verificar si hay al menos un módulo habilitado
+                    const hasEnabledModule = materiasModulos.some((modulo) => {
+                      // Si el módulo no está en enabledModules, está habilitado por defecto
+                      // Si está explícitamente deshabilitado (false), no está habilitado
+                      return enabledModules[modulo.id] !== false;
+                    });
+                    
+                    // Mostrar la materia solo si tiene al menos un módulo habilitado
+                    return hasEnabledModule;
+                  })
+                  .map((materia) => {
+                    // Filtrar módulos habilitados antes de contar y mostrar
+                    const materiasModulos = modulos
+                      .filter(modulo => modulo.id_materia === materia.id)
+                      .filter((modulo) => {
+                        // Si el módulo no está en enabledModules, está habilitado por defecto
+                        // Si está explícitamente deshabilitado (false), no mostrarlo
+                        return enabledModules[modulo.id] !== false;
+                      });
 
                   return (
                     <AccordionItem
@@ -776,6 +841,10 @@ const CourseDetailPage = () => {
                                   </div>
                                 ))}
                               </div>
+                            ) : loadingEnabledModules ? (
+                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
+                              </div>
                             ) : materiasModulos.length > 0 ? (
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
                                 {materiasModulos.map((modulo, index) => (
@@ -790,6 +859,7 @@ const CourseDetailPage = () => {
                                       handleOpenDocument={handleOpenDocument} 
                                       handleOpenVideo={handleOpenVideo}
                                       isHighlighted={highlightedModuloId === modulo.id}
+                                      isEnabled={enabledModules[modulo.id] !== false}
                                     />
                                   </div>
                                 ))}
@@ -799,6 +869,30 @@ const CourseDetailPage = () => {
                                 No hay módulos disponibles para esta materia.
                               </div>
                             )}
+                            {/* Advertencia si hay módulos deshabilitados - al final */}
+                            {(() => {
+                              const allMateriaModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
+                              const disabledModules = allMateriaModulos.filter((modulo) => enabledModules[modulo.id] === false);
+                              
+                              if (disabledModules.length > 0) {
+                                return (
+                                  <div className="mt-4 px-4 sm:px-5">
+                                    <div className="flex items-start gap-3 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                      <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                          Módulos pendientes
+                                        </p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                          Hay {disabledModules.length} módulo{disabledModules.length !== 1 ? 's' : ''} pendiente{disabledModules.length !== 1 ? 's' : ''} por estudiar en esta materia. Los módulos se habilitarán progresivamente según el plan de estudios.
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </AccordionContent>
                         </AccordionItem>
                       );
@@ -1134,7 +1228,7 @@ const CourseDetailPage = () => {
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean }) => {
   const [isModuleExpanded, setIsModuleExpanded] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
@@ -1250,8 +1344,9 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     {fileName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0"
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleOpenDocument(modulo, index)}
+                    disabled={!isEnabled}
                   >
                     <FileText className="h-3.5 w-3.5" />
                     Ver
@@ -1275,8 +1370,9 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
               <div key={`video-${index}`}>
                 {/* Botón para móvil - solo botón sin card */}
                 <Button
-                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
+                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => handleOpenVideo(modulo, index)}
+                  disabled={!isEnabled}
                 >
                   <Play className="h-4 w-4" />
                   {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
@@ -1293,8 +1389,9 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     {videoName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0"
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={() => handleOpenVideo(modulo, index)}
+                    disabled={!isEnabled}
                   >
                     <Play className="h-3.5 w-3.5" />
                     Ver

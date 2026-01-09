@@ -111,6 +111,7 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -256,6 +257,27 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [banners.length]);
 
+  // Cargar módulos habilitados del estudiante
+  useEffect(() => {
+    const fetchEnabledModules = async () => {
+      if (!user?.uid) {
+        setEnabledModules({});
+        return;
+      }
+
+      try {
+        const response = await CoursesService.getStudentModules(user.uid);
+        const modulosHabilitados = response.data?.modulos_habilitados || {};
+        setEnabledModules(modulosHabilitados);
+      } catch (error) {
+        console.error('Error fetching enabled modules:', error);
+        setEnabledModules({});
+      }
+    };
+
+    fetchEnabledModules();
+  }, [user?.uid]);
+
   useEffect(() => {
     const fetchCourses = async () => {
       if (!user?.uid) return;
@@ -273,7 +295,53 @@ const Index = () => {
         // Asegurarse de que courses.data es un array
         const coursesData = Array.isArray(courses.data) ? courses.data : [];
         const filteredCourses = coursesData.filter((course) => course.estado === "activo");
-        setCourses(filteredCourses);
+        
+        // Filtrar cursos que tienen todos sus módulos deshabilitados
+        const coursesWithEnabledModules = await Promise.all(
+          filteredCourses.map(async (course) => {
+            // Obtener materias del curso
+            const materias: any[] = [];
+            if (course.materias && course.materias.length > 0) {
+              for (const materiaId of course.materias) {
+                try {
+                  const materiaResponse = await CoursesService.getMateriasByCourseId(materiaId);
+                  const materiaData = materiaResponse.data;
+                  const materiasArray = Array.isArray(materiaData) ? materiaData : [materiaData];
+                  materias.push(...materiasArray);
+                } catch (error) {
+                  console.error(`Error fetching materia ${materiaId}:`, error);
+                }
+              }
+            }
+
+            // Obtener todos los módulos del curso
+            const allModules: string[] = [];
+            for (const materia of materias) {
+              if (materia.modulos && Array.isArray(materia.modulos)) {
+                allModules.push(...materia.modulos);
+              }
+            }
+
+            // Si el curso no tiene módulos, mostrarlo (no hay módulos que deshabilitar)
+            if (allModules.length === 0) {
+              return course;
+            }
+
+            // Verificar si hay al menos un módulo habilitado
+            const hasEnabledModule = allModules.some((moduleId: string) => {
+              // Si el módulo no está en enabledModules, está habilitado por defecto
+              // Si está explícitamente deshabilitado (false), no está habilitado
+              return enabledModules[moduleId] !== false;
+            });
+
+            // Si todos los módulos están deshabilitados, retornar null para filtrarlo
+            return hasEnabledModule ? course : null;
+          })
+        );
+
+        // Filtrar los cursos null (sin módulos habilitados)
+        const visibleCourses = coursesWithEnabledModules.filter((course): course is Course => course !== null);
+        setCourses(visibleCourses);
       } catch (error) {
         console.error("Error al cargar cursos:", error);
         // En caso de error, establecer array vacío para evitar errores en la UI
@@ -282,8 +350,9 @@ const Index = () => {
         setLoading(false);
       }
     };
+    
     fetchCourses();
-  }, [user]);
+  }, [user, enabledModules]);
 
 
   return (
