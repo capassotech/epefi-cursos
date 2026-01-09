@@ -249,6 +249,12 @@ const CourseDetailPage = () => {
     fetchProgress();
   }, [user?.uid]);
 
+  // Efecto para posicionar la página al principio cuando se carga el curso
+  useEffect(() => {
+    // Hacer scroll al principio cuando se carga el curso
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [courseId]);
+
   // Efecto para manejar el filtro de módulo desde la URL
   useEffect(() => {
     // Soporta tanto "modulo" como "module" para compatibilidad
@@ -279,6 +285,7 @@ const CourseDetailPage = () => {
     });
 
     // Hacer scroll al módulo después de un pequeño delay para asegurar que el DOM esté actualizado
+    // Aumentamos el delay para que primero se posicione al principio
     const scrollTimeout = setTimeout(() => {
       const moduloElement = moduloRefs.current[moduloId];
       if (moduloElement) {
@@ -295,7 +302,7 @@ const CourseDetailPage = () => {
           setHighlightedModuloId(null);
         }, 3000);
       }
-    }, 500);
+    }, 800);
 
     return () => clearTimeout(scrollTimeout);
   }, [searchParams, modulos, materias]);

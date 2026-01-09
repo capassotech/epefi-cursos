@@ -10,15 +10,30 @@ import CourseLoader from "@/components/CourseLoader";
 import EnvironmentBanner from "@/components/EnvironmentBanner";
 
 // Componente para la tarjeta de curso con manejo de carga de imagen
-const CourseCard = ({ course, onNavigate, formatDate }: { 
+const CourseCard = ({ course, onNavigate, formatDate, progressPercentage = 0 }: { 
   course: Course; 
   onNavigate: (url: string) => void;
   formatDate: (date: string | Date | any | undefined) => string;
+  progressPercentage?: number;
 }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   
   const imageSrc = course.imagen === "" || imageError ? "/placeholder.svg" : course.imagen;
+
+  // Función para determinar el color según el progreso
+  const getProgressColor = (percentage: number): string => {
+    if (percentage < 34) {
+      // Rojo para bajo progreso (0-33%)
+      return "bg-gradient-to-r from-red-400 to-red-500";
+    } else if (percentage < 67) {
+      // Amarillo para progreso medio (34-66%)
+      return "bg-gradient-to-r from-yellow-400 to-yellow-500";
+    } else {
+      // Verde para alto progreso (67-100%)
+      return "bg-gradient-to-r from-green-400 to-green-500";
+    }
+  };
   
   return (
     <Card
@@ -86,14 +101,22 @@ const CourseCard = ({ course, onNavigate, formatDate }: {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-4">
               <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 dark:text-gray-500 self-end sm:self-center" />
             </div>
-            {/* Barra de progreso - naranja solo como detalle */}
-            <div className="hidden sm:flex items-center gap-2 mt-3 sm:mt-4">
-              <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full">
+            {/* Barra de progreso */}
+            <div className="flex items-center gap-2 mt-3 sm:mt-4">
+              <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  className="h-2 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-300 shadow-sm"
+                  className={`h-2 ${getProgressColor(progressPercentage)} rounded-full transition-all duration-500 ease-out shadow-sm`}
+                  style={{ width: `${progressPercentage}%` }}
                 ></div>
               </div>
-              <span className="text-xs text-orange-600 dark:text-orange-400 font-medium min-w-[2.5rem] text-right">
+              <span className={`text-xs font-medium min-w-[2.5rem] text-right ${
+                progressPercentage < 34 
+                  ? "text-red-600 dark:text-red-400"
+                  : progressPercentage < 67
+                  ? "text-yellow-600 dark:text-yellow-400"
+                  : "text-green-600 dark:text-green-400"
+              }`}>
+                {progressPercentage}%
               </span>
             </div>
           </div>
@@ -112,6 +135,8 @@ const Index = () => {
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
+  const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [courseProgressMap, setCourseProgressMap] = useState<Record<string, number>>({});
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -278,6 +303,115 @@ const Index = () => {
     fetchEnabledModules();
   }, [user?.uid]);
 
+  // Cargar progreso del estudiante
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!user?.uid) {
+        setProgress({});
+        return;
+      }
+
+      try {
+        const response = await CoursesService.getStudentProgress(user.uid);
+        const progressData = response.data?.progreso || {};
+        setProgress(progressData);
+      } catch (error: any) {
+        // Si el endpoint no existe (404), simplemente inicializar con objeto vacío
+        if (error?.response?.status === 404) {
+          console.log('Endpoint de progreso no disponible todavía, inicializando vacío');
+          setProgress({});
+        } else {
+          console.error('Error fetching progress:', error);
+          setProgress({});
+        }
+      }
+    };
+
+    fetchProgress();
+  }, [user?.uid]);
+
+  // Función para verificar si un contenido está completado
+  const isContentCompleted = (moduleId: string, contentIndex: number, contentType: 'video' | 'document'): boolean => {
+    const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+    const moduleProgress = progress[moduleId] || {};
+    return moduleProgress[contentKey] === true;
+  };
+
+  // Función para calcular el progreso de un curso
+  const calculateCourseProgress = async (course: Course): Promise<number> => {
+    try {
+      // Obtener materias del curso
+      const materias: any[] = [];
+      if (course.materias && course.materias.length > 0) {
+        for (const materiaId of course.materias) {
+          try {
+            const materiaResponse = await CoursesService.getMateriasByCourseId(materiaId);
+            const materiaData = materiaResponse.data;
+            const materiasArray = Array.isArray(materiaData) ? materiaData : [materiaData];
+            materias.push(...materiasArray);
+          } catch (error) {
+            console.error(`Error fetching materia ${materiaId}:`, error);
+          }
+        }
+      }
+
+      // Obtener todos los módulos del curso
+      const allModulos: any[] = [];
+      for (const materia of materias) {
+        if (materia.modulos && Array.isArray(materia.modulos)) {
+          for (const moduloId of materia.modulos) {
+            try {
+              const moduloResponse = await CoursesService.getModulosByMateriaId(moduloId);
+              const moduloData = moduloResponse.data;
+              const modulosArray = Array.isArray(moduloData) ? moduloData : [moduloData];
+              allModulos.push(...modulosArray);
+            } catch (error) {
+              console.error(`Error fetching modulo ${moduloId}:`, error);
+            }
+          }
+        }
+      }
+
+      let completed = 0;
+      let total = 0;
+
+      // Filtrar módulos habilitados
+      const enabledModulos = allModulos.filter(modulo => enabledModules[modulo.id] !== false);
+
+      enabledModulos.forEach(modulo => {
+        // Contar videos
+        if (modulo.url_video) {
+          const videos = Array.isArray(modulo.url_video) ? modulo.url_video : [modulo.url_video];
+          videos.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'video')) {
+              completed++;
+            }
+          });
+        }
+
+        // Contar documentos
+        if (modulo.url_archivo) {
+          const documents = modulo.url_archivo.includes('|||') 
+            ? modulo.url_archivo.split('|||').filter(url => url.trim())
+            : [modulo.url_archivo];
+          documents.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'document')) {
+              completed++;
+            }
+          });
+        }
+      });
+
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      return percentage;
+    } catch (error) {
+      console.error(`Error calculating progress for course ${course.id}:`, error);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     const fetchCourses = async () => {
       if (!user?.uid) return;
@@ -296,7 +430,7 @@ const Index = () => {
         const coursesData = Array.isArray(courses.data) ? courses.data : [];
         const filteredCourses = coursesData.filter((course) => course.estado === "activo");
         
-        // Filtrar cursos que tienen todos sus módulos deshabilitados
+        // Filtrar cursos que tienen todos sus módulos deshabilitados y calcular progreso
         const coursesWithEnabledModules = await Promise.all(
           filteredCourses.map(async (course) => {
             // Obtener materias del curso
@@ -324,7 +458,7 @@ const Index = () => {
 
             // Si el curso no tiene módulos, mostrarlo (no hay módulos que deshabilitar)
             if (allModules.length === 0) {
-              return course;
+              return { course, progress: 0 };
             }
 
             // Verificar si hay al menos un módulo habilitado
@@ -335,24 +469,40 @@ const Index = () => {
             });
 
             // Si todos los módulos están deshabilitados, retornar null para filtrarlo
-            return hasEnabledModule ? course : null;
+            if (!hasEnabledModule) {
+              return null;
+            }
+
+            // Calcular progreso del curso
+            const courseProgress = await calculateCourseProgress(course);
+            return { course, progress: courseProgress };
           })
         );
 
         // Filtrar los cursos null (sin módulos habilitados)
-        const visibleCourses = coursesWithEnabledModules.filter((course): course is Course => course !== null);
+        const validCourses = coursesWithEnabledModules.filter((item): item is { course: Course; progress: number } => item !== null);
+        
+        // Separar cursos y progresos
+        const visibleCourses = validCourses.map(item => item.course);
+        const progressMap: Record<string, number> = {};
+        validCourses.forEach(item => {
+          progressMap[item.course.id] = item.progress;
+        });
+
         setCourses(visibleCourses);
+        setCourseProgressMap(progressMap);
       } catch (error) {
         console.error("Error al cargar cursos:", error);
         // En caso de error, establecer array vacío para evitar errores en la UI
         setCourses([]);
+        setCourseProgressMap({});
       } finally {
         setLoading(false);
       }
     };
     
     fetchCourses();
-  }, [user, enabledModules]);
+  }, [user, enabledModules, progress]);
 
 
   return (
@@ -477,6 +627,7 @@ const Index = () => {
                       course={course}
                       onNavigate={navigate}
                       formatDate={formatDate}
+                      progressPercentage={courseProgressMap[course.id] || 0}
                     />
                   ))
                 )}
