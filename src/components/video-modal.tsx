@@ -1,13 +1,11 @@
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface VideoModalProps {
@@ -21,64 +19,24 @@ interface VideoModalProps {
     duration?: string;
     thumbnail?: string;
     topics?: string[];
+    videos?: string[];
+    currentIndex?: number;
   } | null;
+  onNextVideo?: () => void;
+  onPreviousVideo?: () => void;
 }
 
-const VideoModal = ({ isOpen, onClose, content }: VideoModalProps) => {
+const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo }: VideoModalProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [showIOSOverlay, setShowIOSOverlay] = useState(true);
-
-  useEffect(() => {
-    // Detectar iOS
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(iOS);
-  }, []);
 
   useEffect(() => {
     if (!isOpen) {
       setIsFullscreen(false);
-      setShowIOSOverlay(true);
     }
   }, [isOpen]);
-
-  const handleFullscreen = async () => {
-    if (!videoContainerRef.current) return;
-
-    try {
-      if (!isFullscreen) {
-        // Entrar en pantalla completa
-        if (videoContainerRef.current.requestFullscreen) {
-          await videoContainerRef.current.requestFullscreen();
-        } else if ((videoContainerRef.current as any).webkitRequestFullscreen) {
-          // Safari
-          await (videoContainerRef.current as any).webkitRequestFullscreen();
-        } else if ((videoContainerRef.current as any).webkitEnterFullscreen) {
-          // iOS Safari
-          await (videoContainerRef.current as any).webkitEnterFullscreen();
-        } else if ((videoContainerRef.current as any).mozRequestFullScreen) {
-          await (videoContainerRef.current as any).mozRequestFullScreen();
-        } else if ((videoContainerRef.current as any).msRequestFullscreen) {
-          await (videoContainerRef.current as any).msRequestFullscreen();
-        }
-      } else {
-        // Salir de pantalla completa
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).mozCancelFullScreen) {
-          await (document as any).mozCancelFullScreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
-        }
-      }
-    } catch (error) {
-      console.error("Error al cambiar pantalla completa:", error);
-    }
-  };
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -106,134 +64,247 @@ const VideoModal = ({ isOpen, onClose, content }: VideoModalProps) => {
 
   if (!content) return null;
 
-  // Para iOS, usar un enfoque diferente
-  const handleIOSVideo = () => {
-    if (isIOS) {
-      // En iOS, abrir el video directamente en una nueva ventana/pestaña
-      // Esto permite que el usuario use los controles nativos de pantalla completa
-      window.open(content.url, "_blank", "noopener,noreferrer");
+  // Convertir URL de YouTube o Google Drive al formato embed si es necesario
+  const convertVideoUrlToEmbed = (url: string): string => {
+    if (!url) return url;
+    
+    try {
+      // Google Drive
+      if (url.includes('drive.google.com')) {
+        // Extraer el ID del archivo de diferentes formatos de Google Drive
+        let fileId = '';
+        
+        // Formato: drive.google.com/file/d/FILE_ID/view
+        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (fileMatch && fileMatch[1]) {
+          fileId = fileMatch[1];
+        }
+        // Formato: drive.google.com/open?id=FILE_ID
+        else if (url.includes('id=')) {
+          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+          if (idMatch && idMatch[1]) {
+            fileId = idMatch[1];
+          }
+        }
+        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
+        else if (url.includes('/folders/')) {
+          // Para carpetas, no podemos hacer embed, retornar URL original
+          return url;
+        }
+        
+        if (fileId) {
+          // Usar el formato preview de Google Drive para videos
+          return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+        
+        return url;
+      }
+      
+      // YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        // Si ya es una URL embed, retornarla tal cual
+        if (url.includes('youtube.com/embed/')) {
+          return url;
+        }
+        
+        const urlObj = new URL(url);
+        let videoId = '';
+        
+        // Formato: youtube.com/watch?v=VIDEO_ID
+        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
+          videoId = urlObj.searchParams.get('v') || '';
+        }
+        // Formato: youtu.be/VIDEO_ID
+        else if (urlObj.hostname.includes('youtu.be')) {
+          videoId = urlObj.pathname.replace('/', '').split('?')[0];
+        }
+        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
+        else if (urlObj.pathname.includes('/embed/')) {
+          return url;
+        }
+        
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`;
+        }
+      }
+      
+      // Si no es YouTube ni Google Drive, retornar la URL original
+      return url;
+    } catch {
+      // Si no es una URL válida, retornar tal cual
+      return url;
     }
   };
 
+  const videoUrl = convertVideoUrlToEmbed(content.url);
+  const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
+  const isGoogleDrive = content.url.includes('drive.google.com');
+
+  // Determinar el título del video
+  const getVideoTitle = (): string => {
+    if (content.videos && content.videos.length > 1 && content.currentIndex !== undefined) {
+      return `Video ${content.currentIndex + 1}`;
+    }
+    return 'Video';
+  };
+
+  const videoTitle = getVideoTitle();
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col sm:!max-w-4xl sm:!max-h-[90vh] sm:!w-auto sm:!h-auto sm:!m-auto sm:!p-6 sm:!rounded-lg sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:!transform">
-        <DialogHeader className="p-4 sm:p-0 border-b border-slate-200 dark:border-slate-700 sm:border-0 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-base sm:text-xl font-semibold pr-8 sm:pr-0">
-              {content.title}
-            </DialogTitle>
-            {!isIOS && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleFullscreen}
-                className="absolute top-4 right-4 z-10"
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="h-5 w-5" />
-                ) : (
-                  <Maximize2 className="h-5 w-5" />
-                )}
-              </Button>
-            )}
-          </div>
-          <DialogDescription className="sr-only">
-            Reproductor de video
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto p-4 sm:p-0 space-y-4 min-h-0">
-          {/* Video Player */}
-          <div
-            ref={videoContainerRef}
-            className="aspect-video bg-black rounded-lg sm:rounded-lg overflow-hidden w-full relative"
-          >
-            <iframe
-              ref={iframeRef}
-              src={content.url}
-              title={content.title}
-              className="w-full h-full"
-              allowFullScreen
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-              style={{
-                WebkitAllowFullScreen: true,
-                MozAllowFullScreen: true,
-                msAllowFullScreen: true,
-              } as React.CSSProperties}
-              onLoad={() => {
-                // El overlay permanecerá visible hasta que el usuario elija una opción
-                // No se oculta automáticamente para evitar que quede el reproductor embebido sin pantalla completa
-              }}
-            />
-            {isIOS && showIOSOverlay && (
-              <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-10"
-                // NO cerrar al hacer click fuera - solo con los botones
-              >
-                <div className="text-center space-y-4 p-4 max-w-sm mx-auto">
-                  <p className="text-white text-sm sm:text-base mb-4 leading-relaxed">
-                    Usa la opción "Abrir en nueva ventana" para usar los controles de pantalla completa
-                  </p>
-                  <div className="flex flex-col gap-3">
+      <DialogContent className="max-w-4xl [&>button]:hidden">
+        <DialogTitle className="sr-only">
+          {videoTitle}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Reproducción del video seleccionado
+        </DialogDescription>
+        <div className="w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{videoTitle}</h3>
+              <div className="flex items-center gap-2">
+                {/* Controles de navegación para múltiples videos */}
+                {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
+                  <>
                     <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleIOSVideo();
-                      }}
-                      className="bg-orange-500 hover:bg-orange-600 text-white w-full"
-                      size="lg"
-                    >
-                      <Maximize2 className="h-5 w-5 mr-2" />
-                      Abrir en nueva ventana
-                    </Button>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowIOSOverlay(false);
-                      }}
+                      type="button"
                       variant="outline"
-                      className="bg-white/10 hover:bg-white/20 text-white border-white/20 w-full"
-                      size="sm"
+                      size="icon"
+                      onClick={onPreviousVideo}
+                      disabled={!onPreviousVideo || content.currentIndex === 0}
+                      className="cursor-pointer"
                     >
-                      Usar controles del reproductor
+                      <ChevronLeft className="h-4 w-4" />
                     </Button>
-                  </div>
-                </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
+                      {content.currentIndex + 1} / {content.videos.length}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={onNextVideo}
+                      disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
+                      className="cursor-pointer"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                {!isYouTube && !isGoogleDrive && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={async () => {
+                      if (!videoRef.current) return;
+                      
+                      try {
+                        if (!isFullscreen) {
+                          // Entrar en pantalla completa
+                          if (videoRef.current.requestFullscreen) {
+                            await videoRef.current.requestFullscreen();
+                          } else if ((videoRef.current as any).webkitRequestFullscreen) {
+                            await (videoRef.current as any).webkitRequestFullscreen();
+                          } else if ((videoRef.current as any).mozRequestFullScreen) {
+                            await (videoRef.current as any).mozRequestFullScreen();
+                          } else if ((videoRef.current as any).msRequestFullscreen) {
+                            await (videoRef.current as any).msRequestFullscreen();
+                          }
+                        } else {
+                          // Salir de pantalla completa
+                          if (document.exitFullscreen) {
+                            await document.exitFullscreen();
+                          } else if ((document as any).webkitExitFullscreen) {
+                            await (document as any).webkitExitFullscreen();
+                          } else if ((document as any).mozCancelFullScreen) {
+                            await (document as any).mozCancelFullScreen();
+                          } else if ((document as any).msExitFullscreen) {
+                            await (document as any).msExitFullscreen();
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error al cambiar pantalla completa:', error);
+                      }
+                    }}
+                    title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                  >
+                    {isFullscreen ? (
+                      <>
+                        <Minimize2 className="h-4 w-4 mr-2" />
+                        Salir
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-4 w-4 mr-2" />
+                        Expandir
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={() => {
+                    onClose();
+                    setIsFullscreen(false);
+                  }}
+                >
+                  Cerrar
+                </Button>
               </div>
-            )}
-          </div>
-
-          {/* Video Info - Oculto en mobile para dar más espacio al video */}
-          <div className="hidden sm:block space-y-3">
-            {content.duration && (
-              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                <Clock className="w-4 h-4" />
-                <span>Duración: {content.duration}</span>
-              </div>
-            )}
-
-            {content.description && (
-              <div>
-                <h3 className="font-semibold mb-2">Descripción</h3>
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {content.description}
-                </p>
-              </div>
-            )}
-
-            {content.topics && content.topics.length > 0 && (
-              <div>
-                <h3 className="font-semibold mb-2">Temas tratados</h3>
-                <div className="flex flex-wrap gap-2">
-                  {content.topics.map((topic, index) => (
-                    <Badge key={index} variant="secondary">
-                      {topic}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
+            <div 
+              ref={videoContainerRef}
+              className="relative w-full video-no-download" 
+              style={{ paddingBottom: '56.25%' }}
+            >
+              {(isYouTube || isGoogleDrive) ? (
+                <>
+                  <iframe
+                    ref={iframeRef}
+                    src={videoUrl}
+                    title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
+                    className="absolute top-0 left-0 w-full h-full rounded-lg"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    style={{
+                      border: 'none'
+                    }}
+                    key={videoUrl}
+                  />
+                  {isGoogleDrive && (
+                    <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs z-10">
+                      <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
+                      <button
+                        type="button"
+                        className="text-orange-400 hover:text-orange-300 underline"
+                        onClick={() => {
+                          const originalUrl = videoUrl.replace('/preview', '/view');
+                          window.open(originalUrl, '_blank', 'noopener,noreferrer');
+                        }}
+                      >
+                        Abrir en Google Drive
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  controls
+                  controlsList="nodownload nofullscreen noremoteplayback"
+                  disablePictureInPicture
+                  className="absolute top-0 left-0 w-full h-full rounded-lg"
+                  style={{
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>

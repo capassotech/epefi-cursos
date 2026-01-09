@@ -12,6 +12,8 @@ import {
   ExternalLink,
   Clock,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,8 @@ const CourseDetailPage = () => {
     description?: string;
     url: string;
     thumbnail?: string;
+    videos?: string[]; // Array de todos los videos del módulo
+    currentIndex?: number; // Índice del video actual
   } | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
@@ -59,6 +63,8 @@ const CourseDetailPage = () => {
   const [selectedDocument, setSelectedDocument] = useState<{
     url: string;
     title: string;
+    documents?: string[]; // Array de todos los documentos del módulo
+    currentIndex?: number; // Índice del documento actual
   } | null>(null);
   const [isDocumentLoading, setIsDocumentLoading] = useState(true);
   const [isIOS, setIsIOS] = useState(false);
@@ -212,12 +218,108 @@ const CourseDetailPage = () => {
   }, [searchParams, modulos, materias]);
 
 
-  const handleOpenVideo = (modulo: Modulo) => {
+  // Función para convertir URL de YouTube o Google Drive al formato embed
+  const convertYouTubeToEmbed = (url: string): string => {
+    if (!url) return url;
+    
+    try {
+      // Google Drive
+      if (url.includes('drive.google.com')) {
+        // Extraer el ID del archivo de diferentes formatos de Google Drive
+        let fileId = '';
+        
+        // Formato: drive.google.com/file/d/FILE_ID/view
+        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (fileMatch && fileMatch[1]) {
+          fileId = fileMatch[1];
+        }
+        // Formato: drive.google.com/open?id=FILE_ID
+        else if (url.includes('id=')) {
+          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+          if (idMatch && idMatch[1]) {
+            fileId = idMatch[1];
+          }
+        }
+        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
+        else if (url.includes('/folders/')) {
+          // Para carpetas, no podemos hacer embed, retornar URL original
+          return url;
+        }
+        
+        if (fileId) {
+          // Usar el formato preview de Google Drive para videos
+          return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+        
+        return url;
+      }
+      
+      // YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        // Si ya es una URL embed, retornarla tal cual
+        if (url.includes('youtube.com/embed/')) {
+          return url;
+        }
+        
+        const urlObj = new URL(url);
+        let videoId = '';
+        
+        // Formato: youtube.com/watch?v=VIDEO_ID
+        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
+          videoId = urlObj.searchParams.get('v') || '';
+        }
+        // Formato: youtu.be/VIDEO_ID
+        else if (urlObj.hostname.includes('youtu.be')) {
+          videoId = urlObj.pathname.replace('/', '').split('?')[0];
+        }
+        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
+        else if (urlObj.pathname.includes('/embed/')) {
+          return url;
+        }
+        
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`;
+        }
+      }
+      
+      // Si no es YouTube ni Google Drive, retornar la URL original
+      return url;
+    } catch {
+      // Si no es una URL válida, retornar tal cual
+      return url;
+    }
+  };
+
+  const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) => {
+    // Obtener array de videos (puede ser string, array, o undefined)
+    let videos: string[] = [];
+    if (modulo.url_video) {
+      if (Array.isArray(modulo.url_video)) {
+        videos = modulo.url_video;
+      } else {
+        videos = [modulo.url_video];
+      }
+    }
+    
+    if (videos.length === 0) {
+      console.error('No hay videos disponibles');
+      return;
+    }
+    
+    // Asegurar que el índice esté dentro del rango
+    const validIndex = Math.max(0, Math.min(videoIndex, videos.length - 1));
+    const videoUrl = videos[validIndex];
+    
+    // Convertir URL de YouTube o Google Drive al formato embed si es necesario
+    const embedUrl = convertYouTubeToEmbed(videoUrl);
+    
     setSelectedVideo({
       id: modulo.id,
       title: modulo.titulo,
-      url: modulo.url_video,
+      url: embedUrl,
       thumbnail: modulo.url_miniatura,
+      videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
+      currentIndex: validIndex,
     });
     setIsVideoModalOpen(true);
   };
@@ -225,6 +327,32 @@ const CourseDetailPage = () => {
   const handleCloseVideo = () => {
     setIsVideoModalOpen(false);
     setSelectedVideo(null);
+  };
+
+  // Función para cambiar al siguiente video
+  const handleNextVideo = () => {
+    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
+    const nextIndex = (selectedVideo.currentIndex + 1) % selectedVideo.videos.length;
+    const nextUrl = selectedVideo.videos[nextIndex];
+    const embedUrl = convertYouTubeToEmbed(nextUrl);
+    setSelectedVideo({
+      ...selectedVideo,
+      url: embedUrl,
+      currentIndex: nextIndex,
+    });
+  };
+
+  // Función para cambiar al video anterior
+  const handlePreviousVideo = () => {
+    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
+    const prevIndex = (selectedVideo.currentIndex - 1 + selectedVideo.videos.length) % selectedVideo.videos.length;
+    const prevUrl = selectedVideo.videos[prevIndex];
+    const embedUrl = convertYouTubeToEmbed(prevUrl);
+    setSelectedVideo({
+      ...selectedVideo,
+      url: embedUrl,
+      currentIndex: prevIndex,
+    });
   };
 
   // Función para detectar si es una URL de Google Drive
@@ -253,16 +381,35 @@ const CourseDetailPage = () => {
     return `${baseUrl}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
   };
 
-  const handleOpenDocument = (modulo: Modulo) => {
+  const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) => {
     if (!modulo.url_archivo) {
       console.error('No hay URL de archivo disponible');
       return;
     }
 
+    // Parsear documentos (puede ser string simple o string con delimitador |||)
+    let documents: string[] = [];
+    if (modulo.url_archivo) {
+      if (modulo.url_archivo.includes('|||')) {
+        documents = modulo.url_archivo.split('|||').filter(url => url.trim());
+      } else {
+        documents = [modulo.url_archivo];
+      }
+    }
+    
+    if (documents.length === 0) {
+      console.error('No hay documentos disponibles');
+      return;
+    }
+    
+    // Asegurar que el índice esté dentro del rango
+    const validIndex = Math.max(0, Math.min(documentIndex, documents.length - 1));
+    const selectedUrl = documents[validIndex];
+
     // Detectar si es una URL de Google Drive
-    if (isGoogleDriveUrl(modulo.url_archivo)) {
+    if (isGoogleDriveUrl(selectedUrl)) {
       // Para Google Drive, abrir en nueva pestaña
-      window.open(modulo.url_archivo, '_blank', 'noopener,noreferrer');
+      window.open(selectedUrl, '_blank', 'noopener,noreferrer');
       return;
     }
 
@@ -273,10 +420,12 @@ const CourseDetailPage = () => {
       setIsDocumentLoading(true);
     }
     // Formatear la URL del PDF con parámetros de zoom
-    const formattedUrl = formatPDFUrl(modulo.url_archivo);
+    const formattedUrl = formatPDFUrl(selectedUrl);
     setSelectedDocument({
       url: formattedUrl,
       title: modulo.titulo,
+      documents: documents,
+      currentIndex: validIndex,
     });
     setIsDocumentModalOpen(true);
   };
@@ -285,6 +434,48 @@ const CourseDetailPage = () => {
     setIsDocumentModalOpen(false);
     setSelectedDocument(null);
     setIsDocumentLoading(true);
+  };
+
+  // Función para cambiar al siguiente documento
+  const handleNextDocument = () => {
+    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
+    const nextIndex = (selectedDocument.currentIndex + 1) % selectedDocument.documents.length;
+    const nextUrl = selectedDocument.documents[nextIndex];
+    
+    // Detectar si es una URL de Google Drive
+    if (isGoogleDriveUrl(nextUrl)) {
+      window.open(nextUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    setIsDocumentLoading(true);
+    const formattedUrl = formatPDFUrl(nextUrl);
+    setSelectedDocument({
+      ...selectedDocument,
+      url: formattedUrl,
+      currentIndex: nextIndex,
+    });
+  };
+
+  // Función para cambiar al documento anterior
+  const handlePreviousDocument = () => {
+    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
+    const prevIndex = (selectedDocument.currentIndex - 1 + selectedDocument.documents.length) % selectedDocument.documents.length;
+    const prevUrl = selectedDocument.documents[prevIndex];
+    
+    // Detectar si es una URL de Google Drive
+    if (isGoogleDriveUrl(prevUrl)) {
+      window.open(prevUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    setIsDocumentLoading(true);
+    const formattedUrl = formatPDFUrl(prevUrl);
+    setSelectedDocument({
+      ...selectedDocument,
+      url: formattedUrl,
+      currentIndex: prevIndex,
+    });
   };
 
   const handleDocumentLoad = () => {
@@ -670,31 +861,73 @@ const CourseDetailPage = () => {
         isOpen={isVideoModalOpen}
         onClose={handleCloseVideo}
         content={selectedVideo}
+        onNextVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handleNextVideo : undefined}
+        onPreviousVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handlePreviousVideo : undefined}
       />
 
       {/* Modal de documento a pantalla completa */}
       <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
-        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col">
+        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
           <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
-                {selectedDocument?.title || 'Documento'}
-              </DialogTitle>
-              {isIOS && selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedDocument?.title || 'Documento'}
+                </DialogTitle>
+                {selectedDocument?.documents && selectedDocument.documents.length > 1 && selectedDocument.currentIndex !== undefined && (
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Documento {selectedDocument.currentIndex + 1} de {selectedDocument.documents.length}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Controles de navegación para múltiples documentos */}
+                {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePreviousDocument}
+                      className="h-8 w-8"
+                      disabled={selectedDocument.currentIndex === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleNextDocument}
+                      className="h-8 w-8"
+                      disabled={selectedDocument.currentIndex === selectedDocument.documents.length - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+                {isIOS && selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      // Remover parámetros de fragmento para la URL original
+                      const originalUrl = selectedDocument.url.split('#')[0];
+                      window.open(originalUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="text-orange-600 dark:text-orange-400"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Abrir en Safari
+                  </Button>
+                )}
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    // Remover parámetros de fragmento para la URL original
-                    const originalUrl = selectedDocument.url.split('#')[0];
-                    window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                  }}
-                  className="text-orange-600 dark:text-orange-400"
+                  variant="outline"
+                  size="lg"
+                  onClick={handleCloseDocument}
+                  className="h-10 px-4 sm:h-10 sm:px-6 font-medium"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir en Safari
+                  Cerrar
                 </Button>
-              )}
+              </div>
             </div>
             <DialogDescription className="sr-only">
               Visualizador de documento PDF
@@ -773,6 +1006,7 @@ const CourseDetailPage = () => {
                       window.open(originalUrl, '_blank', 'noopener,noreferrer');
                       handleCloseDocument();
                     }}
+                    key={selectedDocument.url} // Forzar re-render cuando cambia la URL
                   />
                 )}
               </>
@@ -803,7 +1037,8 @@ const CourseDetailPage = () => {
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo) => void; handleOpenVideo: (modulo: Modulo) => void; isHighlighted?: boolean }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean }) => {
+  const [isModuleExpanded, setIsModuleExpanded] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
   const maxLength = 150; // Caracteres para mostrar antes del "Ver más"
@@ -812,63 +1047,168 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
     ? descripcion.substring(0, maxLength) + '...'
     : descripcion;
 
+  // Obtener array de documentos
+  const getDocuments = (): string[] => {
+    if (!modulo.url_archivo) return [];
+    if (modulo.url_archivo.includes('|||')) {
+      return modulo.url_archivo.split('|||').filter(url => url.trim());
+    }
+    return [modulo.url_archivo];
+  };
+
+  // Obtener array de videos
+  const getVideos = (): string[] => {
+    if (!modulo.url_video) return [];
+    if (Array.isArray(modulo.url_video)) {
+      return modulo.url_video;
+    }
+    return [modulo.url_video];
+  };
+
+  const documents = getDocuments();
+  const videos = getVideos();
+
   return (
     <div className={cn(
-      "flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-md border transition-all duration-500",
+      "flex items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
       isHighlighted 
         ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700 shadow-md ring-2 ring-orange-400 dark:ring-orange-500 ring-opacity-50" 
         : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50"
     )}>
-      <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0"></div>
+      <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0 hidden sm:block"></div>
       <div className="flex-1 min-w-0">
-        <h4 className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
-          {modulo.titulo}
-        </h4>
-        {descripcion && (
-          <div className="hidden sm:block mt-1.5 sm:mt-2">
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              {displayDesc}
-            </p>
-            {shouldTruncate && (
-              <button
-                onClick={() => setIsDescExpanded(!isDescExpanded)}
-                className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
-              >
-                {isDescExpanded ? (
-                  <>
-                    Ver menos
-                    <ChevronDown className="h-3 w-3 rotate-180" />
-                  </>
-                ) : (
-                  <>
-                    Ver más
-                    <ChevronDown className="h-3 w-3" />
-                  </>
+        <button
+          onClick={() => setIsModuleExpanded(!isModuleExpanded)}
+          className="w-full flex items-center justify-between gap-2 text-left"
+        >
+          <h4 className="text-xs sm:text-base font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
+            {modulo.titulo}
+          </h4>
+          <ChevronDown className={cn(
+            "h-4 w-4 sm:h-5 sm:w-5 text-slate-500 dark:text-slate-400 transition-transform flex-shrink-0",
+            isModuleExpanded && "rotate-180"
+          )} />
+        </button>
+        {isModuleExpanded && (
+          <>
+            {descripcion && (
+              <div className="hidden sm:block mt-1.5 sm:mt-2">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {displayDesc}
+                </p>
+                {shouldTruncate && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDescExpanded(!isDescExpanded);
+                    }}
+                    className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
+                  >
+                    {isDescExpanded ? (
+                      <>
+                        Ver menos
+                        <ChevronDown className="h-3 w-3 rotate-180" />
+                      </>
+                    ) : (
+                      <>
+                        Ver más
+                        <ChevronDown className="h-3 w-3" />
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             )}
-          </div>
+            <div className="flex flex-col gap-2 sm:gap-3 mt-2 sm:mt-4">
+          {documents.map((doc, index) => {
+            // Extraer y limpiar el nombre del archivo de forma amigable
+            // Para todos los documentos, usar el mismo formato: Documento [X]
+            const getFileName = (url: string): string => {
+              if (documents.length > 1) {
+                return `Documento ${index + 1}`;
+              }
+              return `Documento`;
+            };
+            const fileName = getFileName(doc);
+            
+            return (
+              <div key={`doc-${index}`}>
+                {/* Botón para móvil - solo botón sin card */}
+                <Button
+                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
+                  onClick={() => handleOpenDocument(modulo, index)}
+                >
+                  <FileText className="h-4 w-4" />
+                  {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
+                </Button>
+                {/* Card para desktop */}
+                <div 
+                  className="hidden sm:flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  <span 
+                    className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate min-w-0" 
+                    title={fileName}
+                  >
+                    {fileName}
+                  </span>
+                  <Button
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0"
+                    onClick={() => handleOpenDocument(modulo, index)}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {videos.map((video, index) => {
+            // Extraer y limpiar el nombre del video de forma amigable
+            // Para todos los videos, usar el mismo formato: Video [X]
+            const getVideoName = (url: string): string => {
+              if (videos.length > 1) {
+                return `Video ${index + 1}`;
+              }
+              return `Video`;
+            };
+            const videoName = getVideoName(video);
+            
+            return (
+              <div key={`video-${index}`}>
+                {/* Botón para móvil - solo botón sin card */}
+                <Button
+                  className="w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
+                  onClick={() => handleOpenVideo(modulo, index)}
+                >
+                  <Play className="h-4 w-4" />
+                  {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
+                </Button>
+                {/* Card para desktop */}
+                <div 
+                  className="hidden sm:flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  <span 
+                    className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate min-w-0" 
+                    title={videoName}
+                  >
+                    {videoName}
+                  </span>
+                  <Button
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors flex-shrink-0"
+                    onClick={() => handleOpenVideo(modulo, index)}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+            </div>
+          </>
         )}
-        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 mt-3 sm:mt-4">
-          {modulo.url_archivo && (
-            <Button
-              className="h-11 sm:h-9 w-full sm:w-auto px-4 sm:px-4 text-sm sm:text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
-              onClick={() => handleOpenDocument(modulo)}
-            >
-              <File className="h-4 w-4 sm:h-4 sm:w-4" />
-              Leer documento
-            </Button>
-          )}
-          {modulo.url_video && (
-            <Button
-              className="h-11 sm:h-9 w-full sm:w-auto px-4 sm:px-4 text-sm sm:text-sm font-medium flex items-center justify-center gap-2 border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
-              onClick={() => handleOpenVideo(modulo)}
-            >
-              <Play className="h-4 w-4 sm:h-4 sm:w-4" />
-              Ver video
-            </Button>
-          )}
-        </div>
       </div>
     </div>
   );

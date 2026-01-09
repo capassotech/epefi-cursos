@@ -6,15 +6,13 @@ import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
 import CoursesService from "@/services/coursesService";
 import { useAuth } from "@/contexts/AuthContext";
-import VideoModal from "@/components/video-modal";
 import CourseLoader from "@/components/CourseLoader";
 import EnvironmentBanner from "@/components/EnvironmentBanner";
 
 // Componente para la tarjeta de curso con manejo de carga de imagen
-const CourseCard = ({ course, onNavigate, onOpenVideo, formatDate }: { 
+const CourseCard = ({ course, onNavigate, formatDate }: { 
   course: Course; 
   onNavigate: (url: string) => void;
-  onOpenVideo: (course: Course) => void;
   formatDate: (date: string | Date | any | undefined) => string;
 }) => {
   const [imageLoading, setImageLoading] = useState(true);
@@ -79,18 +77,6 @@ const CourseCard = ({ course, onNavigate, onOpenVideo, formatDate }: {
               </div>
             )}
             
-            {/* Botón de video - siempre visible en mobile */}
-            <button 
-              className="text-xs sm:text-sm hover:underline text-gray-600 dark:text-gray-300 mt-1.5 sm:mt-2 flex items-center gap-1 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-200"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenVideo(course);
-              }}
-            >
-              <Play className="w-3 h-3 sm:w-4 sm:h-5 text-orange-500 dark:text-orange-400 hover:text-orange-600 dark:hover:text-orange-300 transition-colors duration-200" />
-              <span>Ver video</span>
-            </button>
-            
             {/* Descripción solo en desktop */}
             <p className="hidden sm:block text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 break-words">
               {course.descripcion}
@@ -125,16 +111,6 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<{
-    id: string;
-    title: string;
-    description?: string;
-    url: string;
-    duration?: string;
-    thumbnail?: string;
-    topics?: string[];
-  } | null>(null);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -196,19 +172,6 @@ const Index = () => {
     }
   };
 
-  const handleOpenVideoModal = (course: Course) => {
-    setSelectedVideo({
-      id: course.id,
-      title: `Video de formación - ${course.titulo}`,
-      url: "https://www.youtube.com/embed/dQw4w9WgXcQ", 
-    });
-    setIsVideoModalOpen(true);
-  };
-
-  const handleCloseVideoModal = () => {
-    setIsVideoModalOpen(false);
-    setSelectedVideo(null);
-  };
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 639px)");
@@ -339,7 +302,6 @@ const Index = () => {
                       key={course.id}
                       course={course}
                       onNavigate={navigate}
-                      onOpenVideo={handleOpenVideoModal}
                       formatDate={formatDate}
                     />
                   ))
@@ -376,12 +338,6 @@ const Index = () => {
           </div>
         </Card>
       </a>
-
-      <VideoModal
-        isOpen={isVideoModalOpen}
-        onClose={handleCloseVideoModal}
-        content={selectedVideo}
-      />
     </div>
     </>
   );
