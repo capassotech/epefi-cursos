@@ -61,6 +61,13 @@ const CourseDetailPage = () => {
     title: string;
   } | null>(null);
   const [isDocumentLoading, setIsDocumentLoading] = useState(true);
+  const [isIOS, setIsIOS] = useState(false);
+
+  // Detectar iOS
+  useEffect(() => {
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(iOS);
+  }, []);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -231,6 +238,21 @@ const CourseDetailPage = () => {
            urlLower.startsWith('http://drive.google.com');
   };
 
+  // Función para formatear la URL del PDF con parámetros de zoom
+  const formatPDFUrl = (url: string): string => {
+    if (!url) return url;
+    
+    // Remover cualquier fragmento existente para evitar conflictos
+    const baseUrl = url.split('#')[0];
+    
+    // Agregar parámetros para que el PDF se muestre completo y permita zoom manual
+    // #view=FitH ajusta horizontalmente (muestra toda la página)
+    // #toolbar=1 muestra la barra de herramientas para zoom manual
+    // #navpanes=0 oculta el panel de navegación para más espacio
+    // #scrollbar=1 muestra la barra de desplazamiento
+    return `${baseUrl}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
+  };
+
   const handleOpenDocument = (modulo: Modulo) => {
     if (!modulo.url_archivo) {
       console.error('No hay URL de archivo disponible');
@@ -244,9 +266,16 @@ const CourseDetailPage = () => {
       return;
     }
 
-    setIsDocumentLoading(true);
+    // En iOS, no mostrar estado de carga, mostrar directamente las opciones
+    if (isIOS) {
+      setIsDocumentLoading(false);
+    } else {
+      setIsDocumentLoading(true);
+    }
+    // Formatear la URL del PDF con parámetros de zoom
+    const formattedUrl = formatPDFUrl(modulo.url_archivo);
     setSelectedDocument({
-      url: modulo.url_archivo,
+      url: formattedUrl,
       title: modulo.titulo,
     });
     setIsDocumentModalOpen(true);
@@ -647,15 +676,33 @@ const CourseDetailPage = () => {
       <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
         <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col">
           <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-            <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {selectedDocument?.title || 'Documento'}
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {selectedDocument?.title || 'Documento'}
+              </DialogTitle>
+              {isIOS && selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    // Remover parámetros de fragmento para la URL original
+                    const originalUrl = selectedDocument.url.split('#')[0];
+                    window.open(originalUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="text-orange-600 dark:text-orange-400"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Abrir en Safari
+                </Button>
+              )}
+            </div>
             <DialogDescription className="sr-only">
               Visualizador de documento PDF
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
-            {isDocumentLoading && (
+            {/* Solo mostrar estado de carga en dispositivos que no sean iOS */}
+            {isDocumentLoading && !isIOS && (
               <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-950 z-10">
                 <div className="flex flex-col items-center gap-4">
                   <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
@@ -666,19 +713,69 @@ const CourseDetailPage = () => {
               </div>
             )}
             {selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
-              <iframe
-                src={selectedDocument.url}
-                title={selectedDocument.title}
-                className="w-full h-full"
-                style={{ border: 'none', minHeight: 'calc(100vh - 80px)' }}
-                onLoad={handleDocumentLoad}
-                onError={() => {
-                  // Si hay error al cargar, abrir en nueva pestaña
-                  setIsDocumentLoading(false);
-                  window.open(selectedDocument.url, '_blank', 'noopener,noreferrer');
-                  handleCloseDocument();
-                }}
-              />
+              <>
+                {/* En iOS, mostrar opciones para abrir en Safari ya que los PDFs embebidos no funcionan bien */}
+                {isIOS ? (
+                  <div className="flex flex-col items-center justify-center h-full p-6 space-y-6">
+                    <div className="text-center space-y-4 max-w-md">
+                      <FileText className="h-16 w-16 text-orange-500 mx-auto" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+                          {selectedDocument.title}
+                        </h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                          Para ver este documento en iOS, ábrelo en Safari para usar los controles nativos de visualización y zoom.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3 pt-4">
+                        <Button
+                          onClick={() => {
+                            // Remover parámetros de fragmento para la URL original
+                            const originalUrl = selectedDocument.url.split('#')[0];
+                            window.open(originalUrl, '_blank', 'noopener,noreferrer');
+                            handleCloseDocument();
+                          }}
+                          className="bg-orange-500 hover:bg-orange-600 text-white w-full"
+                          size="lg"
+                        >
+                          <ExternalLink className="h-5 w-5 mr-2" />
+                          Abrir en Safari
+                        </Button>
+                        <Button
+                          onClick={handleCloseDocument}
+                          variant="outline"
+                          className="w-full"
+                          size="sm"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <iframe
+                    src={selectedDocument.url}
+                    title={selectedDocument.title}
+                    className="w-full h-full"
+                    style={{ 
+                      border: 'none', 
+                      minHeight: 'calc(100vh - 80px)',
+                      width: '100%',
+                      height: '100%',
+                    }}
+                    allow="fullscreen"
+                    onLoad={handleDocumentLoad}
+                    onError={() => {
+                      // Si hay error al cargar, abrir en nueva pestaña
+                      setIsDocumentLoading(false);
+                      // Remover parámetros de fragmento para la URL original
+                      const originalUrl = selectedDocument.url.split('#')[0];
+                      window.open(originalUrl, '_blank', 'noopener,noreferrer');
+                      handleCloseDocument();
+                    }}
+                  />
+                )}
+              </>
             )}
             {selectedDocument && isGoogleDriveUrl(selectedDocument.url) && (
               <div className="flex items-center justify-center h-full">
