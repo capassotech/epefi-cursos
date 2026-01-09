@@ -40,6 +40,7 @@ const CourseDetailPage = () => {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
