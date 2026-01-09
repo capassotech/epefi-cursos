@@ -24,6 +24,7 @@ interface UserProfile {
   dni?: string;
   role: UserRole;
   fechaRegistro?: string;
+  activo?: boolean;
 }
 
 interface AuthResponse {
@@ -117,6 +118,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             role: profileData.role || { admin: false, student: true },
             fechaRegistro:
               profileData.fechaRegistro || profileData.fechaCreacion,
+            activo: profileData.activo !== undefined ? profileData.activo : true,
           };
 
           setUser(updatedProfile);
@@ -151,14 +153,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log("✅ Using stored data");
             setUser(storedData as UserProfile);
 
-            // Solo buscar datos del backend si los datos almacenados son muy básicos
-            // (no tienen datos completos del backend)
-            if (!storedData.dni && !storedData.fechaRegistro) {
-              console.log(
-                "🔄 Stored data is basic, fetching complete profile..."
-              );
-              fetchUserProfileInBackground(firebaseUser);
-            }
+            // Siempre buscar datos del backend para actualizar el estado activo
+            // especialmente importante si el usuario fue deshabilitado
+            console.log("🔄 Fetching latest profile from backend to check activo status...");
+            fetchUserProfileInBackground(firebaseUser);
           } else {
             console.log("📝 Creating basic profile from Firebase user");
             // Crear perfil básico con datos de Firebase

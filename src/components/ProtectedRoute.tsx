@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ProtectedRoute = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -18,6 +18,17 @@ const ProtectedRoute = () => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Si el usuario está deshabilitado, redirigir a la página principal
+  // donde se mostrará el mensaje de advertencia
+  if (user && user.activo === false) {
+    // Si ya está en la página principal, permitir renderizar para mostrar el mensaje
+    if (location.pathname === "/") {
+      return <Outlet />;
+    }
+    // De lo contrario, redirigir a la página principal
+    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

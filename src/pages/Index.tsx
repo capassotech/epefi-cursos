@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronRight, Loader2, Play, Calendar } from "lucide-react";
+import { ChevronRight, Loader2, Play, Calendar, AlertTriangle, Mail, Phone, MessageCircle } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
@@ -125,39 +125,84 @@ const Index = () => {
     if (!date) return "";
     
     try {
-      let dateObj: Date;
+      let dateObj: Date | null = null;
       
-      // Si es un string, convertir a Date
-      if (typeof date === "string") {
-        dateObj = new Date(date);
+      // Si es null o undefined, retornar vacío
+      if (date === null || date === undefined) {
+        return "";
       }
-      // Si es un objeto Date, usar directamente
-      else if (date instanceof Date) {
-        dateObj = date;
+      
+      // Si es un string vacío, retornar vacío
+      if (typeof date === "string" && date.trim() === "") {
+        return "";
       }
-      // Si es un Timestamp de Firestore, usar toDate()
-      else if (date && typeof date.toDate === "function") {
-        dateObj = date.toDate();
+      
+      // Si es un Timestamp de Firestore con toDate (verificar primero)
+      if (date && typeof date === "object" && typeof date.toDate === "function") {
+        try {
+          dateObj = date.toDate();
+        } catch (e) {
+          console.warn("Error calling toDate():", e);
+        }
       }
-      // Si es un objeto con método getTime, intentar crear Date
-      else if (date && typeof date.getTime === "function") {
-        dateObj = date;
-      }
+      
       // Si es un objeto con seconds (Timestamp de Firestore serializado)
-      else if (date && typeof date.seconds === "number") {
+      if (!dateObj && date && typeof date === "object" && typeof date.seconds === "number") {
         dateObj = new Date(date.seconds * 1000);
       }
+      
       // Si tiene _seconds (otro formato de Timestamp)
-      else if (date && typeof date._seconds === "number") {
+      if (!dateObj && date && typeof date === "object" && typeof date._seconds === "number") {
         dateObj = new Date(date._seconds * 1000);
       }
-      // Intentar convertir directamente
-      else {
+      
+      // Si es un objeto Date, usar directamente
+      if (!dateObj && date instanceof Date) {
+        dateObj = date;
+      }
+      
+      // Si es un número (timestamp en milisegundos)
+      if (!dateObj && typeof date === "number" && !isNaN(date) && date > 0) {
         dateObj = new Date(date);
+      }
+      
+      // Si es un string, intentar parsear
+      if (!dateObj && typeof date === "string") {
+        // Intentar parsear como ISO string
+        dateObj = new Date(date);
+        // Si no es válido, intentar otros formatos
+        if (isNaN(dateObj.getTime())) {
+          // Intentar parsear como timestamp numérico
+          const numDate = Number(date);
+          if (!isNaN(numDate) && numDate > 0) {
+            dateObj = new Date(numDate);
+          } else {
+            return "";
+          }
+        }
+      }
+      
+      // Si es un objeto con método getTime, intentar crear Date
+      if (!dateObj && date && typeof date.getTime === "function") {
+        try {
+          dateObj = new Date(date.getTime());
+        } catch (e) {
+          console.warn("Error creating Date from getTime():", e);
+        }
+      }
+      
+      // Último intento: convertir directamente
+      if (!dateObj) {
+        try {
+          dateObj = new Date(date);
+        } catch (e) {
+          console.warn("Error creating Date:", e);
+        }
       }
       
       // Validar que sea una fecha válida
-      if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+      if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        console.warn("Fecha inválida o no pudo ser parseada:", date);
         return "";
       }
       
@@ -215,6 +260,13 @@ const Index = () => {
     const fetchCourses = async () => {
       if (!user?.uid) return;
       
+      // Si el usuario está deshabilitado, no cargar cursos
+      if (user.activo === false) {
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+      
       setLoading(true);
       try {
         const courses = await CoursesService.getAllCoursesPerUser(user.uid);
@@ -238,7 +290,7 @@ const Index = () => {
     <>
       <EnvironmentBanner />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
-      {!isMobile && (
+      {!isMobile && user?.activo !== false && (
         <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
           <div
             className="flex transition-transform duration-500 ease-in-out"
@@ -268,27 +320,80 @@ const Index = () => {
         </div>
       )}
 
-      <div className="text-center mt-4">
-        <div className="rounded-lg flex items-center justify-center">
-          <img
-            src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
-            alt="Logo EPEFI"
-            className="w-24 sm:w-40 md:w-36 h-auto object-contain transition-opacity duration-300"
-            onError={(e) => {
-              // Fallback en caso de error al cargar la imagen
-              (e.target as HTMLImageElement).src = "/logo.webp";
-            }}
-          />
+      {user?.activo !== false && (
+        <div className="text-center mt-4">
+          <div className="rounded-lg flex items-center justify-center">
+            <img
+              src={isDarkMode ? "/logo.webp" : "/logoNegro.png"}
+              alt="Logo EPEFI"
+              className="w-24 sm:w-40 md:w-36 h-auto object-contain transition-opacity duration-300"
+              onError={(e) => {
+                // Fallback en caso de error al cargar la imagen
+                (e.target as HTMLImageElement).src = "/logo.webp";
+              }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="space-y-4">
-        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 ml-1">
-          Mis formaciones
-        </h2>
+        {user?.activo !== false && (
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 ml-1">
+            Mis formaciones
+          </h2>
+        )}
         <div className="grid grid-cols-1 gap-4">
           {loading ? (
             <CourseLoader />
+          ) : user?.activo === false ? (
+            // Mostrar mensaje de usuario deshabilitado
+            <Card className="bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800">
+              <CardContent className="p-8 sm:p-12">
+                <div className="flex flex-col items-center justify-center text-center space-y-6">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <AlertTriangle className="w-10 h-10 sm:w-12 sm:h-12 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="text-xl sm:text-2xl font-bold text-red-900 dark:text-red-100">
+                      Usuario Deshabilitado
+                    </h3>
+                    <p className="text-base sm:text-lg text-red-700 dark:text-red-300 max-w-2xl">
+                      Tu cuenta ha sido deshabilitada por el administrador.
+                    </p>
+                    <p className="text-sm sm:text-base text-red-600 dark:text-red-400 max-w-2xl">
+                      Por favor, contacta con el administrador para revertir esta acción y recuperar el acceso a tus formaciones.
+                    </p>
+                  </div>
+                  <div className="space-y-3 mt-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
+                      <a
+                        href="https://wa.me/543433010363"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>343 301-0363</span>
+                      </a>
+                      <a
+                        href="tel:+543434365094"
+                        className="flex items-center gap-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                      >
+                        <Phone className="w-4 h-4" />
+                        <span>(0343) 436-5094</span>
+                      </a>
+                      <a
+                        href="mailto:epefigimnasioescuela@gmail.com"
+                        className="flex items-center gap-2 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                      >
+                        <Mail className="w-4 h-4" />
+                        <span>epefigimnasioescuela@gmail.com</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <>
               {courses.length === 0
@@ -313,31 +418,33 @@ const Index = () => {
       </div>
 
       {/* Botón para adquirir más cursos - diseño elegante con naranja como detalle */}
-      <a
-        href="https://epefi.com.ar/escuela"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block"
-      >
-        <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-orange-400 dark:hover:border-orange-400 hover:shadow-lg transition-all duration-300 group">
-          <div className="text-center py-6 sm:py-8 px-4 relative overflow-hidden">
-            {/* Detalle naranja sutil */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500"></div>
+      {user?.activo !== false && (
+        <a
+          href="https://epefi.com.ar/escuela"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <Card className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:border-orange-400 dark:hover:border-orange-400 hover:shadow-lg transition-all duration-300 group">
+            <div className="text-center py-6 sm:py-8 px-4 relative overflow-hidden">
+              {/* Detalle naranja sutil */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500"></div>
 
-            <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-300">
-              Adquirir más formaciones
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mt-2 text-sm sm:text-base">
-              Explorá toda nuestra oferta de formaciones
-            </p>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-300">
+                Adquirir más formaciones
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mt-2 text-sm sm:text-base">
+                Explorá toda nuestra oferta de formaciones
+              </p>
 
-            {/* Ícono con detalle naranja */}
-            <div className="mt-3 flex justify-center">
-              <ChevronRight className="w-5 h-5 text-orange-500 group-hover:translate-x-1 transition-transform duration-300" />
+              {/* Ícono con detalle naranja */}
+              <div className="mt-3 flex justify-center">
+                <ChevronRight className="w-5 h-5 text-orange-500 group-hover:translate-x-1 transition-transform duration-300" />
+              </div>
             </div>
-          </div>
-        </Card>
-      </a>
+          </Card>
+        </a>
+      )}
     </div>
     </>
   );

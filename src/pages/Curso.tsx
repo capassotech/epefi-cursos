@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import VideoModal from "@/components/video-modal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
   const navigate = useNavigate();
@@ -74,6 +75,13 @@ const CourseDetailPage = () => {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
   }, []);
+
+  // Redirigir si el usuario está deshabilitado
+  useEffect(() => {
+    if (user && user.activo === false) {
+      navigate("/", { replace: true });
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -499,39 +507,84 @@ const CourseDetailPage = () => {
     if (!date) return "";
     
     try {
-      let dateObj: Date;
+      let dateObj: Date | null = null;
       
-      // Si es un string, convertir a Date
-      if (typeof date === "string") {
-        dateObj = new Date(date);
+      // Si es null o undefined, retornar vacío
+      if (date === null || date === undefined) {
+        return "";
       }
-      // Si es un objeto Date, usar directamente
-      else if (date instanceof Date) {
-        dateObj = date;
+      
+      // Si es un string vacío, retornar vacío
+      if (typeof date === "string" && date.trim() === "") {
+        return "";
       }
-      // Si es un Timestamp de Firestore, usar toDate()
-      else if (date && typeof date.toDate === "function") {
-        dateObj = date.toDate();
+      
+      // Si es un Timestamp de Firestore con toDate (verificar primero)
+      if (date && typeof date === "object" && typeof date.toDate === "function") {
+        try {
+          dateObj = date.toDate();
+        } catch (e) {
+          console.warn("Error calling toDate():", e);
+        }
       }
-      // Si es un objeto con método getTime, intentar crear Date
-      else if (date && typeof date.getTime === "function") {
-        dateObj = date;
-      }
+      
       // Si es un objeto con seconds (Timestamp de Firestore serializado)
-      else if (date && typeof date.seconds === "number") {
+      if (!dateObj && date && typeof date === "object" && typeof date.seconds === "number") {
         dateObj = new Date(date.seconds * 1000);
       }
+      
       // Si tiene _seconds (otro formato de Timestamp)
-      else if (date && typeof date._seconds === "number") {
+      if (!dateObj && date && typeof date === "object" && typeof date._seconds === "number") {
         dateObj = new Date(date._seconds * 1000);
       }
-      // Intentar convertir directamente
-      else {
+      
+      // Si es un objeto Date, usar directamente
+      if (!dateObj && date instanceof Date) {
+        dateObj = date;
+      }
+      
+      // Si es un número (timestamp en milisegundos)
+      if (!dateObj && typeof date === "number" && !isNaN(date) && date > 0) {
         dateObj = new Date(date);
+      }
+      
+      // Si es un string, intentar parsear
+      if (!dateObj && typeof date === "string") {
+        // Intentar parsear como ISO string
+        dateObj = new Date(date);
+        // Si no es válido, intentar otros formatos
+        if (isNaN(dateObj.getTime())) {
+          // Intentar parsear como timestamp numérico
+          const numDate = Number(date);
+          if (!isNaN(numDate) && numDate > 0) {
+            dateObj = new Date(numDate);
+          } else {
+            return "";
+          }
+        }
+      }
+      
+      // Si es un objeto con método getTime, intentar crear Date
+      if (!dateObj && date && typeof date.getTime === "function") {
+        try {
+          dateObj = new Date(date.getTime());
+        } catch (e) {
+          console.warn("Error creating Date from getTime():", e);
+        }
+      }
+      
+      // Último intento: convertir directamente
+      if (!dateObj) {
+        try {
+          dateObj = new Date(date);
+        } catch (e) {
+          console.warn("Error creating Date:", e);
+        }
       }
       
       // Validar que sea una fecha válida
-      if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+      if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        console.warn("Fecha inválida o no pudo ser parseada:", date);
         return "";
       }
       
@@ -631,6 +684,25 @@ const CourseDetailPage = () => {
             <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100" data-testid="course-title">
               {courseDetail.titulo}
             </h1>
+            {/* Fechas de dictado */}
+            {(courseDetail.fechaInicioDictado || courseDetail.fechaFinDictado) && (
+              <div className="mt-1.5 space-y-0.5">
+                {courseDetail.fechaInicioDictado && (
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span className="font-medium">Inicio:</span>
+                    <span>{formatDate(courseDetail.fechaInicioDictado)}</span>
+                  </div>
+                )}
+                {courseDetail.fechaFinDictado && (
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3 h-3 flex-shrink-0 opacity-0 sm:opacity-100" />
+                    <span className="font-medium">Fin:</span>
+                    <span>{formatDate(courseDetail.fechaFinDictado)}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <Button
             variant="ghost"
@@ -849,10 +921,34 @@ const CourseDetailPage = () => {
               Información del curso
             </DialogTitle>
           </DialogHeader>
-          <div className="pt-2">
+          <div className="pt-2 space-y-4">
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
               {courseDetail?.descripcion || 'Descripción no disponible'}
             </p>
+            
+            {/* Fechas de dictado */}
+            {(courseDetail?.fechaInicioDictado || courseDetail?.fechaFinDictado) && (
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                  Fechas de dictado
+                </h3>
+                <div className="space-y-1.5">
+                  {courseDetail.fechaInicioDictado && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="font-medium min-w-[60px]">Inicio:</span>
+                      <span>{formatDate(courseDetail.fechaInicioDictado)}</span>
+                    </div>
+                  )}
+                  {courseDetail.fechaFinDictado && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="font-medium min-w-[60px]">Fin:</span>
+                      <span>{formatDate(courseDetail.fechaFinDictado)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

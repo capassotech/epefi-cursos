@@ -70,6 +70,7 @@ class AuthService {
           role: userData.role,
           loginTime: new Date().toISOString(),
           fechaRegistro: userData.fechaRegistro || new Date().toISOString(),
+          activo: userData.activo !== undefined ? userData.activo : true,
         });
 
         return {
@@ -141,6 +142,7 @@ class AuthService {
         role: userData.role,
         registrationTime: new Date().toISOString(),
         fechaRegistro: new Date().toISOString(),
+        activo: userData.activo !== undefined ? userData.activo : true,
       });
 
       return {
@@ -200,6 +202,7 @@ class AuthService {
           role: userData.role || { admin: false, student: true },
           loginTime: new Date().toISOString(),
           fechaRegistro: userData.fechaRegistro || new Date().toISOString(),
+          activo: userData.activo !== undefined ? userData.activo : true,
         });
 
         return {
@@ -223,6 +226,7 @@ class AuthService {
           role: { admin: false, student: true },
           loginTime: new Date().toISOString(),
           fechaRegistro: new Date().toISOString(),
+          activo: true, // Por defecto activo hasta que se obtenga del backend
         };
 
         this.saveStudentDataToStorage(basicUserData);

@@ -77,6 +77,13 @@ const Search = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Redirigir si el usuario está deshabilitado
+  useEffect(() => {
+    if (user && user.activo === false) {
+      navigate("/", { replace: true });
+    }
+  }, [user, navigate]);
   
   // Inicializar desde URL params, si no hay, usar localStorage, si no hay, usar valores por defecto
   const getInitialQuery = () => {
