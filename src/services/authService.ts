@@ -173,24 +173,66 @@ class AuthService {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      // Crear perfil básico para Google login
-      const userData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || "",
-        nombre: firebaseUser.displayName?.split(" ")[0] || "",
-        apellido: firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
-        role: { admin: false, student: true },
-        loginTime: new Date().toISOString(),
-        fechaRegistro: new Date().toISOString(),
-      };
+      // Obtener token para autenticación
+      const token = await firebaseUser.getIdToken();
 
-      this.saveStudentDataToStorage(userData);
+      // Intentar crear o verificar usuario en Firestore
+      try {
+        const response = await api.post(
+          "/api/auth/google/create-user",
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-      return {
-        success: true,
-        user: userData,
-        firebaseUser: firebaseUser,
-      };
+        const userData = response.data.user;
+
+        // Guardar datos en localStorage
+        this.saveStudentDataToStorage({
+          uid: firebaseUser.uid,
+          email: userData.email || firebaseUser.email || "",
+          nombre: userData.nombre || firebaseUser.displayName?.split(" ")[0] || "",
+          apellido: userData.apellido || firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+          dni: userData.dni || "",
+          role: userData.role || { admin: false, student: true },
+          loginTime: new Date().toISOString(),
+          fechaRegistro: userData.fechaRegistro || new Date().toISOString(),
+        });
+
+        return {
+          success: true,
+          user: userData,
+          firebaseUser: firebaseUser,
+        };
+      } catch (backendError: any) {
+        console.warn(
+          "Backend error creating/verifying Google user:",
+          backendError
+        );
+
+        // Si falla el backend, crear perfil básico localmente
+        const basicUserData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          nombre: firebaseUser.displayName?.split(" ")[0] || "",
+          apellido: firebaseUser.displayName?.split(" ").slice(1).join(" ") || "",
+          dni: "",
+          role: { admin: false, student: true },
+          loginTime: new Date().toISOString(),
+          fechaRegistro: new Date().toISOString(),
+        };
+
+        this.saveStudentDataToStorage(basicUserData);
+
+        return {
+          success: true,
+          user: basicUserData,
+          firebaseUser: firebaseUser,
+        };
+      }
     } catch (error: any) {
       console.error("Error en Google login:", error);
       throw {
