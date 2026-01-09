@@ -889,6 +889,21 @@ const CourseDetailPage = () => {
           {/* Barra de progreso */}
           {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
+            
+            // Función para determinar el color según el progreso
+            const getProgressColor = (percentage: number): string => {
+              if (percentage < 34) {
+                // Rojo para bajo progreso (0-33%)
+                return "bg-gradient-to-r from-red-400 to-red-500";
+              } else if (percentage < 67) {
+                // Amarillo para progreso medio (34-66%)
+                return "bg-gradient-to-r from-yellow-400 to-yellow-500";
+              } else {
+                // Verde para alto progreso (67-100%)
+                return "bg-gradient-to-r from-green-400 to-green-500";
+              }
+            };
+
             return (
               <section className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -899,7 +914,7 @@ const CourseDetailPage = () => {
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-500 ease-out rounded-full"
+                    className={`h-full ${getProgressColor(courseProgress.percentage)} transition-all duration-500 ease-out rounded-full`}
                     style={{ width: `${courseProgress.percentage}%` }}
                   />
                 </div>
@@ -1448,6 +1463,29 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
   const documents = getDocuments();
   const videos = getVideos();
 
+  // Verificar si todos los contenidos del módulo están completados
+  const isModuleCompleted = (): boolean => {
+    // Si no hay contenidos, no está completado
+    if (documents.length === 0 && videos.length === 0) {
+      return false;
+    }
+
+    // Verificar que todos los documentos estén completados
+    const allDocumentsCompleted = documents.every((_, index) => 
+      isContentCompleted(modulo.id, index, 'document')
+    );
+
+    // Verificar que todos los videos estén completados
+    const allVideosCompleted = videos.every((_, index) => 
+      isContentCompleted(modulo.id, index, 'video')
+    );
+
+    // El módulo está completado solo si todos los contenidos están completados
+    return allDocumentsCompleted && allVideosCompleted;
+  };
+
+  const moduleCompleted = isModuleCompleted();
+
   return (
     <div className={cn(
       "flex items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
@@ -1461,7 +1499,15 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
           onClick={() => setIsModuleExpanded(!isModuleExpanded)}
           className="w-full flex items-center justify-between gap-2 text-left"
         >
-          <h4 className="text-xs sm:text-base font-medium text-slate-800 dark:text-slate-200 leading-relaxed">
+          <h4 className={cn(
+            "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2",
+            moduleCompleted 
+              ? "text-green-600 dark:text-green-400" 
+              : "text-slate-800 dark:text-slate-200"
+          )}>
+            {moduleCompleted && (
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+            )}
             {modulo.titulo}
           </h4>
           <ChevronDown className={cn(
