@@ -1242,7 +1242,8 @@ const CourseDetailPage = () => {
       <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
         <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
           <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-            <div className="flex items-center justify-between">
+            {/* Fila 1: Título - En mobile ocupa toda la fila */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
               <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
                   {selectedDocument?.title || 'Documento'}
@@ -1253,8 +1254,8 @@ const CourseDetailPage = () => {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                {/* Controles de navegación para múltiples documentos */}
+              {/* Controles de navegación - Solo visible en desktop */}
+              <div className="hidden sm:flex items-center gap-2">
                 {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
                   <>
                     <Button
@@ -1292,49 +1293,13 @@ const CourseDetailPage = () => {
                     Abrir en Safari
                   </Button>
                 )}
-                {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
-                  const modulo = modulos.find(m => m.titulo === selectedDocument.title);
-                  const moduleId = modulo?.id || '';
-                  const isDocCompleted = isContentCompleted(moduleId, selectedDocument.currentIndex, 'document');
-                  return (
-                    <Button
-                      variant="default"
-                      size="lg"
-                      onClick={() => {
-                        if (modulo && selectedDocument.currentIndex !== undefined) {
-                          handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
-                        }
-                      }}
-                      className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all ${
-                        isDocCompleted 
-                          ? 'bg-green-600 hover:bg-green-700 text-white' 
-                          : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
-                      }`}
-                    >
-                      <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                      <span className={isMobile ? 'hidden' : ''}>
-                        {isDocCompleted ? 'Completado' : 'Marcar como completado'}
-                      </span>
-                      <span className={isMobile ? '' : 'hidden'}>
-                        {isDocCompleted ? 'LEIDO' : 'LEIDO'}
-                      </span>
-                    </Button>
-                  );
-                })()}
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleCloseDocument}
-                  className="h-10 px-4 sm:h-10 sm:px-6 font-medium"
-                >
-                  Cerrar
-                </Button>
               </div>
             </div>
             <DialogDescription className="sr-only">
               Visualizador de documento PDF
             </DialogDescription>
           </DialogHeader>
+          {/* Fila 2: Navegador (contenido del PDF) */}
           <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
             {/* Solo mostrar estado de carga en dispositivos que no sean iOS */}
             {isDocumentLoading && !isIOS && (
@@ -1431,6 +1396,76 @@ const CourseDetailPage = () => {
                 </div>
               </div>
             )}
+          </div>
+          {/* Fila 3: Botones de visto y cerrar - En mobile ocupa toda la fila */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2 p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+            {/* Controles de navegación para mobile - Solo visible en mobile */}
+            {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
+              <div className="flex sm:hidden items-center justify-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handlePreviousDocument}
+                  className="h-8 w-8"
+                  disabled={selectedDocument.currentIndex === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs text-slate-500 dark:text-slate-400 px-2">
+                  {selectedDocument.currentIndex! + 1} / {selectedDocument.documents.length}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNextDocument}
+                  className="h-8 w-8"
+                  disabled={selectedDocument.currentIndex === selectedDocument.documents.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            {/* Botones de acción */}
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:justify-end">
+              {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
+                const modulo = modulos.find(m => m.titulo === selectedDocument.title);
+                const moduleId = modulo?.id || '';
+                const isDocCompleted = isContentCompleted(moduleId, selectedDocument.currentIndex, 'document');
+                return (
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => {
+                      if (modulo && selectedDocument.currentIndex !== undefined) {
+                        handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
+                      }
+                    }}
+                    className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all flex-1 sm:flex-initial ${
+                      isDocCompleted 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
+                    <span className={isMobile ? 'hidden' : ''}>
+                      {isDocCompleted ? 'Completado' : 'Marcar como completado'}
+                    </span>
+                    <span className={isMobile ? '' : 'hidden'}>
+                      {isDocCompleted ? 'LEIDO' : 'LEIDO'}
+                    </span>
+                  </Button>
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleCloseDocument}
+                className="h-10 px-4 sm:h-10 sm:px-6 font-medium flex-1 sm:flex-initial"
+              >
+                Cerrar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

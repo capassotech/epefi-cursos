@@ -173,9 +173,11 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         </DialogDescription>
         <div className="w-full" onClick={(e) => e.stopPropagation()}>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* Fila 1: Título - En mobile ocupa toda la fila, en desktop está junto con controles */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{videoTitle}</h3>
-              <div className="flex items-center gap-2">
+              {/* Controles de navegación - Solo visible en desktop */}
+              <div className="hidden sm:flex items-center gap-2">
                 {/* Controles de navegación para múltiples videos */}
                 {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
                   <>
@@ -255,39 +257,10 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                     )}
                   </Button>
                 )}
-                {onMarkAsCompleted && (
-                  <Button
-                    type="button"
-                    variant={isCompleted ? "default" : "default"}
-                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all ${
-                      isCompleted 
-                        ? 'bg-green-600 hover:bg-green-700 text-white' 
-                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
-                    }`}
-                    onClick={onMarkAsCompleted}
-                  >
-                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                    <span className={isMobile ? 'hidden' : ''}>
-                      {isCompleted ? 'Completado' : 'Marcar como completado'}
-                    </span>
-                    <span className={isMobile ? '' : 'hidden'}>
-                      {isCompleted ? 'VISTO' : 'VISTO'}
-                    </span>
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => {
-                    onClose();
-                    setIsFullscreen(false);
-                  }}
-                >
-                  Cerrar
-                </Button>
               </div>
             </div>
+            
+            {/* Fila 2: Navegador (contenido del video/PDF) */}
             <div 
               ref={videoContainerRef}
               className="relative w-full video-no-download" 
@@ -336,6 +309,73 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   }}
                 />
               )}
+            </div>
+            
+            {/* Fila 3: Botones de visto y cerrar - En mobile ocupa toda la fila */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2">
+              {/* Controles de navegación para mobile - Solo visible en mobile */}
+              {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
+                <div className="flex sm:hidden items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={onPreviousVideo}
+                    disabled={!onPreviousVideo || content.currentIndex === 0}
+                    className="cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
+                    {content.currentIndex + 1} / {content.videos.length}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={onNextVideo}
+                    disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
+                    className="cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              
+              {/* Botones de acción */}
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:justify-end">
+                {onMarkAsCompleted && (
+                  <Button
+                    type="button"
+                    variant={isCompleted ? "default" : "default"}
+                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all flex-1 sm:flex-initial ${
+                      isCompleted 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    }`}
+                    onClick={onMarkAsCompleted}
+                  >
+                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
+                    <span className={isMobile ? 'hidden' : ''}>
+                      {isCompleted ? 'Completado' : 'Marcar como completado'}
+                    </span>
+                    <span className={isMobile ? '' : 'hidden'}>
+                      {isCompleted ? 'VISTO' : 'VISTO'}
+                    </span>
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="cursor-pointer flex-1 sm:flex-initial"
+                  onClick={() => {
+                    onClose();
+                    setIsFullscreen(false);
+                  }}
+                >
+                  Cerrar
+                </Button>
+              </div>
             </div>
           </div>
         </div>
