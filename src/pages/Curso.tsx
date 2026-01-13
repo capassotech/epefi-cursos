@@ -76,6 +76,7 @@ const CourseDetailPage = () => {
   const [isDocumentLoading, setIsDocumentLoading] = useState(true);
   const [isIOS, setIsIOS] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDisabledModuleDialogOpen, setIsDisabledModuleDialogOpen] = useState(false);
 
   // Detectar iOS
   useEffect(() => {
@@ -382,6 +383,7 @@ const CourseDetailPage = () => {
   const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) => {
     // Verificar si el módulo está habilitado
     if (enabledModules[modulo.id] === false) {
+      setIsDisabledModuleDialogOpen(true);
       return; // No permitir abrir si está deshabilitado
     }
     
@@ -484,6 +486,7 @@ const CourseDetailPage = () => {
   const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) => {
     // Verificar si el módulo está habilitado
     if (enabledModules[modulo.id] === false) {
+      setIsDisabledModuleDialogOpen(true);
       return; // No permitir abrir si está deshabilitado
     }
     if (!modulo.url_archivo) {
@@ -894,7 +897,7 @@ const CourseDetailPage = () => {
 
       <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
         <div className="flex flex-col gap-4 sm:gap-6">
-          {/* Barra de progreso */}
+          {/* Barra de progreso fija */}
           {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
             
@@ -913,22 +916,34 @@ const CourseDetailPage = () => {
             };
 
             return (
-              <section className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
+              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
+                {/* Texto solo visible en desktop */}
+                <div className="hidden sm:flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
                   <span className="text-slate-600 dark:text-slate-400">
                     {courseProgress.completed} de {courseProgress.total} completados
                   </span>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                {/* Barra de progreso - más delgada en mobile */}
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1 sm:h-3 overflow-hidden">
                   <div
                     className={`h-full ${getProgressColor(courseProgress.percentage)} transition-all duration-500 ease-out rounded-full`}
                     style={{ width: `${courseProgress.percentage}%` }}
                   />
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                {/* Porcentaje - solo visible en desktop */}
+                <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 text-center">
                   {courseProgress.percentage}% completado
                 </p>
+                {/* En mobile, mostrar solo el porcentaje de forma compacta */}
+                <div className="flex sm:hidden items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">
+                    {courseProgress.percentage}%
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {courseProgress.completed}/{courseProgress.total}
+                  </span>
+                </div>
               </section>
             );
           })()}
@@ -951,30 +966,13 @@ const CourseDetailPage = () => {
                     // Obtener todos los módulos de esta materia
                     const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
                     
-                    // Si la materia no tiene módulos, mostrarla
-                    if (materiasModulos.length === 0) {
-                      return true;
-                    }
-                    
-                    // Verificar si hay al menos un módulo habilitado
-                    const hasEnabledModule = materiasModulos.some((modulo) => {
-                      // Si el módulo no está en enabledModules, está habilitado por defecto
-                      // Si está explícitamente deshabilitado (false), no está habilitado
-                      return enabledModules[modulo.id] !== false;
-                    });
-                    
-                    // Mostrar la materia solo si tiene al menos un módulo habilitado
-                    return hasEnabledModule;
+                    // Mostrar la materia si tiene módulos (habilitados o deshabilitados)
+                    return materiasModulos.length > 0;
                   })
                   .map((materia) => {
-                    // Filtrar módulos habilitados antes de contar y mostrar
+                    // Mostrar todos los módulos (habilitados y deshabilitados)
                     const materiasModulos = modulos
-                      .filter(modulo => modulo.id_materia === materia.id)
-                      .filter((modulo) => {
-                        // Si el módulo no está en enabledModules, está habilitado por defecto
-                        // Si está explícitamente deshabilitado (false), no mostrarlo
-                        return enabledModules[modulo.id] !== false;
-                      });
+                      .filter(modulo => modulo.id_materia === materia.id);
 
                   return (
                     <AccordionItem
@@ -1038,6 +1036,7 @@ const CourseDetailPage = () => {
                                       isEnabled={enabledModules[modulo.id] !== false}
                                       isContentCompleted={isContentCompleted}
                                       handleMarkAsCompleted={handleMarkAsCompleted}
+                                      onDisabledClick={() => setIsDisabledModuleDialogOpen(true)}
                                     />
                                   </div>
                                 ))}
@@ -1047,30 +1046,6 @@ const CourseDetailPage = () => {
                                 No hay módulos disponibles para esta materia.
                               </div>
                             )}
-                            {/* Advertencia si hay módulos deshabilitados - al final */}
-                            {(() => {
-                              const allMateriaModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
-                              const disabledModules = allMateriaModulos.filter((modulo) => enabledModules[modulo.id] === false);
-                              
-                              if (disabledModules.length > 0) {
-                                return (
-                                  <div className="mt-4 px-4 sm:px-5">
-                                    <div className="flex items-start gap-3 p-3 sm:p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                                      <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                                      <div className="flex-1">
-                                        <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                          Módulos pendientes
-                                        </p>
-                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                                          Hay {disabledModules.length} módulo{disabledModules.length !== 1 ? 's' : ''} pendiente{disabledModules.length !== 1 ? 's' : ''} por estudiar en esta materia. Los módulos se habilitarán progresivamente según el plan de estudios.
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
                           </AccordionContent>
                         </AccordionItem>
                       );
@@ -1366,12 +1341,32 @@ const CourseDetailPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog para módulos deshabilitados */}
+      <Dialog open={isDisabledModuleDialogOpen} onOpenChange={setIsDisabledModuleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Módulo no disponible
+            </DialogTitle>
+          </DialogHeader>
+          <div className="pt-2 space-y-4">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+              Este módulo aún no está disponible. Los módulos se habilitarán progresivamente según el plan de estudios.
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              Si tienes alguna consulta, por favor comunícate con tu profesor.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void> }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted, onDisabledClick }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void>; onDisabledClick?: () => void }) => {
   const [isModuleExpanded, setIsModuleExpanded] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
@@ -1428,26 +1423,42 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
   return (
     <div className={cn(
       "flex items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
-      isHighlighted 
-        ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700 shadow-md ring-2 ring-orange-400 dark:ring-orange-500 ring-opacity-50" 
-        : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50"
+      !isEnabled 
+        ? "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60"
+        : isHighlighted 
+          ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700 shadow-md ring-2 ring-orange-400 dark:ring-orange-500 ring-opacity-50" 
+          : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50"
     )}>
       <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0 hidden sm:block"></div>
       <div className="flex-1 min-w-0">
         <button
-          onClick={() => setIsModuleExpanded(!isModuleExpanded)}
+          onClick={() => {
+            if (!isEnabled && onDisabledClick) {
+              onDisabledClick();
+            } else {
+              setIsModuleExpanded(!isModuleExpanded);
+            }
+          }}
           className="w-full flex items-center justify-between gap-2 text-left"
         >
           <h4 className={cn(
             "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2",
-            moduleCompleted 
-              ? "text-green-600 dark:text-green-400" 
-              : "text-slate-800 dark:text-slate-200"
+            !isEnabled
+              ? "text-slate-500 dark:text-slate-400"
+              : moduleCompleted 
+                ? "text-green-600 dark:text-green-400" 
+                : "text-slate-800 dark:text-slate-200"
           )}>
-            {moduleCompleted && (
+            {moduleCompleted && isEnabled && (
               <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
             )}
+            {!isEnabled && (
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            )}
             {modulo.titulo}
+            {!isEnabled && (
+              <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">(No disponible)</span>
+            )}
           </h4>
           <ChevronDown className={cn(
             "h-4 w-4 sm:h-5 sm:w-5 text-slate-500 dark:text-slate-400 transition-transform flex-shrink-0",
@@ -1503,11 +1514,20 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 <div className="w-full sm:hidden flex items-center gap-2">
                   <Button
                     className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                      isDocCompleted
-                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
-                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                      !isEnabled
+                        ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
+                        : isDocCompleted
+                          ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                          : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
                     }`}
-                    onClick={() => handleOpenDocument(modulo, index)}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenDocument(modulo, index);
+                      }
+                    }}
+                    disabled={!isEnabled}
                   >
                     <FileText className="h-4 w-4" />
                     {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
@@ -1552,7 +1572,13 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                   </span>
                   <Button
                     className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30"
-                    onClick={() => handleOpenDocument(modulo, index)}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenDocument(modulo, index);
+                      }
+                    }}
                     disabled={!isEnabled}
                   >
                     <FileText className="h-3.5 w-3.5" />
@@ -1580,11 +1606,19 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 <div className="w-full sm:hidden flex items-center gap-2">
                   <Button
                     className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isVideoCompleted
-                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
-                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                      !isEnabled
+                        ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
+                        : isVideoCompleted
+                          ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                          : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
                     }`}
-                    onClick={() => handleOpenVideo(modulo, index)}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenVideo(modulo, index);
+                      }
+                    }}
                     disabled={!isEnabled}
                   >
                     <Play className="h-4 w-4" />
@@ -1634,7 +1668,13 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                         ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
                         : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
                     }`}
-                    onClick={() => handleOpenVideo(modulo, index)}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenVideo(modulo, index);
+                      }
+                    }}
                     disabled={!isEnabled}
                   >
                     {isVideoCompleted ? (
