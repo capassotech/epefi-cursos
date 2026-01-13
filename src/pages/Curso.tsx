@@ -30,7 +30,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Curso, Materia, Modulo } from "@/types/types";
@@ -405,6 +404,12 @@ const CourseDetailPage = () => {
     const validIndex = Math.max(0, Math.min(videoIndex, videos.length - 1));
     const videoUrl = videos[validIndex];
     
+    // Marcar como visto automáticamente al abrir
+    const isVideoCompleted = isContentCompleted(modulo.id, validIndex, 'video');
+    if (!isVideoCompleted && user?.uid) {
+      handleMarkAsCompleted(modulo.id, validIndex, 'video');
+    }
+    
     // Convertir URL de YouTube o Google Drive al formato embed si es necesario
     const embedUrl = convertYouTubeToEmbed(videoUrl);
     
@@ -505,20 +510,27 @@ const CourseDetailPage = () => {
     const validIndex = Math.max(0, Math.min(documentIndex, documents.length - 1));
     const selectedUrl = documents[validIndex];
 
-    // Detectar si es una URL de Google Drive
-    if (isGoogleDriveUrl(selectedUrl)) {
-      // Para Google Drive, abrir en nueva pestaña
-      window.open(selectedUrl, '_blank', 'noopener,noreferrer');
+    // Marcar como viso automáticamente al abrir
+    const isDocCompleted = isContentCompleted(modulo.id, validIndex, 'document');
+    if (!isDocCompleted && user?.uid) {
+      handleMarkAsCompleted(modulo.id, validIndex, 'document');
+    }
+
+    // En mobile: abrir directamente en nueva pestaña (sin modal)
+    // En desktop: abrir modal como antes
+    if (isMobile) {
+      const link = document.createElement('a');
+      link.href = selectedUrl.split('#')[0];
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       return;
     }
 
-    // En iOS, no mostrar estado de carga, mostrar directamente las opciones
-    if (isIOS) {
-      setIsDocumentLoading(false);
-    } else {
-      setIsDocumentLoading(true);
-    }
-    // Formatear la URL del PDF con parámetros de zoom
+    // Desktop: abrir modal
+    setIsDocumentLoading(true);
     const formattedUrl = formatPDFUrl(selectedUrl);
     setSelectedDocument({
       url: formattedUrl,
@@ -580,6 +592,7 @@ const CourseDetailPage = () => {
   const handleDocumentLoad = () => {
     setIsDocumentLoading(false);
   };
+
 
   // Función para marcar contenido como completado
   const handleMarkAsCompleted = async (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => {
@@ -664,18 +677,6 @@ const CourseDetailPage = () => {
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { completed, total, percentage };
   };
-
-  // Verificar si el documento es de Google Drive cuando se selecciona
-  useEffect(() => {
-    if (selectedDocument && isGoogleDriveUrl(selectedDocument.url)) {
-      // Si es Google Drive, abrir en nueva pestaña y cerrar el modal
-      const url = selectedDocument.url;
-      setIsDocumentModalOpen(false);
-      setSelectedDocument(null);
-      setIsDocumentLoading(true);
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  }, [selectedDocument]);
 
   // Función para formatear fechas
   const formatDate = (date: string | Date | any | undefined): string => {
@@ -1036,6 +1037,7 @@ const CourseDetailPage = () => {
                                       isHighlighted={highlightedModuloId === modulo.id}
                                       isEnabled={enabledModules[modulo.id] !== false}
                                       isContentCompleted={isContentCompleted}
+                                      handleMarkAsCompleted={handleMarkAsCompleted}
                                     />
                                   </div>
                                 ))}
@@ -1238,11 +1240,10 @@ const CourseDetailPage = () => {
         isCompleted={selectedVideo && selectedVideo.currentIndex !== undefined ? isContentCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video') : false}
       />
 
-      {/* Modal de documento a pantalla completa */}
+      {/* Modal de documento para desktop */}
       <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
         <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
           <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-            {/* Fila 1: Título - En mobile ocupa toda la fila */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
               <div className="flex-1 min-w-0">
                 <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -1254,7 +1255,6 @@ const CourseDetailPage = () => {
                   </p>
                 )}
               </div>
-              {/* Controles de navegación - Solo visible en desktop */}
               <div className="hidden sm:flex items-center gap-2">
                 {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
                   <>
@@ -1278,31 +1278,11 @@ const CourseDetailPage = () => {
                     </Button>
                   </>
                 )}
-                {isIOS && selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      // Remover parámetros de fragmento para la URL original
-                      const originalUrl = selectedDocument.url.split('#')[0];
-                      window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                    }}
-                    className="text-orange-600 dark:text-orange-400"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Abrir en Safari
-                  </Button>
-                )}
               </div>
             </div>
-            <DialogDescription className="sr-only">
-              Visualizador de documento PDF
-            </DialogDescription>
           </DialogHeader>
-          {/* Fila 2: Navegador (contenido del PDF) */}
           <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
-            {/* Solo mostrar estado de carga en dispositivos que no sean iOS */}
-            {isDocumentLoading && !isIOS && (
+            {isDocumentLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-950 z-10">
                 <div className="flex flex-col items-center gap-4">
                   <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
@@ -1313,70 +1293,20 @@ const CourseDetailPage = () => {
               </div>
             )}
             {selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
-              <>
-                {/* En iOS, mostrar opciones para abrir en Safari ya que los PDFs embebidos no funcionan bien */}
-                {isIOS ? (
-                  <div className="flex flex-col items-center justify-center h-full p-6 space-y-6">
-                    <div className="text-center space-y-4 max-w-md">
-                      <FileText className="h-16 w-16 text-orange-500 mx-auto" />
-                      <div>
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-                          {selectedDocument.title}
-                        </h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-300">
-                          Para ver este documento en iOS, ábrelo en Safari para usar los controles nativos de visualización y zoom.
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-3 pt-4">
-                        <Button
-                          onClick={() => {
-                            // Remover parámetros de fragmento para la URL original
-                            const originalUrl = selectedDocument.url.split('#')[0];
-                            window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                            handleCloseDocument();
-                          }}
-                          className="bg-orange-500 hover:bg-orange-600 text-white w-full"
-                          size="lg"
-                        >
-                          <ExternalLink className="h-5 w-5 mr-2" />
-                          Abrir en Safari
-                        </Button>
-                        <Button
-                          onClick={handleCloseDocument}
-                          variant="outline"
-                          className="w-full"
-                          size="sm"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <iframe
-                    src={selectedDocument.url}
-                    title={selectedDocument.title}
-                    className="w-full h-full"
-                    style={{ 
-                      border: 'none', 
-                      minHeight: 'calc(100vh - 80px)',
-                      width: '100%',
-                      height: '100%',
-                    }}
-                    allow="fullscreen"
-                    onLoad={handleDocumentLoad}
-                    onError={() => {
-                      // Si hay error al cargar, abrir en nueva pestaña
-                      setIsDocumentLoading(false);
-                      // Remover parámetros de fragmento para la URL original
-                      const originalUrl = selectedDocument.url.split('#')[0];
-                      window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                      handleCloseDocument();
-                    }}
-                    key={selectedDocument.url} // Forzar re-render cuando cambia la URL
-                  />
-                )}
-              </>
+              <iframe
+                src={selectedDocument.url}
+                title={selectedDocument.title}
+                className="w-full h-full"
+                style={{ 
+                  border: 'none', 
+                  minHeight: 'calc(100vh - 180px)',
+                  width: '100%',
+                  height: '100%',
+                }}
+                allow="fullscreen"
+                onLoad={handleDocumentLoad}
+                key={selectedDocument.url}
+              />
             )}
             {selectedDocument && isGoogleDriveUrl(selectedDocument.url) && (
               <div className="flex items-center justify-center h-full">
@@ -1397,37 +1327,8 @@ const CourseDetailPage = () => {
               </div>
             )}
           </div>
-          {/* Fila 3: Botones de visto y cerrar - En mobile ocupa toda la fila */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2 p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
-            {/* Controles de navegación para mobile - Solo visible en mobile */}
-            {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
-              <div className="flex sm:hidden items-center justify-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handlePreviousDocument}
-                  className="h-8 w-8"
-                  disabled={selectedDocument.currentIndex === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-xs text-slate-500 dark:text-slate-400 px-2">
-                  {selectedDocument.currentIndex! + 1} / {selectedDocument.documents.length}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleNextDocument}
-                  className="h-8 w-8"
-                  disabled={selectedDocument.currentIndex === selectedDocument.documents.length - 1}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            
-            {/* Botones de acción */}
-            <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:justify-end">
+            <div className="flex items-center gap-2 justify-between w-full">
               {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
                 const modulo = modulos.find(m => m.titulo === selectedDocument.title);
                 const moduleId = modulo?.id || '';
@@ -1441,19 +1342,14 @@ const CourseDetailPage = () => {
                         handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
                       }
                     }}
-                    className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all flex-1 sm:flex-initial ${
+                    className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all ${
                       isDocCompleted 
                         ? 'bg-green-600 hover:bg-green-700 text-white' 
                         : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
                     }`}
                   >
                     <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                    <span className={isMobile ? 'hidden' : ''}>
-                      {isDocCompleted ? 'Completado' : 'Marcar como completado'}
-                    </span>
-                    <span className={isMobile ? '' : 'hidden'}>
-                      {isDocCompleted ? 'LEIDO' : 'LEIDO'}
-                    </span>
+                    {isDocCompleted ? 'Visto' : 'Marcar como visto'}
                   </Button>
                 );
               })()}
@@ -1461,7 +1357,7 @@ const CourseDetailPage = () => {
                 variant="outline"
                 size="lg"
                 onClick={handleCloseDocument}
-                className="h-10 px-4 sm:h-10 sm:px-6 font-medium flex-1 sm:flex-initial"
+                className="h-10 px-4 sm:h-10 sm:px-6 font-medium ml-auto"
               >
                 Cerrar
               </Button>
@@ -1469,12 +1365,13 @@ const CourseDetailPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };
 
 // Componente para cada módulo con descripción desplegable
-const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean }) => {
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void> }) => {
   const [isModuleExpanded, setIsModuleExpanded] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
@@ -1602,22 +1499,34 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             
             return (
               <div key={`doc-${index}`}>
-                {/* Botón para móvil - solo botón sin card */}
-                <Button
-                  className={`w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-                    isDocCompleted
-                      ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
-                      : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
-                  }`}
-                  onClick={() => handleOpenDocument(modulo, index)}
-                >
-                  {isDocCompleted ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  ) : (
+                {/* Botón para móvil - con opción de marcar como visto */}
+                <div className="w-full sm:hidden flex items-center gap-2">
+                  <Button
+                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                      isDocCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
+                    onClick={() => handleOpenDocument(modulo, index)}
+                  >
                     <FileText className="h-4 w-4" />
-                  )}
-                  {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
-                </Button>
+                    {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
+                  </Button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsCompleted(modulo.id, index, 'document');
+                    }}
+                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                      isDocCompleted
+                        ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                    }`}
+                    title={isDocCompleted ? 'Marcar como no visto' : 'Marcar como visto'}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                  </button>
+                </div>
                 {/* Card para desktop */}
                 <div 
                   className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
@@ -1642,19 +1551,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     {fileName}
                   </span>
                   <Button
-                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      isDocCompleted
-                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
-                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
-                    }`}
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30"
                     onClick={() => handleOpenDocument(modulo, index)}
                     disabled={!isEnabled}
                   >
-                    {isDocCompleted ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                    ) : (
-                      <FileText className="h-3.5 w-3.5" />
-                    )}
+                    <FileText className="h-3.5 w-3.5" />
                     Ver
                   </Button>
                 </div>
@@ -1675,23 +1576,35 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             
             return (
               <div key={`video-${index}`}>
-                {/* Botón para móvil - solo botón sin card */}
-                <Button
-                  className={`w-full h-10 sm:hidden px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isVideoCompleted
-                      ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
-                      : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
-                  }`}
-                  onClick={() => handleOpenVideo(modulo, index)}
-                  disabled={!isEnabled}
-                >
-                  {isVideoCompleted ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  ) : (
+                {/* Botón para móvil - con opción de marcar como visto */}
+                <div className="w-full sm:hidden flex items-center gap-2">
+                  <Button
+                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isVideoCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
+                    onClick={() => handleOpenVideo(modulo, index)}
+                    disabled={!isEnabled}
+                  >
                     <Play className="h-4 w-4" />
-                  )}
-                  {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
-                </Button>
+                    {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
+                  </Button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsCompleted(modulo.id, index, 'video');
+                    }}
+                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                      isVideoCompleted
+                        ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                    }`}
+                    title={isVideoCompleted ? 'Marcar como no visto' : 'Marcar como visto'}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                  </button>
+                </div>
                 {/* Card para desktop */}
                 <div 
                   className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${

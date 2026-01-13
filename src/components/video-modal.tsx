@@ -175,7 +175,56 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
           <div className="space-y-4">
             {/* Fila 1: Título - En mobile ocupa toda la fila, en desktop está junto con controles */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{videoTitle}</h3>
+              <div className="flex items-center justify-between w-full sm:w-auto">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{videoTitle}</h3>
+                {/* Botón de expandir para mobile - Solo visible en mobile */}
+                {!isYouTube && !isGoogleDrive && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="cursor-pointer sm:hidden"
+                    onClick={async () => {
+                      if (!videoRef.current) return;
+                      
+                      try {
+                        if (!isFullscreen) {
+                          // Entrar en pantalla completa
+                          if (videoRef.current.requestFullscreen) {
+                            await videoRef.current.requestFullscreen();
+                          } else if ((videoRef.current as any).webkitRequestFullscreen) {
+                            await (videoRef.current as any).webkitRequestFullscreen();
+                          } else if ((videoRef.current as any).mozRequestFullScreen) {
+                            await (videoRef.current as any).mozRequestFullScreen();
+                          } else if ((videoRef.current as any).msRequestFullscreen) {
+                            await (videoRef.current as any).msRequestFullscreen();
+                          }
+                        } else {
+                          // Salir de pantalla completa
+                          if (document.exitFullscreen) {
+                            await document.exitFullscreen();
+                          } else if ((document as any).webkitExitFullscreen) {
+                            await (document as any).webkitExitFullscreen();
+                          } else if ((document as any).mozCancelFullScreen) {
+                            await (document as any).mozCancelFullScreen();
+                          } else if ((document as any).msExitFullscreen) {
+                            await (document as any).msExitFullscreen();
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error al cambiar pantalla completa:', error);
+                      }
+                    }}
+                    title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                  >
+                    {isFullscreen ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
               {/* Controles de navegación - Solo visible en desktop */}
               <div className="hidden sm:flex items-center gap-2">
                 {/* Controles de navegación para múltiples videos */}
@@ -343,12 +392,12 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               )}
               
               {/* Botones de acción */}
-              <div className="flex items-center gap-2 flex-1 sm:flex-initial sm:justify-end">
+              <div className="flex items-center gap-2 justify-between w-full">
                 {onMarkAsCompleted && (
                   <Button
                     type="button"
                     variant={isCompleted ? "default" : "default"}
-                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all flex-1 sm:flex-initial ${
+                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all ${
                       isCompleted 
                         ? 'bg-green-600 hover:bg-green-700 text-white' 
                         : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
@@ -357,7 +406,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   >
                     <CheckCircle2 className="h-5 w-5 sm:mr-2" />
                     <span className={isMobile ? 'hidden' : ''}>
-                      {isCompleted ? 'Completado' : 'Marcar como completado'}
+                      {isCompleted ? 'Visto' : 'Marcar como visto'}
                     </span>
                     <span className={isMobile ? '' : 'hidden'}>
                       {isCompleted ? 'VISTO' : 'VISTO'}
@@ -367,7 +416,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 <Button
                   type="button"
                   variant="outline"
-                  className="cursor-pointer flex-1 sm:flex-initial"
+                  className="cursor-pointer ml-auto"
                   onClick={() => {
                     onClose();
                     setIsFullscreen(false);
