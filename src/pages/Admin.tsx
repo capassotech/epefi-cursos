@@ -74,6 +74,14 @@ const Admin = () => {
   const handleFileSelect = async (course: Curso, type: "planDeEstudios" | "fechasDeExamenes", file: File | null) => {
     if (!file || !firebaseUser) return;
 
+    // Validar que el usuario sea administrador
+    if (!isAdmin()) {
+      toast.error("Acceso denegado", {
+        description: "Solo los administradores pueden subir archivos.",
+      });
+      return;
+    }
+
     // Validar tipo de archivo
     if (file.type !== "application/pdf") {
       toast.error("Formato inválido", {
@@ -245,27 +253,35 @@ const Admin = () => {
                           </Button>
                         </div>
                       )}
-                      <div className="flex gap-2">
-                        <Input
-                          id={`plan-${course.id}`}
-                          type="file"
-                          accept="application/pdf"
-                          disabled={uploading && uploadType === "planDeEstudios"}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) {
-                              handleFileSelect(course, "planDeEstudios", file);
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        {uploading && uploadType === "planDeEstudios" && (
-                          <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Solo PDF, máximo 10 MB
-                      </p>
+                      {isAdmin() ? (
+                        <>
+                          <div className="flex gap-2">
+                            <Input
+                              id={`plan-${course.id}`}
+                              type="file"
+                              accept="application/pdf"
+                              disabled={uploading && uploadType === "planDeEstudios"}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) {
+                                  handleFileSelect(course, "planDeEstudios", file);
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            {uploading && uploadType === "planDeEstudios" && (
+                              <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Solo PDF, máximo 10 MB
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                          Solo los administradores pueden subir archivos
+                        </p>
+                      )}
                     </div>
 
                     {/* Fechas de Exámenes */}
@@ -295,27 +311,35 @@ const Admin = () => {
                           </Button>
                         </div>
                       )}
-                      <div className="flex gap-2">
-                        <Input
-                          id={`fechas-${course.id}`}
-                          type="file"
-                          accept="application/pdf"
-                          disabled={uploading && uploadType === "fechasDeExamenes"}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            if (file) {
-                              handleFileSelect(course, "fechasDeExamenes", file);
-                            }
-                          }}
-                          className="flex-1"
-                        />
-                        {uploading && uploadType === "fechasDeExamenes" && (
-                          <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Solo PDF, máximo 10 MB
-                      </p>
+                      {isAdmin() ? (
+                        <>
+                          <div className="flex gap-2">
+                            <Input
+                              id={`fechas-${course.id}`}
+                              type="file"
+                              accept="application/pdf"
+                              disabled={uploading && uploadType === "fechasDeExamenes"}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) {
+                                  handleFileSelect(course, "fechasDeExamenes", file);
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            {uploading && uploadType === "fechasDeExamenes" && (
+                              <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Solo PDF, máximo 10 MB
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                          Solo los administradores pueden subir archivos
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 )}
