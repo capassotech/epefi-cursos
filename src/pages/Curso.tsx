@@ -1,168 +1,1699 @@
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  BookOpen,
+  School,
+  ChevronDown,
+  Play,
+  File,
+  Info,
+  FileText,
+  ExternalLink,
+  Clock,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Play, BookOpen, Clock, Trophy, ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { Curso, Materia, Modulo } from "@/types/types";
+import CoursesService from "@/services/coursesService";
+import VideoModal from "@/components/video-modal";
+import { useAuth } from "@/contexts/AuthContext";
 
-const Curso = () => {
+const CourseDetailPage = () => {
   const navigate = useNavigate();
+  const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
+  const [loadingEnabledModules, setLoadingEnabledModules] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadingMaterias, setLoadingMaterias] = useState(true);
+  const [loadingModulos, setLoadingModulos] = useState(true);
+  const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
+  const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [loadingProgress, setLoadingProgress] = useState(true);
+  const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<{
+    id: string;
+    title: string;
+    description?: string;
+    url: string;
+    thumbnail?: string;
+    videos?: string[]; // Array de todos los videos del módulo
+    currentIndex?: number; // Índice del video actual
+  } | null>(null);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<{
+    url: string;
+    title: string;
+    documents?: string[]; // Array de todos los documentos del módulo
+    currentIndex?: number; // Índice del documento actual
+  } | null>(null);
+  const [isDocumentLoading, setIsDocumentLoading] = useState(true);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isDisabledModuleDialogOpen, setIsDisabledModuleDialogOpen] = useState(false);
 
-  const stats = [
-    { label: "Clases presenciales completadas", value: "3/17", progress: 18 },
-    { label: "Tiempo de cursado", value: "10.5h", progress: 18 },
-    { label: "Unidades de teoría", value: "1/6", progress: 16 },
-  ];
+  // Detectar iOS
+  useEffect(() => {
+    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(iOS);
+  }, []);
 
-  const recentActivity = [
-    { type: "class", title: "Anatomía del esqueleto humano", module: "Módulo 1", duration: "70 min" },
-    { type: "theory", title: "Anatomía del esqueleto humano", unit: "Módulo 1", readTime: "30 min" },
-    // { type: "class", title: "Articulaciones", module: "Módulo 2", duration: "60 min" },
-    // { type: "theory", title: "Articulaciones", unit: "Módulo 2", readTime: "30 min" },
-    // { type: "class", title: "Planos y ejes corporales", module: "Módulo 3", duration: "30 min" },
-    // { type: "theory", title: "Planos y ejes corporales", unit: "Módulo 3", readTime: "30 min" },
-    // { type: "class", title: "Músculos", module: "Módulo 4", duration: "30 min" },
-    // { type: "theory", title: "Músculos", unit: "Módulo 4", readTime: "30 min" },
-    // { type: "class", title: "Fisiología muscular", module: "Módulo 5", duration: "30 min" },
-    // { type: "theory", title: "Fisiología muscular", unit: "Módulo 5", readTime: "30 min" },
-    // { type: "class", title: "Análisis del Movimiento", module: "Módulo 6", duration: "30 min" },
-    // { type: "theory", title: "Análisis del Movimiento", unit: "Módulo 6", readTime: "30 min" },
-  ];
+  // Detectar mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Redirigir si el usuario está deshabilitado
+  useEffect(() => {
+    if (user && user.activo === false) {
+      navigate("/", { replace: true });
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    const fetchCourse = async () => {
+      if (!courseId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await CoursesService.getCourseById(courseId);
+        setCourseDetail(response.data);
+      } catch (error) {
+        console.error('Error fetching course:', error);
+        setCourseDetail(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourse();
+  }, [courseId]);
+
+  useEffect(() => {
+    const fetchMaterias = async () => {
+      if (!courseDetail?.materias || courseDetail.materias.length === 0) {
+        setMaterias([]);
+        setLoadingMaterias(false);
+        return;
+      }
+
+      try {
+        const materiasPromises = courseDetail.materias.map(async (materiaId) => {
+          const responseMateria = await CoursesService.getMateriasByCourseId(materiaId);
+          const materiaData = responseMateria.data;
+          return Array.isArray(materiaData) ? materiaData : [materiaData];
+        });
+
+        const materiasArrays = await Promise.all(materiasPromises);
+        const allMaterias = materiasArrays.flat();
+        setMaterias(allMaterias);
+        setLoadingMaterias(false);
+      } catch (error) {
+        console.error('Error fetching materias:', error);
+        setMaterias([]);
+        setLoadingMaterias(false);
+      }
+    };
+
+    fetchMaterias();
+  }, [courseDetail]);
+
+
+  useEffect(() => {
+    const fetchModulos = async () => {
+      if (!materias || materias.length === 0) {
+        setModulos([]);
+        setLoadingModulos(false);
+        return;
+      }
+
+      try {
+        setLoadingModulos(true);
+        const allModulosPromises: Promise<Modulo[]>[] = [];
+
+        materias.forEach((materia) => {
+          if (materia.modulos && materia.modulos.length > 0) {
+            materia.modulos.forEach((moduloId) => {
+              allModulosPromises.push(
+                CoursesService.getModulosByMateriaId(moduloId).then((response) => {
+                  const moduloData = response.data;
+                  return Array.isArray(moduloData) ? moduloData : [moduloData];
+                })
+              );
+            });
+          }
+        });
+
+        const modulosArrays = await Promise.all(allModulosPromises);
+        const allModulos = modulosArrays.flat();
+        setModulos(allModulos);
+        setLoadingModulos(false);
+      } catch (error) {
+        console.error('Error fetching modulos:', error);
+        setModulos([]);
+        setLoadingModulos(false);
+      }
+    };
+
+    fetchModulos();
+  }, [materias]);
+
+  // Cargar módulos habilitados del estudiante
+  useEffect(() => {
+    const fetchEnabledModules = async () => {
+      if (!user?.uid) {
+        setEnabledModules({});
+        setLoadingEnabledModules(false);
+        return;
+      }
+
+      try {
+        setLoadingEnabledModules(true);
+        const response = await CoursesService.getStudentModules(user.uid);
+        const modulosHabilitados = response.data?.modulos_habilitados || {};
+        setEnabledModules(modulosHabilitados);
+      } catch (error) {
+        console.error('Error fetching enabled modules:', error);
+        // Si hay error, asumir que todos los módulos están habilitados por defecto
+        setEnabledModules({});
+      } finally {
+        setLoadingEnabledModules(false);
+      }
+    };
+
+    fetchEnabledModules();
+  }, [user?.uid]);
+
+  // Cargar progreso del estudiante
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!user?.uid) {
+        setProgress({});
+        setLoadingProgress(false);
+        return;
+      }
+
+      try {
+        setLoadingProgress(true);
+        const response = await CoursesService.getStudentProgress(user.uid);
+        const progressData = response.data?.progreso || {};
+        setProgress(progressData);
+      } catch (error: any) {
+        // Si el endpoint no existe (404), simplemente inicializar con objeto vacío
+        if (error?.response?.status === 404) {
+          console.log('Endpoint de progreso no disponible todavía, inicializando vacío');
+          setProgress({});
+        } else {
+          console.error('Error fetching progress:', error);
+          setProgress({});
+        }
+      } finally {
+        setLoadingProgress(false);
+      }
+    };
+
+    fetchProgress();
+  }, [user?.uid]);
+
+  // Efecto para posicionar la página al principio cuando se carga el curso
+  useEffect(() => {
+    // Hacer scroll al principio cuando se carga el curso
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [courseId]);
+
+  // Efecto para manejar el filtro de módulo desde la URL
+  useEffect(() => {
+    // Soporta tanto "modulo" como "module" para compatibilidad
+    const moduloId = searchParams.get("modulo") || searchParams.get("module");
+    
+    if (!moduloId || modulos.length === 0 || materias.length === 0) {
+      return;
+    }
+
+    // Encontrar el módulo y su materia correspondiente
+    const modulo = modulos.find(m => m.id === moduloId);
+    if (!modulo) {
+      return;
+    }
+
+    const materiaId = modulo.id_materia;
+    const materia = materias.find(m => m.id === materiaId);
+    if (!materia) {
+      return;
+    }
+
+    // Abrir automáticamente la materia si no está abierta
+    setExpandedMaterias(prev => {
+      if (!prev.includes(materiaId)) {
+        return [...prev, materiaId];
+      }
+      return prev;
+    });
+
+    // Hacer scroll al módulo después de un pequeño delay para asegurar que el DOM esté actualizado
+    // Aumentamos el delay para que primero se posicione al principio
+    const scrollTimeout = setTimeout(() => {
+      const moduloElement = moduloRefs.current[moduloId];
+      if (moduloElement) {
+        moduloElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+        
+        // Resaltar el módulo
+        setHighlightedModuloId(moduloId);
+        
+        // Remover el resaltado después de 3 segundos
+        setTimeout(() => {
+          setHighlightedModuloId(null);
+        }, 3000);
+      }
+    }, 800);
+
+    return () => clearTimeout(scrollTimeout);
+  }, [searchParams, modulos, materias]);
+
+
+  // Función para convertir URL de YouTube o Google Drive al formato embed
+  const convertYouTubeToEmbed = (url: string): string => {
+    if (!url) return url;
+    
+    try {
+      // Google Drive
+      if (url.includes('drive.google.com')) {
+        // Extraer el ID del archivo de diferentes formatos de Google Drive
+        let fileId = '';
+        
+        // Formato: drive.google.com/file/d/FILE_ID/view
+        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (fileMatch && fileMatch[1]) {
+          fileId = fileMatch[1];
+        }
+        // Formato: drive.google.com/open?id=FILE_ID
+        else if (url.includes('id=')) {
+          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+          if (idMatch && idMatch[1]) {
+            fileId = idMatch[1];
+          }
+        }
+        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
+        else if (url.includes('/folders/')) {
+          // Para carpetas, no podemos hacer embed, retornar URL original
+          return url;
+        }
+        
+        if (fileId) {
+          // Usar el formato preview de Google Drive para videos
+          return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+        
+        return url;
+      }
+      
+      // YouTube
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        // Si ya es una URL embed, retornarla tal cual
+        if (url.includes('youtube.com/embed/')) {
+          return url;
+        }
+        
+        const urlObj = new URL(url);
+        let videoId = '';
+        
+        // Formato: youtube.com/watch?v=VIDEO_ID
+        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
+          videoId = urlObj.searchParams.get('v') || '';
+        }
+        // Formato: youtu.be/VIDEO_ID
+        else if (urlObj.hostname.includes('youtu.be')) {
+          videoId = urlObj.pathname.replace('/', '').split('?')[0];
+        }
+        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
+        else if (urlObj.pathname.includes('/embed/')) {
+          return url;
+        }
+        
+        if (videoId) {
+          return `https://www.youtube.com/embed/${videoId}`;
+        }
+      }
+      
+      // Si no es YouTube ni Google Drive, retornar la URL original
+      return url;
+    } catch {
+      // Si no es una URL válida, retornar tal cual
+      return url;
+    }
+  };
+
+  const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) => {
+    // Verificar si el módulo está habilitado
+    if (enabledModules[modulo.id] === false) {
+      setIsDisabledModuleDialogOpen(true);
+      return; // No permitir abrir si está deshabilitado
+    }
+    
+    // Obtener array de videos (puede ser string, array, o undefined)
+    let videos: string[] = [];
+    if (modulo.url_video) {
+      if (Array.isArray(modulo.url_video)) {
+        videos = modulo.url_video;
+      } else {
+        videos = [modulo.url_video];
+      }
+    }
+    
+    if (videos.length === 0) {
+      console.error('No hay videos disponibles');
+      return;
+    }
+    
+    // Asegurar que el índice esté dentro del rango
+    const validIndex = Math.max(0, Math.min(videoIndex, videos.length - 1));
+    const videoUrl = videos[validIndex];
+    
+    // Marcar como visto automáticamente al abrir
+    const isVideoCompleted = isContentCompleted(modulo.id, validIndex, 'video');
+    if (!isVideoCompleted && user?.uid) {
+      handleMarkAsCompleted(modulo.id, validIndex, 'video');
+    }
+    
+    // Convertir URL de YouTube o Google Drive al formato embed si es necesario
+    const embedUrl = convertYouTubeToEmbed(videoUrl);
+    
+    setSelectedVideo({
+      id: modulo.id,
+      title: modulo.titulo,
+      url: embedUrl,
+      thumbnail: modulo.url_miniatura,
+      videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
+      currentIndex: validIndex,
+    });
+    setIsVideoModalOpen(true);
+  };
+
+  const handleCloseVideo = () => {
+    setIsVideoModalOpen(false);
+    setSelectedVideo(null);
+  };
+
+  // Función para cambiar al siguiente video
+  const handleNextVideo = () => {
+    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
+    const nextIndex = (selectedVideo.currentIndex + 1) % selectedVideo.videos.length;
+    const nextUrl = selectedVideo.videos[nextIndex];
+    const embedUrl = convertYouTubeToEmbed(nextUrl);
+    setSelectedVideo({
+      ...selectedVideo,
+      url: embedUrl,
+      currentIndex: nextIndex,
+    });
+  };
+
+  // Función para cambiar al video anterior
+  const handlePreviousVideo = () => {
+    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
+    const prevIndex = (selectedVideo.currentIndex - 1 + selectedVideo.videos.length) % selectedVideo.videos.length;
+    const prevUrl = selectedVideo.videos[prevIndex];
+    const embedUrl = convertYouTubeToEmbed(prevUrl);
+    setSelectedVideo({
+      ...selectedVideo,
+      url: embedUrl,
+      currentIndex: prevIndex,
+    });
+  };
+
+  // Función para detectar si es una URL de Google Drive
+  const isGoogleDriveUrl = (url: string): boolean => {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    return urlLower.includes('drive.google.com') || 
+           urlLower.includes('docs.google.com') ||
+           urlLower.includes('googleusercontent.com') ||
+           urlLower.startsWith('https://drive.google.com') ||
+           urlLower.startsWith('http://drive.google.com');
+  };
+
+  // Función para formatear la URL del PDF con parámetros de zoom
+  const formatPDFUrl = (url: string): string => {
+    if (!url) return url;
+    
+    // Remover cualquier fragmento existente para evitar conflictos
+    const baseUrl = url.split('#')[0];
+    
+    // Agregar parámetros para que el PDF se muestre completo y permita zoom manual
+    // #view=FitH ajusta horizontalmente (muestra toda la página)
+    // #toolbar=1 muestra la barra de herramientas para zoom manual
+    // #navpanes=0 oculta el panel de navegación para más espacio
+    // #scrollbar=1 muestra la barra de desplazamiento
+    return `${baseUrl}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
+  };
+
+  const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) => {
+    // Verificar si el módulo está habilitado
+    if (enabledModules[modulo.id] === false) {
+      setIsDisabledModuleDialogOpen(true);
+      return; // No permitir abrir si está deshabilitado
+    }
+    if (!modulo.url_archivo) {
+      console.error('No hay URL de archivo disponible');
+      return;
+    }
+
+    // Parsear documentos (puede ser string simple o string con delimitador |||)
+    let documents: string[] = [];
+    if (modulo.url_archivo) {
+      if (modulo.url_archivo.includes('|||')) {
+        documents = modulo.url_archivo.split('|||').filter(url => url.trim());
+      } else {
+        documents = [modulo.url_archivo];
+      }
+    }
+    
+    if (documents.length === 0) {
+      console.error('No hay documentos disponibles');
+      return;
+    }
+    
+    // Asegurar que el índice esté dentro del rango
+    const validIndex = Math.max(0, Math.min(documentIndex, documents.length - 1));
+    const selectedUrl = documents[validIndex];
+
+    // Marcar como viso automáticamente al abrir
+    const isDocCompleted = isContentCompleted(modulo.id, validIndex, 'document');
+    if (!isDocCompleted && user?.uid) {
+      handleMarkAsCompleted(modulo.id, validIndex, 'document');
+    }
+
+    // En mobile: abrir directamente en nueva pestaña (sin modal)
+    // En desktop: abrir modal como antes
+    if (isMobile) {
+      const link = document.createElement('a');
+      link.href = selectedUrl.split('#')[0];
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // Desktop: abrir modal
+    setIsDocumentLoading(true);
+    const formattedUrl = formatPDFUrl(selectedUrl);
+    setSelectedDocument({
+      url: formattedUrl,
+      title: modulo.titulo,
+      documents: documents,
+      currentIndex: validIndex,
+    });
+    setIsDocumentModalOpen(true);
+  };
+
+  const handleCloseDocument = () => {
+    setIsDocumentModalOpen(false);
+    setSelectedDocument(null);
+    setIsDocumentLoading(true);
+  };
+
+  // Función para cambiar al siguiente documento
+  const handleNextDocument = () => {
+    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
+    const nextIndex = (selectedDocument.currentIndex + 1) % selectedDocument.documents.length;
+    const nextUrl = selectedDocument.documents[nextIndex];
+    
+    // Detectar si es una URL de Google Drive
+    if (isGoogleDriveUrl(nextUrl)) {
+      window.open(nextUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    setIsDocumentLoading(true);
+    const formattedUrl = formatPDFUrl(nextUrl);
+    setSelectedDocument({
+      ...selectedDocument,
+      url: formattedUrl,
+      currentIndex: nextIndex,
+    });
+  };
+
+  // Función para cambiar al documento anterior
+  const handlePreviousDocument = () => {
+    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
+    const prevIndex = (selectedDocument.currentIndex - 1 + selectedDocument.documents.length) % selectedDocument.documents.length;
+    const prevUrl = selectedDocument.documents[prevIndex];
+    
+    // Detectar si es una URL de Google Drive
+    if (isGoogleDriveUrl(prevUrl)) {
+      window.open(prevUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
+    setIsDocumentLoading(true);
+    const formattedUrl = formatPDFUrl(prevUrl);
+    setSelectedDocument({
+      ...selectedDocument,
+      url: formattedUrl,
+      currentIndex: prevIndex,
+    });
+  };
+
+  const handleDocumentLoad = () => {
+    setIsDocumentLoading(false);
+  };
+
+
+  // Función para marcar contenido como completado
+  const handleMarkAsCompleted = async (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => {
+    if (!user?.uid) return;
+
+    try {
+      const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+      const moduleProgress = progress[moduleId] || {};
+      const isCompleted = moduleProgress[contentKey] === true;
+
+      // Actualizar el estado local primero para feedback inmediato
+      setProgress(prev => ({
+        ...prev,
+        [moduleId]: {
+          ...prev[moduleId],
+          [contentKey]: !isCompleted
+        }
+      }));
+
+      // Llamar al backend
+      await CoursesService.markContentAsCompleted(user.uid, moduleId, contentIndex, contentType, !isCompleted);
+    } catch (error) {
+      console.error('Error marking content as completed:', error);
+      // Revertir el cambio en caso de error
+      const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+      const moduleProgress = progress[moduleId] || {};
+      const isCompleted = moduleProgress[contentKey] === true;
+      setProgress(prev => ({
+        ...prev,
+        [moduleId]: {
+          ...prev[moduleId],
+          [contentKey]: isCompleted
+        }
+      }));
+    }
+  };
+
+  // Función para verificar si un contenido está completado
+  const isContentCompleted = (moduleId: string, contentIndex: number, contentType: 'video' | 'document'): boolean => {
+    const contentKey = `${moduleId}_${contentType}_${contentIndex}`;
+    const moduleProgress = progress[moduleId] || {};
+    return moduleProgress[contentKey] === true;
+  };
+
+  // Calcular progreso del curso
+  const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
+    let completed = 0;
+    let total = 0;
+
+    materias.forEach(materia => {
+      const materiasModulos = modulos
+        .filter(modulo => modulo.id_materia === materia.id)
+        .filter(modulo => enabledModules[modulo.id] !== false);
+
+      materiasModulos.forEach(modulo => {
+        // Contar videos
+        if (modulo.url_video) {
+          const videos = Array.isArray(modulo.url_video) ? modulo.url_video : [modulo.url_video];
+          videos.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'video')) {
+              completed++;
+            }
+          });
+        }
+
+        // Contar documentos
+        if (modulo.url_archivo) {
+          const documents = modulo.url_archivo.includes('|||') 
+            ? modulo.url_archivo.split('|||').filter(url => url.trim())
+            : [modulo.url_archivo];
+          documents.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'document')) {
+              completed++;
+            }
+          });
+        }
+      });
+    });
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
+  };
+
+  // Función para formatear fechas
+  const formatDate = (date: string | Date | any | undefined): string => {
+    if (!date) return "";
+    
+    try {
+      let dateObj: Date | null = null;
+      
+      // Si es null o undefined, retornar vacío
+      if (date === null || date === undefined) {
+        return "";
+      }
+      
+      // Si es un string vacío, retornar vacío
+      if (typeof date === "string" && date.trim() === "") {
+        return "";
+      }
+      
+      // Si es un Timestamp de Firestore con toDate (verificar primero)
+      if (date && typeof date === "object" && typeof date.toDate === "function") {
+        try {
+          dateObj = date.toDate();
+        } catch (e) {
+          console.warn("Error calling toDate():", e);
+        }
+      }
+      
+      // Si es un objeto con seconds (Timestamp de Firestore serializado)
+      if (!dateObj && date && typeof date === "object" && typeof date.seconds === "number") {
+        dateObj = new Date(date.seconds * 1000);
+      }
+      
+      // Si tiene _seconds (otro formato de Timestamp)
+      if (!dateObj && date && typeof date === "object" && typeof date._seconds === "number") {
+        dateObj = new Date(date._seconds * 1000);
+      }
+      
+      // Si es un objeto Date, usar directamente
+      if (!dateObj && date instanceof Date) {
+        dateObj = date;
+      }
+      
+      // Si es un número (timestamp en milisegundos)
+      if (!dateObj && typeof date === "number" && !isNaN(date) && date > 0) {
+        dateObj = new Date(date);
+      }
+      
+      // Si es un string, intentar parsear
+      if (!dateObj && typeof date === "string") {
+        // Intentar parsear como ISO string
+        dateObj = new Date(date);
+        // Si no es válido, intentar otros formatos
+        if (isNaN(dateObj.getTime())) {
+          // Intentar parsear como timestamp numérico
+          const numDate = Number(date);
+          if (!isNaN(numDate) && numDate > 0) {
+            dateObj = new Date(numDate);
+          } else {
+            return "";
+          }
+        }
+      }
+      
+      // Si es un objeto con método getTime, intentar crear Date
+      if (!dateObj && date && typeof date.getTime === "function") {
+        try {
+          dateObj = new Date(date.getTime());
+        } catch (e) {
+          console.warn("Error creating Date from getTime():", e);
+        }
+      }
+      
+      // Último intento: convertir directamente
+      if (!dateObj) {
+        try {
+          dateObj = new Date(date);
+        } catch (e) {
+          console.warn("Error creating Date:", e);
+        }
+      }
+      
+      // Validar que sea una fecha válida
+      if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) {
+        console.warn("Fecha inválida o no pudo ser parseada:", date);
+        return "";
+      }
+      
+      return new Intl.DateTimeFormat("es-AR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(dateObj);
+    } catch (error) {
+      console.error("Error formatting date:", error, date);
+      return "";
+    }
+  };
+
+
+  // Componente Skeleton para el loading
+  const CourseSkeleton = () => (
+    <div className="min-h-screen bg-white dark:bg-slate-950">
+      {/* Header Skeleton */}
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
+          <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-16 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+            <div className="h-5 w-48 sm:w-64 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+          </div>
+          <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+        </div>
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-6">
+        <div className="flex flex-col gap-6">
+          {/* Contenido principal skeleton */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+              <div className="h-5 w-32 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+              <div className="h-5 w-40 bg-slate-200 dark:bg-slate-800 rounded mb-4 sm:mb-5 animate-pulse"></div>
+              
+              {/* Skeleton de materias */}
+              <div className="space-y-2.5 sm:space-y-3">
+                {[1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="border border-slate-200 dark:border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 sm:py-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                        <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                      </div>
+                      <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  );
+
+  if (loading) {
+    return <CourseSkeleton />;
+  }
+
+  if (!courseDetail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-slate-950">
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">Curso no encontrado</p>
+          <Button variant="outline" onClick={() => navigate("/")}>Volver al inicio</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
-      {/* Hero Section */}
-      <div className="text-center space-y-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-4">
-          <Trophy className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-white dark:bg-slate-950">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full text-slate-600 dark:text-slate-300"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1">
+            <p className="text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100" data-testid="course-title">
+              {courseDetail.titulo}
+            </h1>
+            {/* Fechas de dictado */}
+            {(courseDetail.fechaInicioDictado || courseDetail.fechaFinDictado) && (
+              <div className="mt-1.5 space-y-0.5">
+                {courseDetail.fechaInicioDictado && (
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span className="font-medium">Inicio:</span>
+                    <span>{formatDate(courseDetail.fechaInicioDictado)}</span>
+                  </div>
+                )}
+                {courseDetail.fechaFinDictado && (
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3 h-3 flex-shrink-0 opacity-0 sm:opacity-100" />
+                    <span className="font-medium">Fin:</span>
+                    <span>{formatDate(courseDetail.fechaFinDictado)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full text-slate-600 dark:text-slate-300 hover:text-orange-500 dark:hover:text-orange-400"
+            onClick={() => setIsInfoModalOpen(true)}
+            aria-label="Información del curso"
+          >
+            <Info className="h-5 w-5" />
+          </Button>
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold text-primary">
-          Instructorado de fitness grupal
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300 max-w-md mx-auto">
-          Clases grabadas y material teórico para que puedas estudiar a tu ritmo
-        </p>
-      </div>
+      </header>
 
-      {/* Progress Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map((stat, index) => (
-          <Card key={index} className="bg-background border-border shadow-lg">
-            <CardHeader className="pb-2">
-              <CardDescription>{stat.label}</CardDescription>
-              <CardTitle className="text-2xl">{stat.value}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Progress value={stat.progress} className="h-2" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
+          {/* Barra de progreso fija */}
+          {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
+            const courseProgress = calculateCourseProgress();
+            
+            // Función para determinar el color según el progreso
+            const getProgressColor = (percentage: number): string => {
+              if (percentage < 34) {
+                // Rojo para bajo progreso (0-33%)
+                return "bg-gradient-to-r from-red-400 to-red-500";
+              } else if (percentage < 67) {
+                // Amarillo para progreso medio (34-66%)
+                return "bg-gradient-to-r from-yellow-400 to-yellow-500";
+              } else {
+                // Verde para alto progreso (67-100%)
+                return "bg-gradient-to-r from-green-400 to-green-500";
+              }
+            };
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card 
-          className="bg-primary text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-          onClick={() => navigate("/classes")}
-        >
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Play className="w-5 h-5" />
-                  Clases Grabadas
-                </CardTitle>
-                <CardDescription className="text-white/80">
-                  Videos organizados por módulo
-                </CardDescription>
-              </div>
-              <ChevronRight className="w-6 h-6" />
-            </div>
-          </CardHeader>
-        </Card>
-
-        <Card 
-          className="bg-black text-white border-0 shadow-lg cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-          onClick={() => navigate("/theory")}
-        >
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="w-5 h-5" />
-                  Material Teórico
-                </CardTitle>
-                <CardDescription className="text-white/80">
-                  Todo lo que necesitas para estudiar
-                </CardDescription>
-              </div>
-              <ChevronRight className="w-6 h-6" />
-            </div>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
-            Actividad Reciente
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {recentActivity.map((item, index) => (
-            <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                  item.type === 'class' 
-                    ? 'bg-primary/10 dark:bg-primary/20 text-primary'
-                    : 'bg-black/10 dark:bg-white/10 text-black dark:text-white'
-                }`}>
-                  {item.type === 'class' ? <Play className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+            return (
+              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
+                {/* Texto solo visible en desktop */}
+                <div className="hidden sm:flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
+                  <span className="text-slate-600 dark:text-slate-400">
+                    {courseProgress.completed} de {courseProgress.total} completados
+                  </span>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{item.title}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {item.type === 'class' ? item.module : item.unit}
+                {/* Barra de progreso - más delgada en mobile */}
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1 sm:h-3 overflow-hidden">
+                  <div
+                    className={`h-full ${getProgressColor(courseProgress.percentage)} transition-all duration-500 ease-out rounded-full`}
+                    style={{ width: `${courseProgress.percentage}%` }}
+                  />
+                </div>
+                {/* Porcentaje - solo visible en desktop */}
+                <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 text-center">
+                  {courseProgress.percentage}% completado
+                </p>
+                {/* En mobile, mostrar solo el porcentaje de forma compacta */}
+                <div className="flex sm:hidden items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">
+                    {courseProgress.percentage}%
+                  </span>
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {courseProgress.completed}/{courseProgress.total}
+                  </span>
+                </div>
+              </section>
+            );
+          })()}
+
+          <section className="space-y-3 sm:space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <School className="h-4 w-4 text-orange-500" />
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Contenido del curso</h2>
+            </div>
+
+            {materias.length > 0 ? (
+              <Accordion 
+                type="multiple" 
+                className="w-full space-y-2.5 sm:space-y-3"
+                value={expandedMaterias}
+                onValueChange={setExpandedMaterias}
+              >
+                {materias
+                  .filter((materia) => {
+                    // Obtener todos los módulos de esta materia
+                    const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
+                    
+                    // Mostrar la materia si tiene módulos (habilitados o deshabilitados)
+                    return materiasModulos.length > 0;
+                  })
+                  .map((materia) => {
+                    // Mostrar todos los módulos (habilitados y deshabilitados)
+                    const materiasModulos = modulos
+                      .filter(modulo => modulo.id_materia === materia.id);
+
+                  return (
+                    <AccordionItem
+                      key={materia.id}
+                      value={materia.id}
+                      className="border border-slate-200 dark:border-slate-700 rounded-lg px-4 sm:px-5 bg-white dark:bg-slate-900/70"
+                    >
+                          <AccordionTrigger className="hover:no-underline py-3.5 sm:py-4">
+                            <div className="flex items-center gap-3 text-left w-full">
+                              <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block">
+                                  {materia.nombre}
+                                </span>
+                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                  {materiasModulos.length} módulo{materiasModulos.length !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+
+                          <AccordionContent className="pb-4 sm:pb-5 pt-0">
+                            {loadingModulos ? (
+                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                                {[1, 2, 3].map((item) => (
+                                  <div
+                                    key={item}
+                                    className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-md bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50"
+                                  >
+                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-1.5 sm:mt-2 animate-pulse"></div>
+                                    <div className="flex-1 min-w-0 space-y-2">
+                                      <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                      <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                      <div className="h-3 w-5/6 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                      <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4">
+                                        <div className="h-7 sm:h-8 w-24 sm:w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                        <div className="h-7 sm:h-8 w-20 sm:w-28 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : loadingEnabledModules ? (
+                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
+                              </div>
+                            ) : materiasModulos.length > 0 ? (
+                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                                {materiasModulos.map((modulo, index) => (
+                                  <div
+                                    key={modulo.id}
+                                    ref={(el) => {
+                                      moduloRefs.current[modulo.id] = el;
+                                    }}
+                                  >
+                                    <ModuleItem 
+                                      modulo={modulo} 
+                                      handleOpenDocument={handleOpenDocument} 
+                                      handleOpenVideo={handleOpenVideo}
+                                      isHighlighted={highlightedModuloId === modulo.id}
+                                      isEnabled={enabledModules[modulo.id] !== false}
+                                      isContentCompleted={isContentCompleted}
+                                      handleMarkAsCompleted={handleMarkAsCompleted}
+                                      onDisabledClick={() => setIsDisabledModuleDialogOpen(true)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 px-4 sm:px-5 py-2 leading-relaxed">
+                                No hay módulos disponibles para esta materia.
+                              </div>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+              </Accordion>
+            ) : loadingMaterias ? (
+              <div className="space-y-2.5 sm:space-y-3">
+                {[1, 2].map((item) => (
+                  <div
+                    key={item}
+                    className="border border-slate-200 dark:border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 sm:py-4 bg-white dark:bg-slate-900/70"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-2 w-2 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                        <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                      </div>
+                      <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  No hay materias asignadas a este curso.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Sección de documentos del curso */}
+          {(courseDetail?.planDeEstudiosUrl || courseDetail?.fechasDeExamenesUrl) && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-orange-500" />
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Documentos del curso</h2>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                <div className="space-y-3">
+                  {/* Plan de Estudios */}
+                  {courseDetail.planDeEstudiosUrl && (
+                    <div className="flex items-center justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
+                          Plan de Estudios
+                        </h4>
+                        {courseDetail.planDeEstudiosFechaActualizacion && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
+                            <Clock className="h-3 w-3" />
+                            Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm flex-shrink-0"
+                        asChild
+                      >
+                        <a
+                          href={courseDetail.planDeEstudiosUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Ver
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Fechas de Exámenes */}
+                  {courseDetail.fechasDeExamenesUrl && (
+                    <div className="flex items-center justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
+                          Fechas de Exámenes
+                        </h4>
+                        {courseDetail.fechasDeExamenesFechaActualizacion && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
+                            <Clock className="h-3 w-3" />
+                            Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm flex-shrink-0"
+                        asChild
+                      >
+                        <a
+                          href={courseDetail.fechasDeExamenesUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Ver
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
+
+      {/* Modal de información del curso */}
+      <Dialog open={isInfoModalOpen} onOpenChange={setIsInfoModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-orange-500" />
+              Información del curso
+            </DialogTitle>
+          </DialogHeader>
+          <div className="pt-2 space-y-4">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+              {courseDetail?.descripcion || 'Descripción no disponible'}
+            </p>
+            
+            {/* Fechas de dictado */}
+            {(courseDetail?.fechaInicioDictado || courseDetail?.fechaFinDictado) && (
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                  Fechas de dictado
+                </h3>
+                <div className="space-y-1.5">
+                  {courseDetail.fechaInicioDictado && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="font-medium min-w-[60px]">Inicio:</span>
+                      <span>{formatDate(courseDetail.fechaInicioDictado)}</span>
+                    </div>
+                  )}
+                  {courseDetail.fechaFinDictado && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <span className="font-medium min-w-[60px]">Fin:</span>
+                      <span>{formatDate(courseDetail.fechaFinDictado)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <VideoModal
+        isOpen={isVideoModalOpen}
+        onClose={handleCloseVideo}
+        content={selectedVideo}
+        onNextVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handleNextVideo : undefined}
+        onPreviousVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handlePreviousVideo : undefined}
+        onMarkAsCompleted={selectedVideo ? () => {
+          if (selectedVideo.currentIndex !== undefined) {
+            handleMarkAsCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video');
+          }
+        } : undefined}
+        isCompleted={selectedVideo && selectedVideo.currentIndex !== undefined ? isContentCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video') : false}
+      />
+
+      {/* Modal de documento para desktop */}
+      <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
+        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
+          <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+              <div className="flex-1 min-w-0">
+                <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedDocument?.title || 'Documento'}
+                </DialogTitle>
+                {selectedDocument?.documents && selectedDocument.documents.length > 1 && selectedDocument.currentIndex !== undefined && (
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                    Documento {selectedDocument.currentIndex + 1} de {selectedDocument.documents.length}
+                  </p>
+                )}
+              </div>
+              <div className="hidden sm:flex items-center gap-2">
+                {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handlePreviousDocument}
+                      className="h-8 w-8"
+                      disabled={selectedDocument.currentIndex === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleNextDocument}
+                      className="h-8 w-8"
+                      disabled={selectedDocument.currentIndex === selectedDocument.documents.length - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
+            {isDocumentLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-950 z-10">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
+                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
+                    Cargando documento...
                   </p>
                 </div>
               </div>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {item.type === 'class' ? item.duration : item.readTime}
-              </span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Call to Action */}
-      <Card className="bg-primary text-white border-0 shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">¿Listo para continuar aprendiendo?</CardTitle>
-          <CardDescription className="text-white/80">
-            Accede a todo tu contenido educativo organizado y optimizado para mobile
-          </CardDescription>
-          <div className="pt-4 space-x-4">
-            <Button 
-              variant="secondary" 
-              onClick={() => navigate("/classes")}
-              className="bg-white text-primary hover:bg-gray-100"
-            >
-              Ver Clases
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => navigate("/theory")}
-              className="border-white text-white hover:bg-white/10"
-            >
-              Estudiar Teoría
-            </Button>
+            )}
+            {selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
+              <iframe
+                src={selectedDocument.url}
+                title={selectedDocument.title}
+                className="w-full h-full"
+                style={{ 
+                  border: 'none', 
+                  minHeight: 'calc(100vh - 180px)',
+                  width: '100%',
+                  height: '100%',
+                }}
+                allow="fullscreen"
+                onLoad={handleDocumentLoad}
+                key={selectedDocument.url}
+              />
+            )}
+            {selectedDocument && isGoogleDriveUrl(selectedDocument.url) && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center p-6">
+                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-4">
+                    Este documento se abrirá en una nueva pestaña
+                  </p>
+                  <Button
+                    onClick={() => {
+                      window.open(selectedDocument.url, '_blank', 'noopener,noreferrer');
+                      handleCloseDocument();
+                    }}
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                  >
+                    Abrir documento
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
-        </CardHeader>
-      </Card>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2 p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
+            <div className="flex items-center gap-2 justify-between w-full">
+              {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
+                const modulo = modulos.find(m => m.titulo === selectedDocument.title);
+                const moduleId = modulo?.id || '';
+                const isDocCompleted = isContentCompleted(moduleId, selectedDocument.currentIndex, 'document');
+                return (
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => {
+                      if (modulo && selectedDocument.currentIndex !== undefined) {
+                        handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
+                      }
+                    }}
+                    className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all ${
+                      isDocCompleted 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
+                    {isDocCompleted ? 'Visto' : 'Marcar como visto'}
+                  </Button>
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleCloseDocument}
+                className="h-10 px-4 sm:h-10 sm:px-6 font-medium ml-auto"
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para módulos deshabilitados */}
+      <Dialog open={isDisabledModuleDialogOpen} onOpenChange={setIsDisabledModuleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Módulo no disponible
+            </DialogTitle>
+          </DialogHeader>
+          <div className="pt-2 space-y-4">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
+              Este módulo aún no está disponible. Los módulos se habilitarán progresivamente según el plan de estudios.
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              Si tienes alguna consulta, por favor comunícate con tu profesor.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };
 
-export default Curso;
+// Componente para cada módulo con descripción desplegable
+const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted, onDisabledClick }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void>; onDisabledClick?: () => void }) => {
+  const [isModuleExpanded, setIsModuleExpanded] = useState(false);
+  const [isDescExpanded, setIsDescExpanded] = useState(false);
+  const descripcion = modulo.descripcion || '';
+  const maxLength = 150; // Caracteres para mostrar antes del "Ver más"
+  const shouldTruncate = descripcion.length > maxLength;
+  const displayDesc = shouldTruncate && !isDescExpanded 
+    ? descripcion.substring(0, maxLength) + '...'
+    : descripcion;
+
+  // Obtener array de documentos
+  const getDocuments = (): string[] => {
+    if (!modulo.url_archivo) return [];
+    if (modulo.url_archivo.includes('|||')) {
+      return modulo.url_archivo.split('|||').filter(url => url.trim());
+    }
+    return [modulo.url_archivo];
+  };
+
+  // Obtener array de videos
+  const getVideos = (): string[] => {
+    if (!modulo.url_video) return [];
+    if (Array.isArray(modulo.url_video)) {
+      return modulo.url_video;
+    }
+    return [modulo.url_video];
+  };
+
+  const documents = getDocuments();
+  const videos = getVideos();
+
+  // Verificar si todos los contenidos del módulo están completados
+  const isModuleCompleted = (): boolean => {
+    // Si no hay contenidos, no está completado
+    if (documents.length === 0 && videos.length === 0) {
+      return false;
+    }
+
+    // Verificar que todos los documentos estén completados
+    const allDocumentsCompleted = documents.every((_, index) => 
+      isContentCompleted(modulo.id, index, 'document')
+    );
+
+    // Verificar que todos los videos estén completados
+    const allVideosCompleted = videos.every((_, index) => 
+      isContentCompleted(modulo.id, index, 'video')
+    );
+
+    // El módulo está completado solo si todos los contenidos están completados
+    return allDocumentsCompleted && allVideosCompleted;
+  };
+
+  const moduleCompleted = isModuleCompleted();
+
+  return (
+    <div className={cn(
+      "flex items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
+      !isEnabled 
+        ? "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60"
+        : isHighlighted 
+          ? "bg-orange-50 dark:bg-orange-950/30 border-orange-300 dark:border-orange-700 shadow-md ring-2 ring-orange-400 dark:ring-orange-500 ring-opacity-50" 
+          : "bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-700/50"
+    )}>
+      <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0 hidden sm:block"></div>
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={() => {
+            if (!isEnabled && onDisabledClick) {
+              onDisabledClick();
+            } else {
+              setIsModuleExpanded(!isModuleExpanded);
+            }
+          }}
+          className="w-full flex items-center justify-between gap-2 text-left"
+        >
+          <h4 className={cn(
+            "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2",
+            !isEnabled
+              ? "text-slate-500 dark:text-slate-400"
+              : moduleCompleted 
+                ? "text-green-600 dark:text-green-400" 
+                : "text-slate-800 dark:text-slate-200"
+          )}>
+            {moduleCompleted && isEnabled && (
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+            )}
+            {!isEnabled && (
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            )}
+            {modulo.titulo}
+            {!isEnabled && (
+              <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">(No disponible)</span>
+            )}
+          </h4>
+          <ChevronDown className={cn(
+            "h-4 w-4 sm:h-5 sm:w-5 text-slate-500 dark:text-slate-400 transition-transform flex-shrink-0",
+            isModuleExpanded && "rotate-180"
+          )} />
+        </button>
+        {isModuleExpanded && (
+          <>
+            {descripcion && (
+              <div className="hidden sm:block mt-1.5 sm:mt-2">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {displayDesc}
+                </p>
+                {shouldTruncate && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDescExpanded(!isDescExpanded);
+                    }}
+                    className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
+                  >
+                    {isDescExpanded ? (
+                      <>
+                        Ver menos
+                        <ChevronDown className="h-3 w-3 rotate-180" />
+                      </>
+                    ) : (
+                      <>
+                        Ver más
+                        <ChevronDown className="h-3 w-3" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex flex-col gap-2 sm:gap-3 mt-2 sm:mt-4">
+          {documents.map((doc, index) => {
+            // Extraer y limpiar el nombre del archivo de forma amigable
+            // Para todos los documentos, usar el mismo formato: Documento [X]
+            const getFileName = (url: string): string => {
+              if (documents.length > 1) {
+                return `Documento ${index + 1}`;
+              }
+              return `Documento`;
+            };
+            const fileName = getFileName(doc);
+            const isDocCompleted = isContentCompleted(modulo.id, index, 'document');
+            
+            return (
+              <div key={`doc-${index}`}>
+                {/* Botón para móvil - con opción de marcar como visto */}
+                <div className="w-full sm:hidden flex items-center gap-2">
+                  <Button
+                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                      !isEnabled
+                        ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
+                        : isDocCompleted
+                          ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                          : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenDocument(modulo, index);
+                      }
+                    }}
+                    disabled={!isEnabled}
+                  >
+                    <FileText className="h-4 w-4" />
+                    {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
+                  </Button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsCompleted(modulo.id, index, 'document');
+                    }}
+                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                      isDocCompleted
+                        ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                    }`}
+                    title={isDocCompleted ? 'Marcar como no visto' : 'Marcar como visto'}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                  </button>
+                </div>
+                {/* Card para desktop */}
+                <div 
+                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    isDocCompleted
+                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  {isDocCompleted ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  ) : (
+                    <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  )}
+                  <span 
+                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                      isDocCompleted
+                        ? 'text-green-800 dark:text-green-200'
+                        : 'text-slate-800 dark:text-slate-200'
+                    }`}
+                    title={fileName}
+                  >
+                    {fileName}
+                  </span>
+                  <Button
+                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30"
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenDocument(modulo, index);
+                      }
+                    }}
+                    disabled={!isEnabled}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          {videos.map((video, index) => {
+            // Extraer y limpiar el nombre del video de forma amigable
+            // Para todos los videos, usar el mismo formato: Video [X]
+            const getVideoName = (url: string): string => {
+              if (videos.length > 1) {
+                return `Video ${index + 1}`;
+              }
+              return `Video`;
+            };
+            const videoName = getVideoName(video);
+            const isVideoCompleted = isContentCompleted(modulo.id, index, 'video');
+            
+            return (
+              <div key={`video-${index}`}>
+                {/* Botón para móvil - con opción de marcar como visto */}
+                <div className="w-full sm:hidden flex items-center gap-2">
+                  <Button
+                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      !isEnabled
+                        ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
+                        : isVideoCompleted
+                          ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/40'
+                          : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenVideo(modulo, index);
+                      }
+                    }}
+                    disabled={!isEnabled}
+                  >
+                    <Play className="h-4 w-4" />
+                    {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
+                  </Button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsCompleted(modulo.id, index, 'video');
+                    }}
+                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                      isVideoCompleted
+                        ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
+                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
+                    }`}
+                    title={isVideoCompleted ? 'Marcar como no visto' : 'Marcar como visto'}
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                  </button>
+                </div>
+                {/* Card para desktop */}
+                <div 
+                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                    isVideoCompleted
+                      ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  {isVideoCompleted ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  ) : (
+                    <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
+                  )}
+                  <span 
+                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                      isVideoCompleted
+                        ? 'text-green-800 dark:text-green-200'
+                        : 'text-slate-800 dark:text-slate-200'
+                    }`}
+                    title={videoName}
+                  >
+                    {videoName}
+                  </span>
+                  <Button
+                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isVideoCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
+                    onClick={() => {
+                      if (!isEnabled && onDisabledClick) {
+                        onDisabledClick();
+                      } else {
+                        handleOpenVideo(modulo, index);
+                      }
+                    }}
+                    disabled={!isEnabled}
+                  >
+                    {isVideoCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5" />
+                    )}
+                    Ver
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CourseDetailPage;

@@ -1,9 +1,7 @@
-// firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getDatabase } from "firebase/database";
-import { getStorage } from "firebase/storage";
 
+// Configuración de Firebase para el frontend
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -24,12 +22,10 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
   console.error("- VITE_FIREBASE_AUTH_DOMAIN");
 }
 
-// Inicializa Firebase
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
-// Exporta la instancia de autenticación
+// Exportar servicios
 export const auth = getAuth(app);
 
-// Exporta la instancia de Realtime Database
-export const database = getDatabase(app);
-export const storage = getStorage(app);
+export default app;

@@ -1,73 +1,103 @@
-# Welcome to your Lovable project
+# EPEFI Cursos
 
-## Project info
+Portal de cursos de la plataforma EPEFI.
 
-**URL**: https://lovable.dev/projects/73b57fb6-77ca-4818-b007-1c0bf93a95d8
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/73b57fb6-77ca-4818-b007-1c0bf93a95d8) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## 🚀 Inicio Rápido
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+cp env.local .env  # Usa env.qa o env.production según necesites
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Configuración de Entornos
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+El proyecto soporta **QA** y **Producción** mediante variables de entorno, cada uno con su propio backend.
 
-**Use GitHub Codespaces**
+### Archivos de Configuración
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `env.local` - Configuración para desarrollo local (usa backend de QA)
+- `env.qa` - Configuración para entorno QA
+- `env.production` - Configuración para producción
 
-## What technologies are used for this project?
+**Para desarrollo local:** Copia `env.local` a `.env`:
+```sh
+cp env.local .env
+```
 
-This project is built with:
+### Variables Requeridas
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Cada archivo de entorno contiene las siguientes variables:
 
-## How can I deploy this project?
+#### Variables de API (Backend)
+- `VITE_API_BASE_URL` - URL del backend API
+  - **QA**: `https://epefi-backend-qa.onrender.com`
+  - **Producción**: `https://epefi-backend.onrender.com`
 
-Simply open [Lovable](https://lovable.dev/projects/73b57fb6-77ca-4818-b007-1c0bf93a95d8) and click on Share -> Publish.
+#### Variables de Firebase
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID`
 
-## Can I connect a custom domain to my Lovable project?
+### Scripts de Build
 
-Yes, you can!
+El proyecto incluye scripts específicos para cada entorno:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```sh
+# Desarrollo
+npm run dev
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+# Build para QA
+npm run build:qa
+
+# Build para Producción
+npm run build:production
+
+# Build por defecto (usa .env)
+npm run build
+```
+
+### Indicador Visual
+
+Cuando el entorno es **QA**, se muestra un banner "ENTORNO PARA PRUEBAS" en la esquina superior derecha.
+
+### CI/CD (GitHub Actions)
+
+Los despliegues automáticos se ejecutan al hacer push a las ramas:
+- **develop** → Despliega a QA con backend de QA
+- **main** → Despliega a Producción con backend de Producción
+
+#### GitHub Secrets Requeridos
+
+Para QA (rama `develop`):
+- `VITE_API_BASE_URL_QA` = `https://epefi-backend-qa.onrender.com`
+- `VITE_FIREBASE_API_KEY_QA`
+- `VITE_FIREBASE_AUTH_DOMAIN_QA`
+- `VITE_FIREBASE_PROJECT_ID_QA`
+- `VITE_FIREBASE_STORAGE_BUCKET_QA`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID_QA`
+- `VITE_FIREBASE_APP_ID_QA`
+- `VITE_FIREBASE_MEASUREMENT_ID_QA`
+- `FIREBASE_SERVICE_ACCOUNT_QA`
+
+Para Producción (rama `main`):
+- `VITE_API_BASE_URL_PROD` = `https://epefi-backend.onrender.com`
+- `VITE_FIREBASE_API_KEY_PROD`
+- `VITE_FIREBASE_AUTH_DOMAIN_PROD`
+- `VITE_FIREBASE_PROJECT_ID_PROD`
+- `VITE_FIREBASE_STORAGE_BUCKET_PROD`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID_PROD`
+- `VITE_FIREBASE_APP_ID_PROD`
+- `VITE_FIREBASE_MEASUREMENT_ID_PROD`
+- `FIREBASE_SERVICE_ACCOUNT_PROD`
+
+## 📦 Tecnologías
+
+- Vite + TypeScript + React
+- shadcn-ui + Tailwind CSS
+- Firebase (Auth, Storage, Firestore)
+- Axios para comunicación con el backend

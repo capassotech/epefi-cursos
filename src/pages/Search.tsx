@@ -1,210 +1,529 @@
-
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search as SearchIcon, Play, BookOpen, Filter } from "lucide-react";
+import {
+  Search as SearchIcon,
+  Play,
+  BookOpen,
+  Filter,
+  School,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { buildCourseUrl } from "@/data/courses";
+import CoursesService from "@/services/coursesService";
+import { useAuth } from "@/contexts/AuthContext";
+import { Curso, Materia, Modulo } from "@/types/types";
+
+type FilterType = "all" | "course" | "materia" | "modulo";
+type SearchResultType = Exclude<FilterType, "all">;
+
+interface SearchResult {
+  id: string;
+  type: SearchResultType;
+  title: string;
+  description: string;
+  path: string;
+  courseTitle?: string;
+  subjectName?: string;
+  meta: string[];
+}
+
+const TYPE_CONFIG = {
+  course: {
+    label: "Curso",
+    icon: <School className="w-6 h-6" />,
+    iconClass: "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400",
+    badgeClass:
+      "border-blue-200 text-blue-700 dark:border-blue-700 dark:text-blue-300",
+  },
+  materia: {
+    label: "Materia",
+    icon: <BookOpen className="w-6 h-6" />,
+    iconClass: "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400",
+    badgeClass:
+      "border-purple-200 text-purple-700 dark:border-purple-700 dark:text-purple-300",
+  },
+  modulo: {
+    label: "Módulo",
+    icon: <Play className="w-6 h-6" />,
+    iconClass:
+      "bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-300",
+    badgeClass:
+      "border-orange-200 text-orange-700 dark:border-orange-700 dark:text-orange-300",
+  },
+} as const satisfies Record<SearchResultType, {
+  label: string;
+  icon: JSX.Element;
+  iconClass: string;
+  badgeClass: string;
+}>;
+
+const filterOptions: { value: FilterType; label: string }[] = [
+  { value: "all", label: "Todo" },
+  { value: "course", label: "Cursos" },
+  { value: "materia", label: "Materias" },
+  { value: "modulo", label: "Módulos" },
+];
+const ITEMS_PER_PAGE = 5;
+const SEARCH_FILTER_KEY = "search_filter";
+const SEARCH_QUERY_KEY = "search_query";
 
 const Search = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [query, setQuery] = useState(searchParams.get('q') || '');
-  const [filter, setFilter] = useState<'all' | 'classes' | 'theory'>('all');
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Mock data - en una app real esto vendría de una API o base de datos
-  const searchData = [
-    {
-      id: 'clase-1-1',
-      type: 'class',
-      title: 'Introducción al Fitness Grupal',
-      description: 'Fundamentos básicos del entrenamiento grupal',
-      module: 'Módulo 1',
-      duration: '35 min',
-      path: '/classes/modulo-1/clase-1-1'
-    },
-    {
-      id: 'clase-2-1',
-      type: 'class', 
-      title: 'Entrenamiento de Fuerza',
-      description: 'Técnicas y metodología para el desarrollo de la fuerza',
-      module: 'Módulo 2',
-      duration: '48 min',
-      path: '/classes/modulo-2/clase-2-1'
-    },
-    {
-      id: 'unidad-1',
-      type: 'theory',
-      title: 'Anatomía y Fisiología del Ejercicio',
-      description: 'Sistema muscular, cardiovascular y metabolismo energético',
-      readTime: '25 min',
-      path: '/theory/unidad-1'
-    },
-    {
-      id: 'unidad-3',
-      type: 'theory',
-      title: 'Biomecánica del Movimiento',
-      description: 'Análisis técnico de ejercicios y planos de movimiento',
-      readTime: '35 min',
-      path: '/theory/unidad-3'
-    },
-    {
-      id: 'clase-3-1',
-      type: 'class',
-      title: 'HIIT y Entrenamiento Funcional',
-      description: 'Técnicas de alta intensidad y ejercicios funcionales',
-      module: 'Módulo 3',
-      duration: '45 min',
-      path: '/classes/modulo-3/clase-3-1'
-    },
-    {
-      id: 'unidad-4',
-      type: 'theory',
-      title: 'Nutrición Deportiva',
-      description: 'Macronutrientes, hidratación y suplementación',
-      readTime: '28 min',
-      path: '/theory/unidad-4'
+  // Redirigir si el usuario está deshabilitado
+  useEffect(() => {
+    if (user && user.activo === false) {
+      navigate("/", { replace: true });
     }
-  ];
+  }, [user, navigate]);
+  
+  // Inicializar desde URL params, si no hay, usar localStorage, si no hay, usar valores por defecto
+  const getInitialQuery = () => {
+    const urlQuery = searchParams.get("q");
+    if (urlQuery) return urlQuery;
+    const storedQuery = localStorage.getItem(SEARCH_QUERY_KEY);
+    return storedQuery || "";
+  };
+
+  const getInitialFilter = (): FilterType => {
+    const urlFilter = searchParams.get("filter") as FilterType;
+    if (urlFilter && ["all", "course", "materia", "modulo"].includes(urlFilter)) {
+      return urlFilter;
+    }
+    const storedFilter = localStorage.getItem(SEARCH_FILTER_KEY) as FilterType;
+    if (storedFilter && ["all", "course", "materia", "modulo"].includes(storedFilter)) {
+      return storedFilter;
+    }
+    return "all";
+  };
+
+  const [query, setQuery] = useState(getInitialQuery());
+  const [filter, setFilter] = useState<FilterType>(getInitialFilter());
+  const [loading, setLoading] = useState(true);
+  const [searchIndex, setSearchIndex] = useState<SearchResult[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Sincronizar query y filter con URL params cuando cambian los searchParams (ej: al volver con botón atrás)
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") || "";
+    const urlFilter = searchParams.get("filter") as FilterType;
+    
+    // Actualizar query desde URL
+    if (urlQuery !== query) {
+      setQuery(urlQuery);
+      if (urlQuery) {
+        localStorage.setItem(SEARCH_QUERY_KEY, urlQuery);
+      } else {
+        localStorage.removeItem(SEARCH_QUERY_KEY);
+      }
+    }
+    
+    // Actualizar filter desde URL
+    const validFilter = urlFilter && ["all", "course", "materia", "modulo"].includes(urlFilter) 
+      ? urlFilter 
+      : (localStorage.getItem(SEARCH_FILTER_KEY) as FilterType) || "all";
+    
+    if (validFilter !== filter) {
+      setFilter(validFilter);
+      if (validFilter !== "all") {
+        localStorage.setItem(SEARCH_FILTER_KEY, validFilter);
+      } else {
+        localStorage.removeItem(SEARCH_FILTER_KEY);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()]);
+
+  // Actualizar URL y localStorage cuando cambia el filtro
+  const handleFilterChange = (newFilter: FilterType) => {
+    setFilter(newFilter);
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (newFilter === "all") {
+      newSearchParams.delete("filter");
+      localStorage.removeItem(SEARCH_FILTER_KEY);
+    } else {
+      newSearchParams.set("filter", newFilter);
+      localStorage.setItem(SEARCH_FILTER_KEY, newFilter);
+    }
+    setSearchParams(newSearchParams, { replace: true });
+  };
+
+  // Actualizar URL y localStorage cuando cambia la query
+  const handleQueryChange = (newQuery: string) => {
+    setQuery(newQuery);
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (newQuery.trim()) {
+      newSearchParams.set("q", newQuery);
+      localStorage.setItem(SEARCH_QUERY_KEY, newQuery);
+    } else {
+      newSearchParams.delete("q");
+      localStorage.removeItem(SEARCH_QUERY_KEY);
+    }
+    setSearchParams(newSearchParams, { replace: true });
+  };
+
+  // Resetear página cuando cambia el filtro o la búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, query]);
+
+  // Cargar datos del backend
+  useEffect(() => {
+    const loadSearchData = async () => {
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        // Obtener cursos del usuario
+        const coursesResponse = await CoursesService.getAllCoursesPerUser(user.uid);
+        const courses: Curso[] = Array.isArray(coursesResponse.data) 
+          ? coursesResponse.data.filter((c: Curso) => c.estado === "activo")
+          : [];
+
+        const results: SearchResult[] = [];
+
+        // Para cada curso, obtener materias y módulos
+        for (const course of courses) {
+          // Agregar el curso a los resultados
+          const courseResult: SearchResult = {
+            id: `course-${course.id}`,
+            type: "course",
+            title: course.titulo,
+            description: course.descripcion || "",
+            path: buildCourseUrl(course.id),
+            meta: [],
+          };
+
+          // Obtener materias del curso
+          const materias: Materia[] = [];
+          if (course.materias && course.materias.length > 0) {
+            for (const materiaId of course.materias) {
+              try {
+                const materiaResponse = await CoursesService.getMateriasByCourseId(materiaId);
+                const materiaData = materiaResponse.data;
+                const materiasArray = Array.isArray(materiaData) ? materiaData : [materiaData];
+                materias.push(...materiasArray);
+              } catch (error) {
+                console.error(`Error loading materia ${materiaId}:`, error);
+              }
+            }
+          }
+
+          courseResult.meta.push(`${materias.length} materias`);
+
+          // Agregar materias y módulos a los resultados
+          for (const materia of materias) {
+            // Agregar la materia
+            const materiaResult: SearchResult = {
+              id: `materia-${course.id}-${materia.id}`,
+              type: "materia",
+              title: materia.nombre,
+              description: "",
+              courseTitle: course.titulo,
+              path: buildCourseUrl(course.id, materia.id),
+              meta: [],
+            };
+
+            // Obtener módulos de la materia
+            const modulos: Modulo[] = [];
+            if (materia.modulos && materia.modulos.length > 0) {
+              for (const moduloId of materia.modulos) {
+                try {
+                  const moduloResponse = await CoursesService.getModulosByMateriaId(moduloId);
+                  const moduloData = moduloResponse.data;
+                  const modulosArray = Array.isArray(moduloData) ? moduloData : [moduloData];
+                  modulos.push(...modulosArray);
+                } catch (error) {
+                  console.error(`Error loading modulo ${moduloId}:`, error);
+                }
+              }
+            }
+
+            materiaResult.meta.push(`${modulos.length} módulos`);
+
+            // Agregar módulos
+            for (const modulo of modulos) {
+              const moduloResult: SearchResult = {
+                id: `modulo-${course.id}-${materia.id}-${modulo.id}`,
+                type: "modulo",
+                title: modulo.titulo,
+                description: modulo.descripcion || "",
+                courseTitle: course.titulo,
+                subjectName: materia.nombre,
+                path: buildCourseUrl(course.id, materia.id, modulo.id),
+                meta: [],
+              };
+              results.push(moduloResult);
+            }
+
+            results.push(materiaResult);
+          }
+
+          const totalModulos = materias.reduce((acc, m) => acc + (m.modulos?.length || 0), 0);
+          courseResult.meta.push(`${totalModulos} módulos`);
+          results.push(courseResult);
+        }
+
+        setSearchIndex(results);
+      } catch (error) {
+        console.error("Error loading search data:", error);
+        setSearchIndex([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSearchData();
+  }, [user]);
+
+  // Función para normalizar texto (eliminar acentos y convertir a minúsculas)
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""); // Eliminar diacríticos (acentos)
+  };
 
   const filteredResults = useMemo(() => {
-    let results = searchData;
+    let results = searchIndex;
 
-    // Aplicar filtro por tipo
-    if (filter !== 'all') {
-      results = results.filter(item => item.type === filter);
+    if (filter !== "all") {
+      results = results.filter((item) => item.type === filter);
     }
 
-    // Aplicar búsqueda por texto
     if (query.trim()) {
-      const searchTerm = query.toLowerCase();
-      results = results.filter(item => 
-        item.title.toLowerCase().includes(searchTerm) ||
-        item.description.toLowerCase().includes(searchTerm) ||
-        (item.type === 'class' && item.module?.toLowerCase().includes(searchTerm))
-      );
+      const searchTerm = normalizeText(query);
+      results = results.filter((item) => {
+        const haystack = normalizeText(
+          [
+            item.title,
+            item.description,
+            item.courseTitle,
+            item.subjectName,
+            ...item.meta,
+          ]
+            .filter(Boolean)
+            .join(" ")
+        );
+
+        return haystack.includes(searchTerm);
+      });
     }
 
     return results;
-  }, [query, filter]);
+  }, [filter, query, searchIndex]);
+
+  // Calcular resultados paginados
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedResults = filteredResults.slice(startIndex, endIndex);
+
+  // Funciones de navegación
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    // Scroll al inicio de los resultados
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Buscar Contenido
+          Buscar contenido
         </h1>
         <p className="text-gray-600 dark:text-gray-300">
-          Encuentra clases y material teórico
+          Encontrá cursos, materias y módulos del campus
         </p>
       </div>
 
-      {/* Barra de búsqueda */}
       <div className="relative">
         <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         <Input
           type="search"
-          placeholder="Buscar por título, descripción o módulo..."
+          placeholder="Buscar por título, materia, módulo o descripción..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleQueryChange(e.target.value)}
           className="pl-12 h-12 text-lg bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
         />
       </div>
 
-      {/* Filtros */}
       <div className="flex items-center space-x-2 overflow-x-auto pb-2">
         <Filter className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-        <Button
-          variant={filter === 'all' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('all')}
-          className="whitespace-nowrap"
-        >
-          Todo
-        </Button>
-        <Button
-          variant={filter === 'classes' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('classes')}
-          className="whitespace-nowrap"
-        >
-          Clases
-        </Button>
-        <Button
-          variant={filter === 'theory' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setFilter('theory')}
-          className="whitespace-nowrap"
-        >
-          Teoría
-        </Button>
+        {filterOptions.map((option) => (
+          <Button
+            key={option.value}
+            variant={filter === option.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => handleFilterChange(option.value)}
+            className="whitespace-nowrap"
+          >
+            {option.label}
+          </Button>
+        ))}
       </div>
 
-      {/* Resultados */}
       <div className="space-y-3">
-        {filteredResults.length > 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              <p className="text-gray-600 dark:text-gray-400">Cargando contenido...</p>
+            </div>
+          </div>
+        ) : filteredResults.length > 0 ? (
           <>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {filteredResults.length} resultado{filteredResults.length !== 1 ? 's' : ''} encontrado{filteredResults.length !== 1 ? 's' : ''}
-            </p>
-            {filteredResults.map((item) => (
-              <Card 
-                key={item.id}
-                className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                onClick={() => navigate(item.path)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      item.type === 'class'
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                        : 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400'
-                    }`}>
-                      {item.type === 'class' ? (
-                        <Play className="w-6 h-6" />
-                      ) : (
-                        <BookOpen className="w-6 h-6" />
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
-                          {item.title}
-                        </h3>
-                        <Badge 
-                          variant="outline"
-                          className={`ml-2 ${
-                            item.type === 'class'
-                              ? 'border-blue-200 text-blue-700 dark:border-blue-700 dark:text-blue-300'
-                              : 'border-purple-200 text-purple-700 dark:border-purple-700 dark:text-purple-300'
-                          }`}
-                        >
-                          {item.type === 'class' ? 'Clase' : 'Teoría'}
-                        </Badge>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {filteredResults.length} resultado{filteredResults.length !== 1 ? "s" : ""} encontrado{filteredResults.length !== 1 ? "s" : ""}
+                {totalPages > 1 && (
+                  <span className="ml-2">
+                    (Página {currentPage} de {totalPages})
+                  </span>
+                )}
+              </p>
+            </div>
+            {paginatedResults.map((item) => {
+              const config = TYPE_CONFIG[item.type];
+              const infoLine = [
+                item.type !== "course" ? item.courseTitle : null,
+                item.type === "modulo" ? item.subjectName : null,
+                ...item.meta,
+              ].filter(Boolean) as string[];
+
+              return (
+                <Card
+                  key={item.id}
+                  className="cursor-pointer hover:shadow-md transition-all duration-200 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  onClick={() => navigate(item.path)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start space-x-4">
+                      <div
+                        className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${config.iconClass}`}
+                      >
+                        {config.icon}
                       </div>
-                      
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
-                        {item.description}
-                      </p>
-                      
-                      <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {item.type === 'class' ? (
-                          <>
-                            <span>{item.module}</span>
-                            <span>•</span>
-                            <span>{item.duration}</span>
-                          </>
-                        ) : (
-                          <span>Tiempo de lectura: {item.readTime}</span>
-                        )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-2">
+                            {item.title}
+                          </h3>
+                          <Badge variant="outline" className={`ml-2 ${config.badgeClass}`}>
+                            {config.label}
+                          </Badge>
+                        </div>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                          {item.description}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          {infoLine.map((info, index) => (
+                            <span key={`${item.id}-meta-${index}`} className="flex items-center gap-2">
+                              {index > 0 && (
+                                <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">
+                                  •
+                                </span>
+                              )}
+                              <span>{info}</span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
+
+            {/* Controles de paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center gap-1"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Mostrar solo algunas páginas alrededor de la actual
+                    const showPage =
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1);
+
+                    if (!showPage) {
+                      // Mostrar puntos suspensivos
+                      if (page === currentPage - 2 || page === currentPage + 2) {
+                        return (
+                          <span
+                            key={page}
+                            className="px-2 text-gray-500 dark:text-gray-400"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
+
+                    return (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(page)}
+                        className="min-w-[2.5rem]"
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="text-center py-12">
