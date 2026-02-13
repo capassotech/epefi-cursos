@@ -1367,7 +1367,7 @@ const CourseDetailPage = () => {
 
 // Componente para cada módulo con descripción desplegable
 const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted, onDisabledClick }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void>; onDisabledClick?: () => void }) => {
-  const [isModuleExpanded, setIsModuleExpanded] = useState(false);
+  const [isModuleExpanded, setIsModuleExpanded] = useState(true);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
   const maxLength = 150; // Caracteres para mostrar antes del "Ver más"
