@@ -101,3 +101,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Prevenir descarga de video en móvil */
+  .video-no-download video {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: auto;
+  }
+
+  .video-no-download video::-webkit-media-controls {
+    -webkit-touch-callout: none;
+  }
+
+  .video-no-download video::-webkit-media-controls-enclosure {
+    -webkit-touch-callout: none;
+  }
+}

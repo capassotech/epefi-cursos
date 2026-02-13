@@ -50,6 +50,39 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     }
   }, [isOpen]);
 
+  // Prevenir menú contextual y descarga en móvil
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'VIDEO' || target.closest('.video-no-download')) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'VIDEO' || target.closest('.video-no-download')) {
+        // Prevenir el menú contextual en móvil cuando se mantiene presionado
+        if (e.touches.length === 1) {
+          // Permitir interacción normal con un solo toque
+          return;
+        }
+        e.preventDefault();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('contextmenu', handleContextMenu, true);
+      document.addEventListener('touchstart', handleTouchStart, { passive: false });
+      
+      return () => {
+        document.removeEventListener('contextmenu', handleContextMenu, true);
+        document.removeEventListener('touchstart', handleTouchStart);
+      };
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isCurrentlyFullscreen = !!(
@@ -355,6 +388,25 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   className="absolute top-0 left-0 w-full h-full rounded-lg"
                   style={{
                     objectFit: 'contain',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    return false;
+                  }}
+                  onTouchStart={(e) => {
+                    // Prevenir el menú contextual en móvil
+                    if (e.touches.length > 1) {
+                      e.preventDefault();
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    // Prevenir acciones no deseadas durante el movimiento
+                    if (e.touches.length > 1) {
+                      e.preventDefault();
+                    }
                   }}
                 />
               )}
