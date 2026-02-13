@@ -105,16 +105,22 @@ const CourseDetailPage = () => {
     const fetchCourse = async () => {
       if (!courseId) {
         setLoading(false);
+        setLoadingMaterias(false);
+        setLoadingModulos(false);
         return;
       }
 
       try {
         setLoading(true);
+        setLoadingMaterias(true);
+        setLoadingModulos(true);
         const response = await CoursesService.getCourseById(courseId);
         setCourseDetail(response.data);
       } catch (error) {
         console.error('Error fetching course:', error);
         setCourseDetail(null);
+        setLoadingMaterias(false);
+        setLoadingModulos(false);
       } finally {
         setLoading(false);
       }
@@ -125,13 +131,21 @@ const CourseDetailPage = () => {
 
   useEffect(() => {
     const fetchMaterias = async () => {
-      if (!courseDetail?.materias || courseDetail.materias.length === 0) {
+      if (!courseDetail) {
+        return;
+      }
+
+      if (!courseDetail.materias || courseDetail.materias.length === 0) {
         setMaterias([]);
+        // Si no hay materias, establecer loadingMaterias en false inmediatamente
+        // y también loadingModulos ya que no hay nada que cargar
         setLoadingMaterias(false);
+        setLoadingModulos(false);
         return;
       }
 
       try {
+        setLoadingMaterias(true);
         const materiasPromises = courseDetail.materias.map(async (materiaId) => {
           const responseMateria = await CoursesService.getMateriasByCourseId(materiaId);
           const materiaData = responseMateria.data;
@@ -141,20 +155,35 @@ const CourseDetailPage = () => {
         const materiasArrays = await Promise.all(materiasPromises);
         const allMaterias = materiasArrays.flat();
         setMaterias(allMaterias);
+        // Establecer loadingMaterias en false cuando terminan de cargar las materias
+        // fetchModulos se ejecutará automáticamente cuando materias cambie
         setLoadingMaterias(false);
       } catch (error) {
         console.error('Error fetching materias:', error);
         setMaterias([]);
         setLoadingMaterias(false);
+        setLoadingModulos(false);
       }
     };
 
-    fetchMaterias();
+    if (courseDetail) {
+      fetchMaterias();
+    }
   }, [courseDetail]);
 
 
   useEffect(() => {
     const fetchModulos = async () => {
+      // Solo ejecutar si courseDetail está cargado (para evitar ejecuciones prematuras)
+      if (!courseDetail) {
+        return;
+      }
+
+      // Si loadingMaterias aún es true, esperar a que termine
+      if (loadingMaterias) {
+        return;
+      }
+
       if (!materias || materias.length === 0) {
         setModulos([]);
         setLoadingModulos(false);
@@ -178,6 +207,13 @@ const CourseDetailPage = () => {
           }
         });
 
+        // Si no hay módulos para cargar, establecer loadingModulos en false inmediatamente
+        if (allModulosPromises.length === 0) {
+          setModulos([]);
+          setLoadingModulos(false);
+          return;
+        }
+
         const modulosArrays = await Promise.all(allModulosPromises);
         const allModulos = modulosArrays.flat();
         setModulos(allModulos);
@@ -189,8 +225,11 @@ const CourseDetailPage = () => {
       }
     };
 
-    fetchModulos();
-  }, [materias]);
+    // Solo ejecutar si courseDetail está cargado y loadingMaterias es false
+    if (courseDetail && !loadingMaterias) {
+      fetchModulos();
+    }
+  }, [materias, courseDetail, loadingMaterias]);
 
   // Cargar módulos habilitados del estudiante
   useEffect(() => {
@@ -831,7 +870,10 @@ const CourseDetailPage = () => {
     </div>
   );
 
-  if (loading) {
+  // Mostrar skeleton mientras se carga el curso, las materias o los módulos
+  const isLoadingContent = loading || loadingMaterias || loadingModulos;
+  
+  if (isLoadingContent) {
     return <CourseSkeleton />;
   }
 
@@ -995,27 +1037,7 @@ const CourseDetailPage = () => {
                           </AccordionTrigger>
 
                           <AccordionContent className="pb-4 sm:pb-5 pt-0">
-                            {loadingModulos ? (
-                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
-                                {[1, 2, 3].map((item) => (
-                                  <div
-                                    key={item}
-                                    className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-md bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50"
-                                  >
-                                    <div className="h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-1.5 sm:mt-2 animate-pulse"></div>
-                                    <div className="flex-1 min-w-0 space-y-2">
-                                      <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                      <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                      <div className="h-3 w-5/6 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                      <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4">
-                                        <div className="h-7 sm:h-8 w-24 sm:w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                        <div className="h-7 sm:h-8 w-20 sm:w-28 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : loadingEnabledModules ? (
+                            {loadingEnabledModules ? (
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
                               </div>
@@ -1051,24 +1073,6 @@ const CourseDetailPage = () => {
                       );
                     })}
               </Accordion>
-            ) : loadingMaterias ? (
-              <div className="space-y-2.5 sm:space-y-3">
-                {[1, 2].map((item) => (
-                  <div
-                    key={item}
-                    className="border border-slate-200 dark:border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 sm:py-4 bg-white dark:bg-slate-900/70"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-2 w-2 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
-                        <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
-                      </div>
-                      <div className="h-4 w-4 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
                 <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -1367,7 +1371,7 @@ const CourseDetailPage = () => {
 
 // Componente para cada módulo con descripción desplegable
 const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted, onDisabledClick }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void>; onDisabledClick?: () => void }) => {
-  const [isModuleExpanded, setIsModuleExpanded] = useState(false);
+  const [isModuleExpanded, setIsModuleExpanded] = useState(true);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
   const descripcion = modulo.descripcion || '';
   const maxLength = 150; // Caracteres para mostrar antes del "Ver más"

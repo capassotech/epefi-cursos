@@ -41,8 +41,8 @@ const CourseCard = ({ course, onNavigate, formatDate, progressPercentage = 0 }: 
       onClick={() => onNavigate(buildCourseUrl(course.id))}
     >
       <CardContent className="p-0 flex flex-row sm:flex-row h-auto sm:h-[200px]">
-        {/* Imagen del curso - pequeña en mobile */}
-        <div className="w-24 sm:w-1/3 h-24 sm:h-full relative overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+        {/* Imagen del curso - siempre cuadrada */}
+        <div className="w-24 h-24 sm:w-48 sm:h-48 relative overflow-hidden flex-shrink-0 bg-slate-100 dark:bg-slate-800">
           {imageLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-100 dark:bg-slate-800">
               <img
