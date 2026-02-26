@@ -77,6 +77,7 @@ const CourseDetailPage = () => {
   const [isIOS, setIsIOS] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isDisabledModuleDialogOpen, setIsDisabledModuleDialogOpen] = useState(false);
+  const videoModalStatePushedRef = useRef(false);
 
   // Detectar iOS
   useEffect(() => {
@@ -462,13 +463,33 @@ const CourseDetailPage = () => {
       videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
       currentIndex: validIndex,
     });
+    history.pushState({ videoModalOpen: true }, "", window.location.href);
+    videoModalStatePushedRef.current = true;
     setIsVideoModalOpen(true);
   };
 
   const handleCloseVideo = () => {
-    setIsVideoModalOpen(false);
-    setSelectedVideo(null);
+    if (videoModalStatePushedRef.current) {
+      videoModalStatePushedRef.current = false;
+      history.back();
+    } else {
+      setIsVideoModalOpen(false);
+      setSelectedVideo(null);
+    }
   };
+
+  // Cerrar modal al pulsar atrás del navegador
+  useEffect(() => {
+    const handlePopState = () => {
+      if (isVideoModalOpen) {
+        videoModalStatePushedRef.current = false;
+        setIsVideoModalOpen(false);
+        setSelectedVideo(null);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isVideoModalOpen]);
 
   // Función para cambiar al siguiente video
   const handleNextVideo = () => {
