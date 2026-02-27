@@ -1401,6 +1401,24 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
   const documents = getDocuments();
   const videos = getVideos();
 
+  const nombresArchivos: string[] = modulo.nombres_archivos
+    ? (modulo.nombres_archivos.includes('|||')
+        ? modulo.nombres_archivos.split('|||')
+        : [modulo.nombres_archivos])
+    : [];
+
+  const nombresVideos: string[] = modulo.nombres_videos
+    ? (modulo.nombres_videos.includes('|||')
+        ? modulo.nombres_videos.split('|||')
+        : [modulo.nombres_videos])
+    : [];
+
+  const getDocName = (index: number): string =>
+    nombresArchivos[index]?.trim() || (documents.length > 1 ? `Documento ${index + 1}` : 'Documento');
+
+  const getVidName = (index: number): string =>
+    nombresVideos[index]?.trim() || (videos.length > 1 ? `Video ${index + 1}` : 'Video');
+
   // Verificar si todos los contenidos del módulo están completados
   const isModuleCompleted = (): boolean => {
     // Si no hay contenidos, no está completado
@@ -1501,15 +1519,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             )}
             <div className="flex flex-col gap-2 sm:gap-3 mt-2 sm:mt-4">
           {documents.map((doc, index) => {
-            // Extraer y limpiar el nombre del archivo de forma amigable
-            // Para todos los documentos, usar el mismo formato: Documento [X]
-            const getFileName = (url: string): string => {
-              if (documents.length > 1) {
-                return `Documento ${index + 1}`;
-              }
-              return `Documento`;
-            };
-            const fileName = getFileName(doc);
+            const fileName = getDocName(index);
             const isDocCompleted = isContentCompleted(modulo.id, index, 'document');
             
             return (
@@ -1534,7 +1544,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     disabled={!isEnabled}
                   >
                     <FileText className="h-4 w-4" />
-                    {documents.length > 1 ? `Doc ${index + 1}` : 'Doc'}
+                    {fileName}
                   </Button>
                   <button
                     onClick={(e) => {
@@ -1593,15 +1603,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             );
           })}
           {videos.map((video, index) => {
-            // Extraer y limpiar el nombre del video de forma amigable
-            // Para todos los videos, usar el mismo formato: Video [X]
-            const getVideoName = (url: string): string => {
-              if (videos.length > 1) {
-                return `Video ${index + 1}`;
-              }
-              return `Video`;
-            };
-            const videoName = getVideoName(video);
+            const videoName = getVidName(index);
             const isVideoCompleted = isContentCompleted(modulo.id, index, 'video');
             
             return (
@@ -1626,7 +1628,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     disabled={!isEnabled}
                   >
                     <Play className="h-4 w-4" />
-                    {videos.length > 1 ? `Video ${index + 1}` : 'Video'}
+                    {videoName}
                   </Button>
                   <button
                     onClick={(e) => {
