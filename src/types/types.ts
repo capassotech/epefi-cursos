@@ -29,10 +29,12 @@ export interface Modulo {
   titulo: string;
   descripcion: string;
   tipo_contenido: "pdf" | "video" | "evaluacion" | "extra" | "imagen";
-  url_archivo: string; // Puede ser string simple o string con delimitador ||| para múltiples archivos
+  url_archivo: string; // String simple o con delimitador ||| para múltiples archivos
   url_miniatura?: string;
   bibliografia?: string;
-  url_video?: string | string[]; // Puede ser string simple o array de strings para múltiples videos
+  url_video?: string | string[]; // String simple o array de strings para múltiples videos
+  nombres_archivos?: string; // Nombres personalizados separados por ||| (mismo orden que url_archivo)
+  nombres_videos?: string; // Nombres personalizados separados por ||| (mismo orden que url_video)
 }
 
 export interface Usuario {
