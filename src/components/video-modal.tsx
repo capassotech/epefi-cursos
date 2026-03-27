@@ -20,6 +20,7 @@ interface VideoModalProps {
     thumbnail?: string;
     topics?: string[];
     videos?: string[];
+    videoTitles?: string[];
     currentIndex?: number;
   } | null;
   onNextVideo?: () => void;
@@ -185,11 +186,23 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
   const isGoogleDrive = content.url.includes('drive.google.com');
 
-  // Determinar el título del video
+  // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
-    if (content.videos && content.videos.length > 1 && content.currentIndex !== undefined) {
-      return `Video ${content.currentIndex + 1}`;
+    const idx = content.currentIndex;
+
+    if (content.videoTitles && idx !== undefined) {
+      const t = content.videoTitles[idx];
+      if (t && t.trim()) return t.trim();
     }
+
+    if (content.videos && content.videos.length > 1 && idx !== undefined) {
+      return `Video ${idx + 1}`;
+    }
+
+    if (content.title && content.title.trim()) {
+      return content.title.trim();
+    }
+
     return 'Video';
   };
 
@@ -207,9 +220,14 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         <div className="w-full" onClick={(e) => e.stopPropagation()}>
           <div className="space-y-4">
             {/* Fila 1: Título - En mobile ocupa toda la fila, en desktop está junto con controles */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-              <div className="flex items-center justify-between w-full sm:w-auto">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{videoTitle}</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 min-w-0">
+              <div className="flex items-center justify-between gap-2 w-full min-w-0 sm:flex-1 sm:min-w-0">
+                <h3
+                  className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate min-w-0"
+                  title={videoTitle}
+                >
+                  {videoTitle}
+                </h3>
                 {/* Botón de expandir para mobile - Solo visible en mobile */}
                 {!isYouTube && !isGoogleDrive && (
                   <Button
@@ -259,7 +277,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 )}
               </div>
               {/* Controles de navegación - Solo visible en desktop */}
-              <div className="hidden sm:flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                 {/* Controles de navegación para múltiples videos */}
                 {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
                   <>
