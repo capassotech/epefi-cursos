@@ -19,23 +19,9 @@ import { PasswordRequirements } from "../PasswordRequirements";
 import ThemeToggle from "../ThemeToggle";
 import AuthLoader from "../AuthLoader";
 
-export default function AuthFormView({
-  isLogin = false,
-  currentStep = 1,
-  showEmailForm = false,
-  onSubmit,
-  onGoogleAuth,
-  onInputChange,
-  onStepChange,
-  onEmailMethodSelect,
-  errors,
-  formData,
-  isSubmitting,
-  showPassword,
-  setShowPassword,
-  passwordRequirements,
-}: {
+interface AuthFormViewProps {
   isLogin?: boolean;
+  forceProfileCompletion?: boolean;
   currentStep?: number;
   showEmailForm?: boolean;
   onSubmit: (e: React.FormEvent) => void;
@@ -43,6 +29,7 @@ export default function AuthFormView({
   onInputChange: (field: string, value: string | boolean) => void;
   onStepChange?: (step: number) => void;
   onEmailMethodSelect?: () => void;
+  onCompleteGoogleProfile?: () => void;
   errors: Record<string, string>;
   formData: Record<string, string | boolean>;
   isSubmitting: boolean;
@@ -54,7 +41,26 @@ export default function AuthFormView({
     hasSpecialChar: boolean;
     hasNumber: boolean;
   };
-}) {
+}
+
+export default function AuthFormView({
+  isLogin = false,
+  forceProfileCompletion = false,
+  currentStep = 1,
+  showEmailForm = false,
+  onSubmit,
+  onGoogleAuth,
+  onInputChange,
+  onStepChange,
+  onEmailMethodSelect,
+  onCompleteGoogleProfile,
+  errors,
+  formData,
+  isSubmitting,
+  showPassword,
+  setShowPassword,
+  passwordRequirements,
+}: AuthFormViewProps) {
   const { theme } = useTheme();
 
   // Detectar si está en modo oscuro
@@ -64,7 +70,7 @@ export default function AuthFormView({
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   const isStep1Valid = () => {
-    if (isLogin) return true;
+    if (isLogin && !forceProfileCompletion) return true;
     return (
       (formData.firstName as string)?.trim().length >= 2 &&
       (formData.lastName as string)?.trim().length >= 2 &&
@@ -73,6 +79,7 @@ export default function AuthFormView({
   };
 
   const getStepTitle = () => {
+    if (forceProfileCompletion) return "Completar datos de tu cuenta";
     if (isLogin) return "Iniciar sesión";
 
     switch (currentStep) {
@@ -86,6 +93,9 @@ export default function AuthFormView({
   };
 
   const getStepDescription = () => {
+    if (forceProfileCompletion) {
+      return "Para continuar con Google necesitamos nombre, apellido y DNI";
+    }
     if (isLogin) return "Ingresa a tu cuenta para continuar";
 
     switch (currentStep) {
@@ -166,11 +176,17 @@ export default function AuthFormView({
       </div>
 
       <Button
-        onClick={() => onStepChange?.(2)}
+        onClick={() => {
+          if (forceProfileCompletion) {
+            onCompleteGoogleProfile?.();
+          } else {
+            onStepChange?.(2);
+          }
+        }}
         className="w-full btn-gradient dark:btn-gradient-dark hover:opacity-90 transition-all duration-200 font-medium"
         disabled={!isStep1Valid() || isSubmitting}
       >
-        Continuar
+        {forceProfileCompletion ? "Guardar y continuar" : "Continuar"}
       </Button>
     </>
   );
@@ -564,7 +580,9 @@ export default function AuthFormView({
               <AuthLoader isLogin={isLogin} />
             ) : (
               <>
-                {isLogin
+                {forceProfileCompletion
+                  ? renderStep1()
+                  : isLogin
                   ? renderLogin()
                   : currentStep === 1
                   ? renderStep1()
@@ -572,19 +590,21 @@ export default function AuthFormView({
                   ? renderStep2()
                   : renderStep1()}
 
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {isLogin ? "¿No tienes una cuenta?" : "¿Ya tienes una cuenta?"}{" "}
-                    <Link
-                      to={isLogin ? "/registro" : "/login"}
-                      className="text-primary hover:underline font-medium transition-colors"
-                    >
-                      {isLogin ? "Regístrate" : "Inicia sesión"}
-                    </Link>
-                  </p>
-                </div>
+                {!forceProfileCompletion && (
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {isLogin ? "¿No tienes una cuenta?" : "¿Ya tienes una cuenta?"}{" "}
+                      <Link
+                        to={isLogin ? "/registro" : "/login"}
+                        className="text-primary hover:underline font-medium transition-colors"
+                      >
+                        {isLogin ? "Regístrate" : "Inicia sesión"}
+                      </Link>
+                    </p>
+                  </div>
+                )}
 
-                {isLogin && (
+                {isLogin && !forceProfileCompletion && (
                   <div className="text-center">
                     <Link
                       to="/recuperar-contrasena"
