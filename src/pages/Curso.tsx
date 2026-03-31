@@ -62,6 +62,7 @@ const CourseDetailPage = () => {
     url: string;
     thumbnail?: string;
     videos?: string[]; // Array de todos los videos del módulo
+    videoTitles?: string[]; // Nombres personalizados por índice de video
     currentIndex?: number; // Índice del video actual
   } | null>(null);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
@@ -445,6 +446,13 @@ const CourseDetailPage = () => {
     // Asegurar que el índice esté dentro del rango
     const validIndex = Math.max(0, Math.min(videoIndex, videos.length - 1));
     const videoUrl = videos[validIndex];
+
+    // Obtener títulos (nombres) de videos para mostrar el correcto en el modal
+    const videoTitles: string[] = modulo.nombres_videos
+      ? modulo.nombres_videos.includes('|||')
+        ? modulo.nombres_videos.split('|||').map(s => s.trim()).filter(Boolean)
+        : [modulo.nombres_videos.trim()].filter(Boolean)
+      : [];
     
     // Marcar como visto automáticamente al abrir
     const isVideoCompleted = isContentCompleted(modulo.id, validIndex, 'video');
@@ -461,6 +469,7 @@ const CourseDetailPage = () => {
       url: embedUrl,
       thumbnail: modulo.url_miniatura,
       videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
+      videoTitles,
       currentIndex: validIndex,
     });
     history.pushState({ videoModalOpen: true }, "", window.location.href);
@@ -1047,7 +1056,10 @@ const CourseDetailPage = () => {
                             <div className="flex items-center gap-3 text-left w-full">
                               <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
                               <div className="flex-1 min-w-0">
-                                <span className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block">
+                                <span
+                                  className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block truncate"
+                                  title={materia.nombre}
+                                >
                                   {materia.nombre}
                                 </span>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
@@ -1465,7 +1477,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
 
   return (
     <div className={cn(
-      "flex items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
+      "flex min-w-0 items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
       !isEnabled 
         ? "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60"
         : isHighlighted 
@@ -1485,7 +1497,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
           className="w-full flex items-center justify-between gap-2 text-left"
         >
           <h4 className={cn(
-            "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2",
+            "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2 min-w-0 flex-1",
             !isEnabled
               ? "text-slate-500 dark:text-slate-400"
               : moduleCompleted 
@@ -1498,9 +1510,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             {!isEnabled && (
               <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
             )}
-            {modulo.titulo}
+            <span className="min-w-0 truncate" title={modulo.titulo}>
+              {modulo.titulo}
+            </span>
             {!isEnabled && (
-              <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">(No disponible)</span>
+              <span className="flex-shrink-0 text-xs text-slate-400 dark:text-slate-500 ml-1">(No disponible)</span>
             )}
           </h4>
           <ChevronDown className={cn(
@@ -1546,9 +1560,9 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             return (
               <div key={`doc-${index}`}>
                 {/* Botón para móvil - con opción de marcar como visto */}
-                <div className="w-full sm:hidden flex items-center gap-2">
+                <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isDocCompleted
@@ -1563,16 +1577,18 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                       }
                     }}
                     disabled={!isEnabled}
+                    title={fileName}
                   >
-                    <FileText className="h-4 w-4" />
-                    {fileName}
+                    <FileText className="h-4 w-4 flex-shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{fileName}</span>
                   </Button>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleMarkAsCompleted(modulo.id, index, 'document');
                     }}
-                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                    className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
                       isDocCompleted
                         ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
@@ -1630,9 +1646,9 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             return (
               <div key={`video-${index}`}>
                 {/* Botón para móvil - con opción de marcar como visto */}
-                <div className="w-full sm:hidden flex items-center gap-2">
+                <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`flex-1 h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isVideoCompleted
@@ -1647,16 +1663,18 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                       }
                     }}
                     disabled={!isEnabled}
+                    title={videoName}
                   >
-                    <Play className="h-4 w-4" />
-                    {videoName}
+                    <Play className="h-4 w-4 flex-shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{videoName}</span>
                   </Button>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleMarkAsCompleted(modulo.id, index, 'video');
                     }}
-                    className={`h-10 w-10 rounded-lg flex items-center justify-center transition-colors ${
+                    className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
                       isVideoCompleted
                         ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'

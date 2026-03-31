@@ -35,6 +35,18 @@ interface RegisterData {
 }
 
 class AuthService {
+  private needsProfileCompletion(userData: any): boolean {
+    const nombre = (userData?.nombre || "").trim();
+    const apellido = (userData?.apellido || "").trim();
+    const dni = (userData?.dni || "").trim();
+
+    const nombreValido = nombre.length >= 2 && nombre.toLowerCase() !== "usuario";
+    const apellidoValido = apellido.length >= 2;
+    const dniValido = /^\d{7,8}$/.test(dni);
+
+    return !(nombreValido && apellidoValido && dniValido);
+  }
+
   async login(data: LoginData) {
     console.log("ENTRO AL LOGIN...");
     try {
@@ -77,6 +89,7 @@ class AuthService {
           success: true,
           user: userData,
           firebaseUser: firebaseUser,
+          requiresProfileCompletion: this.needsProfileCompletion(userData),
         };
       } catch (backendError: any) {
         console.warn(
@@ -102,6 +115,7 @@ class AuthService {
           success: true,
           user: basicUserData,
           firebaseUser: firebaseUser,
+          requiresProfileCompletion: true,
         };
       }
     } catch (error: any) {
@@ -209,6 +223,7 @@ class AuthService {
           success: true,
           user: userData,
           firebaseUser: firebaseUser,
+          requiresProfileCompletion: this.needsProfileCompletion(userData),
         };
       } catch (backendError: any) {
         console.warn(
@@ -235,6 +250,7 @@ class AuthService {
           success: true,
           user: basicUserData,
           firebaseUser: firebaseUser,
+          requiresProfileCompletion: true,
         };
       }
     } catch (error: any) {
