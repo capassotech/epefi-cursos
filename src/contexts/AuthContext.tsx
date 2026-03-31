@@ -31,6 +31,7 @@ interface AuthResponse {
   success: boolean;
   message?: string;
   user?: UserProfile;
+  requiresProfileCompletion?: boolean;
 }
 
 interface RegisterUserData {

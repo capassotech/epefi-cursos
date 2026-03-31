@@ -12,12 +12,13 @@ interface AuthFormProps {
 
 const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
   const navigate = useNavigate();
-  const { login, register, googleRegister, googleLogin } = useAuth();
+  const { login, register, googleRegister, googleLogin, updateProfile } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [forceProfileCompletion, setForceProfileCompletion] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -35,7 +36,10 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     };
   };
 
-  const validateForm = (googleAuth: boolean = false) => {
+  const validateForm = (
+    googleAuth: boolean = false,
+    requirePersonalData: boolean = false
+  ) => {
     const newErrors: Record<string, string> = {};
 
     if (!googleAuth) {
@@ -62,7 +66,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       }
     }
 
-    if (!isLogin) {
+    if (!isLogin || requirePersonalData) {
       if (!googleAuth) {
         if (!formData.firstName.trim()) {
           newErrors.firstName = "El nombre es requerido";
@@ -143,7 +147,29 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     if (isLogin) {
       setIsSubmitting(true);
       try {
-        await googleLogin();
+        const response = await googleLogin();
+
+        if (response.requiresProfileCompletion) {
+          const nombre = response.user?.nombre || "";
+          const apellido = response.user?.apellido || "";
+          const dni = response.user?.dni || "";
+
+          setFormData((prev) => ({
+            ...prev,
+            firstName: nombre.toLowerCase() === "usuario" ? "" : nombre,
+            lastName: apellido,
+            dni,
+          }));
+          setForceProfileCompletion(true);
+          setIsSubmitting(false);
+
+          toast.info("Completa tus datos para continuar", {
+            description:
+              "Necesitamos nombre, apellido y DNI para terminar tu alta con Google.",
+            duration: 5000,
+          });
+          return;
+        }
 
         toast.success("¡Bienvenido de vuelta!", {
           description: "Has iniciado sesión exitosamente",
@@ -201,6 +227,36 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     }
   };
 
+  const handleCompleteGoogleProfile = async () => {
+    if (!validateForm(true, true)) {
+      toast.error("Por favor, completa nombre, apellido y DNI");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const nombre = formData.firstName.trim();
+      const apellido = formData.lastName.trim();
+      const dni = formData.dni.trim();
+
+      await updateProfile({ nombre, apellido, dni });
+      authService.updateStudentDataInStorage({ nombre, apellido, dni });
+      setForceProfileCompletion(false);
+
+      toast.success("¡Perfil completado!", {
+        description: "Ya puedes continuar con tu cuenta de Google.",
+        duration: 4000,
+      });
+
+      setTimeout(() => {
+        navigate("/");
+      }, 1000);
+    } catch (error: any) {
+      setIsSubmitting(false);
+      toast.error(error?.message || error?.error || "No se pudo completar el perfil");
+    }
+  };
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
@@ -223,6 +279,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
   return (
     <AuthFormView
       isLogin={isLogin}
+      forceProfileCompletion={forceProfileCompletion}
       currentStep={currentStep}
       showEmailForm={showEmailForm}
       onSubmit={handleSubmit}
@@ -230,6 +287,7 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       onInputChange={handleInputChange}
       onStepChange={handleStepChange}
       onEmailMethodSelect={handleEmailMethodSelect}
+      onCompleteGoogleProfile={handleCompleteGoogleProfile}
       errors={errors}
       formData={formData}
       isSubmitting={isSubmitting}
