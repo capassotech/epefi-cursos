@@ -79,6 +79,7 @@ const CourseDetailPage = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isDisabledModuleDialogOpen, setIsDisabledModuleDialogOpen] = useState(false);
   const videoModalStatePushedRef = useRef(false);
+  const documentModalStatePushedRef = useRef(false);
 
   // Detectar iOS
   useEffect(() => {
@@ -487,9 +488,16 @@ const CourseDetailPage = () => {
     }
   };
 
-  // Cerrar modal al pulsar atrás del navegador
+  // Cerrar modal de documento o video al pulsar atrás del navegador (mismo patrón que el reproductor)
   useEffect(() => {
     const handlePopState = () => {
+      if (isDocumentModalOpen) {
+        documentModalStatePushedRef.current = false;
+        setIsDocumentModalOpen(false);
+        setSelectedDocument(null);
+        setIsDocumentLoading(true);
+        return;
+      }
       if (isVideoModalOpen) {
         videoModalStatePushedRef.current = false;
         setIsVideoModalOpen(false);
@@ -498,7 +506,7 @@ const CourseDetailPage = () => {
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [isVideoModalOpen]);
+  }, [isVideoModalOpen, isDocumentModalOpen]);
 
   // Función para cambiar al siguiente video
   const handleNextVideo = () => {
@@ -610,13 +618,20 @@ const CourseDetailPage = () => {
       documents: documents,
       currentIndex: validIndex,
     });
+    history.pushState({ documentModalOpen: true }, "", window.location.href);
+    documentModalStatePushedRef.current = true;
     setIsDocumentModalOpen(true);
   };
 
   const handleCloseDocument = () => {
-    setIsDocumentModalOpen(false);
-    setSelectedDocument(null);
-    setIsDocumentLoading(true);
+    if (documentModalStatePushedRef.current) {
+      documentModalStatePushedRef.current = false;
+      history.back();
+    } else {
+      setIsDocumentModalOpen(false);
+      setSelectedDocument(null);
+      setIsDocumentLoading(true);
+    }
   };
 
   // Función para cambiar al siguiente documento

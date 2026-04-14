@@ -5,8 +5,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight, ExternalLink, CheckCircle2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -107,6 +108,56 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
       document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
     };
   }, []);
+
+  const getFullscreenElement = useCallback((): HTMLElement | null => {
+    const url = content?.url ?? "";
+    const isYt = url.includes("youtube.com") || url.includes("youtu.be");
+    const isGd = url.includes("drive.google.com");
+    if (isYt || isGd) {
+      return iframeRef.current;
+    }
+    return videoRef.current;
+  }, [content?.url]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = getFullscreenElement();
+    if (!el) return;
+
+    try {
+      const fsDoc = document as Document & {
+        webkitFullscreenElement?: Element | null;
+        mozFullScreenElement?: Element | null;
+        msFullscreenElement?: Element | null;
+      };
+      const isFs =
+        document.fullscreenElement ||
+        fsDoc.webkitFullscreenElement ||
+        fsDoc.mozFullScreenElement ||
+        fsDoc.msFullscreenElement;
+
+      if (!isFs) {
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if ((el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen) {
+          await (el as HTMLElement & { webkitRequestFullscreen: () => Promise<void> }).webkitRequestFullscreen();
+        } else if ((el as HTMLElement & { mozRequestFullScreen?: () => Promise<void> }).mozRequestFullScreen) {
+          await (el as HTMLElement & { mozRequestFullScreen: () => Promise<void> }).mozRequestFullScreen();
+        } else if ((el as HTMLElement & { msRequestFullscreen?: () => Promise<void> }).msRequestFullscreen) {
+          await (el as HTMLElement & { msRequestFullscreen: () => Promise<void> }).msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if ((document as Document & { webkitExitFullscreen?: () => Promise<void> }).webkitExitFullscreen) {
+          await (document as Document & { webkitExitFullscreen: () => Promise<void> }).webkitExitFullscreen();
+        } else if ((document as Document & { mozCancelFullScreen?: () => Promise<void> }).mozCancelFullScreen) {
+          await (document as Document & { mozCancelFullScreen: () => Promise<void> }).mozCancelFullScreen();
+        } else if ((document as Document & { msExitFullscreen?: () => Promise<void> }).msExitFullscreen) {
+          await (document as Document & { msExitFullscreen: () => Promise<void> }).msExitFullscreen();
+        }
+      }
+    } catch (error) {
+      console.error("Error al cambiar pantalla completa:", error);
+    }
+  }, [getFullscreenElement]);
 
   if (!content) return null;
 
@@ -210,71 +261,53 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl [&>button]:hidden">
+      <DialogContent
+        className={cn(
+          "max-w-4xl z-[51] [&>button]:hidden",
+          "flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
+          /* Móvil: ocupar pantalla sin translate 50% (evita caja colapsada / solo overlay negro) */
+          "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
+          "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        )}
+      >
         <DialogTitle className="sr-only">
           {videoTitle}
         </DialogTitle>
         <DialogDescription className="sr-only">
           Reproducción del video seleccionado
         </DialogDescription>
-        <div className="w-full" onClick={(e) => e.stopPropagation()}>
-          <div className="space-y-4">
-            {/* Fila 1: Título - En mobile ocupa toda la fila, en desktop está junto con controles */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 min-w-0">
-              <div className="flex items-center justify-between gap-2 w-full min-w-0 sm:flex-1 sm:min-w-0">
+        <div className="w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex w-full flex-col gap-2 sm:gap-4">
+            {/* Fila 1: Título - En mobile el texto puede ocupar varias líneas; botón pantalla completa siempre accesible */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 min-w-0 shrink-0">
+              <div className="flex items-start justify-between gap-2 w-full min-w-0 sm:flex-1 sm:items-center sm:min-w-0">
                 <h3
-                  className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate min-w-0"
+                  className={cn(
+                    "min-w-0 flex-1 text-left font-semibold text-gray-900 dark:text-gray-100",
+                    "text-base leading-snug sm:text-lg",
+                    "break-words [overflow-wrap:anywhere]",
+                    "line-clamp-4 sm:line-clamp-2 sm:leading-tight"
+                  )}
                   title={videoTitle}
                 >
                   {videoTitle}
                 </h3>
-                {/* Botón de expandir para mobile - Solo visible en mobile */}
-                {!isYouTube && !isGoogleDrive && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="cursor-pointer sm:hidden"
-                    onClick={async () => {
-                      if (!videoRef.current) return;
-                      
-                      try {
-                        if (!isFullscreen) {
-                          // Entrar en pantalla completa
-                          if (videoRef.current.requestFullscreen) {
-                            await videoRef.current.requestFullscreen();
-                          } else if ((videoRef.current as any).webkitRequestFullscreen) {
-                            await (videoRef.current as any).webkitRequestFullscreen();
-                          } else if ((videoRef.current as any).mozRequestFullScreen) {
-                            await (videoRef.current as any).mozRequestFullScreen();
-                          } else if ((videoRef.current as any).msRequestFullscreen) {
-                            await (videoRef.current as any).msRequestFullscreen();
-                          }
-                        } else {
-                          // Salir de pantalla completa
-                          if (document.exitFullscreen) {
-                            await document.exitFullscreen();
-                          } else if ((document as any).webkitExitFullscreen) {
-                            await (document as any).webkitExitFullscreen();
-                          } else if ((document as any).mozCancelFullScreen) {
-                            await (document as any).mozCancelFullScreen();
-                          } else if ((document as any).msExitFullscreen) {
-                            await (document as any).msExitFullscreen();
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Error al cambiar pantalla completa:', error);
-                      }
-                    }}
-                    title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-                  >
-                    {isFullscreen ? (
-                      <Minimize2 className="h-4 w-4" />
-                    ) : (
-                      <Maximize2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
+                {/* Pantalla completa en mobile: todos los tipos (YouTube/Drive antes no tenían botón) */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0 cursor-pointer touch-manipulation sm:hidden"
+                  onClick={() => void toggleFullscreen()}
+                  title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                  aria-label={isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-5 w-5" />
+                  ) : (
+                    <Maximize2 className="h-5 w-5" />
+                  )}
+                </Button>
               </div>
               {/* Controles de navegación - Solo visible en desktop */}
               <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
@@ -311,37 +344,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                     type="button"
                     variant="outline"
                     className="cursor-pointer"
-                    onClick={async () => {
-                      if (!videoRef.current) return;
-                      
-                      try {
-                        if (!isFullscreen) {
-                          // Entrar en pantalla completa
-                          if (videoRef.current.requestFullscreen) {
-                            await videoRef.current.requestFullscreen();
-                          } else if ((videoRef.current as any).webkitRequestFullscreen) {
-                            await (videoRef.current as any).webkitRequestFullscreen();
-                          } else if ((videoRef.current as any).mozRequestFullScreen) {
-                            await (videoRef.current as any).mozRequestFullScreen();
-                          } else if ((videoRef.current as any).msRequestFullscreen) {
-                            await (videoRef.current as any).msRequestFullscreen();
-                          }
-                        } else {
-                          // Salir de pantalla completa
-                          if (document.exitFullscreen) {
-                            await document.exitFullscreen();
-                          } else if ((document as any).webkitExitFullscreen) {
-                            await (document as any).webkitExitFullscreen();
-                          } else if ((document as any).mozCancelFullScreen) {
-                            await (document as any).mozCancelFullScreen();
-                          } else if ((document as any).msExitFullscreen) {
-                            await (document as any).msExitFullscreen();
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Error al cambiar pantalla completa:', error);
-                      }
-                    }}
+                    onClick={() => void toggleFullscreen()}
                     title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                   >
                     {isFullscreen ? (
@@ -360,11 +363,11 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               </div>
             </div>
             
-            {/* Fila 2: Navegador (contenido del video/PDF) */}
-            <div 
+            {/* Fila 2: reproductor — ratio 16:9 estable (padding-bottom evita colapsos con flex en algunos navegadores) */}
+            <div
               ref={videoContainerRef}
-              className="relative w-full video-no-download" 
-              style={{ paddingBottom: '56.25%' }}
+              className="relative w-full shrink-0 overflow-hidden rounded-lg video-no-download"
+              style={{ paddingBottom: "56.25%" }}
             >
               {(isYouTube || isGoogleDrive) ? (
                 <>
