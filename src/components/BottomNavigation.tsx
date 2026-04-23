@@ -223,7 +223,7 @@ const BottomNavigation = () => {
   );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-700 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-gray-700 dark:bg-gray-900 md:hidden">
       <div className="flex items-center justify-around py-2">
         {navItems.map(({ icon: Icon, label, path, activePath, ariaLabel, onClick, id }) => {
           const basePath = activePath ?? path;
