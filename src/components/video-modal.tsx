@@ -1,12 +1,11 @@
 import {
-  Dialog,
-  DialogContent,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 
@@ -222,19 +221,11 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   );
   const isGoogleDrive = !!(content?.url && content.url.includes("drive.google.com"));
 
-  // Debe ejecutarse siempre (nunca después de un return condicional): si no, React rompe con
-  // "Rendered more hooks than during the previous render" cuando content pasa de null a datos.
-  useLayoutEffect(() => {
-    if (!isOpen || !content || (!isYouTube && !isGoogleDrive)) return;
-    const el = iframeRef.current;
-    if (!el || !videoUrl) return;
-    el.src = videoUrl;
-  }, [isOpen, content, isYouTube, isGoogleDrive, videoUrl]);
-
   if (!content) return null;
 
-  // WebKit (Safari / iOS): clave por módulo + índice + URL para remontar iframe al cambiar de video.
-  const iframeMountKey = `embed-${content.id}-${String(content.currentIndex ?? 0)}-${videoUrl}`;
+  // Un solo iframe por módulo: al cambiar de video con las flechas solo cambia `src` (más rápido
+  // que remontar el iframe en cada índice, que obliga a YouTube a cargar el player desde cero).
+  const iframeSlotKey = `embed-slot-${content.id}`;
 
   // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
@@ -259,16 +250,36 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   const videoTitle = getVideoTitle();
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className={cn(
-          "max-w-4xl z-[51] [&>button]:hidden",
-          "flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
-          /* Móvil: ocupar pantalla sin translate 50% (evita caja colapsada / solo overlay negro) */
-          "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-          "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-        )}
-      >
+    <DialogPrimitive.Root
+      open={isOpen}
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        {/* Radix no pinta overlay con modal=false; hace falta para no bloquear pantalla completa del iframe (YouTube). */}
+        <button
+          type="button"
+          aria-label="Cerrar reproductor"
+          className={cn(
+            "fixed inset-0 z-[49] cursor-default border-0 bg-black/80",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          )}
+          data-state={isOpen ? "open" : "closed"}
+          onClick={() => onClose()}
+        />
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed left-[50%] top-[50%] z-[51] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+            "max-w-4xl flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
+            "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
+            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+            "outline-none focus:outline-none"
+          )}
+        >
         <DialogTitle className="sr-only">
           {videoTitle}
         </DialogTitle>
@@ -372,7 +383,8 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 <>
                   <iframe
                     ref={iframeRef}
-                    key={iframeMountKey}
+                    key={iframeSlotKey}
+                    src={videoUrl}
                     title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -500,8 +512,9 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 };
 
