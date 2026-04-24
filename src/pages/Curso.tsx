@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import VideoModal from "@/components/video-modal";
@@ -462,14 +463,14 @@ const CourseDetailPage = () => {
     }
     
     // Convertir URL de YouTube o Google Drive al formato embed si es necesario
-    const embedUrl = convertYouTubeToEmbed(videoUrl);
+    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(videoUrl));
     
     setSelectedVideo({
       id: modulo.id,
       title: modulo.titulo,
       url: embedUrl,
       thumbnail: modulo.url_miniatura,
-      videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
+      videos: videos.map(v => ensureYouTubeEmbedParams(convertYouTubeToEmbed(v))), // Convertir todos los videos
       videoTitles,
       currentIndex: validIndex,
     });
@@ -513,7 +514,7 @@ const CourseDetailPage = () => {
     if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
     const nextIndex = (selectedVideo.currentIndex + 1) % selectedVideo.videos.length;
     const nextUrl = selectedVideo.videos[nextIndex];
-    const embedUrl = convertYouTubeToEmbed(nextUrl);
+    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(nextUrl));
     setSelectedVideo({
       ...selectedVideo,
       url: embedUrl,
@@ -526,7 +527,7 @@ const CourseDetailPage = () => {
     if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
     const prevIndex = (selectedVideo.currentIndex - 1 + selectedVideo.videos.length) % selectedVideo.videos.length;
     const prevUrl = selectedVideo.videos[prevIndex];
-    const embedUrl = convertYouTubeToEmbed(prevUrl);
+    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(prevUrl));
     setSelectedVideo({
       ...selectedVideo,
       url: embedUrl,

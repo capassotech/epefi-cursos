@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -233,7 +234,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     }
   };
 
-  const videoUrl = convertVideoUrlToEmbed(content.url);
+  const videoUrl = ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url));
   const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
   const isGoogleDrive = content.url.includes('drive.google.com');
 
@@ -378,6 +379,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                     allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
                     style={{
                       border: 'none'
                     }}
