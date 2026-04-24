@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 
@@ -222,19 +222,11 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   );
   const isGoogleDrive = !!(content?.url && content.url.includes("drive.google.com"));
 
-  // Debe ejecutarse siempre (nunca después de un return condicional): si no, React rompe con
-  // "Rendered more hooks than during the previous render" cuando content pasa de null a datos.
-  useLayoutEffect(() => {
-    if (!isOpen || !content || (!isYouTube && !isGoogleDrive)) return;
-    const el = iframeRef.current;
-    if (!el || !videoUrl) return;
-    el.src = videoUrl;
-  }, [isOpen, content, isYouTube, isGoogleDrive, videoUrl]);
-
   if (!content) return null;
 
-  // WebKit (Safari / iOS): clave por módulo + índice + URL para remontar iframe al cambiar de video.
-  const iframeMountKey = `embed-${content.id}-${String(content.currentIndex ?? 0)}-${videoUrl}`;
+  // Un solo iframe por módulo: al cambiar de video con las flechas solo cambia `src` (más rápido
+  // que remontar el iframe en cada índice, que obliga a YouTube a cargar el player desde cero).
+  const iframeSlotKey = `embed-slot-${content.id}`;
 
   // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
@@ -372,7 +364,8 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 <>
                   <iframe
                     ref={iframeRef}
-                    key={iframeMountKey}
+                    key={iframeSlotKey}
+                    src={videoUrl}
                     title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
