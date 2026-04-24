@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 
@@ -238,6 +238,18 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
   const isGoogleDrive = content.url.includes('drive.google.com');
 
+  // WebKit (Safari / iOS) a veces no recarga bien el embed si solo cambia `src` en el mismo iframe.
+  // Clave estable por módulo + índice + URL fuerza un nodo nuevo al cambiar de video con las flechas;
+  // `useLayoutEffect` asigna `src` tras el montaje para evitar carreras con el reproductor de YouTube.
+  const iframeMountKey = `embed-${content.id}-${String(content.currentIndex ?? 0)}-${videoUrl}`;
+
+  useLayoutEffect(() => {
+    if (!isOpen || (!isYouTube && !isGoogleDrive)) return;
+    const el = iframeRef.current;
+    if (!el || !videoUrl) return;
+    el.src = videoUrl;
+  }, [isOpen, isYouTube, isGoogleDrive, videoUrl]);
+
   // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
     const idx = content.currentIndex;
@@ -374,7 +386,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 <>
                   <iframe
                     ref={iframeRef}
-                    src={videoUrl}
+                    key={iframeMountKey}
                     title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -383,7 +395,6 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                     style={{
                       border: 'none'
                     }}
-                    key={videoUrl}
                   />
                   {isGoogleDrive && (
                     <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs z-10">
