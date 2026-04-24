@@ -31,6 +31,59 @@ interface VideoModalProps {
   isCompleted?: boolean;
 }
 
+function convertVideoUrlToEmbed(url: string): string {
+  if (!url) return url;
+
+  try {
+    if (url.includes("drive.google.com")) {
+      let fileId = "";
+
+      const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileMatch?.[1]) {
+        fileId = fileMatch[1];
+      } else if (url.includes("id=")) {
+        const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (idMatch?.[1]) {
+          fileId = idMatch[1];
+        }
+      } else if (url.includes("/folders/")) {
+        return url;
+      }
+
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+
+      return url;
+    }
+
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      if (url.includes("youtube.com/embed/")) {
+        return url;
+      }
+
+      const urlObj = new URL(url);
+      let videoId = "";
+
+      if (urlObj.hostname.includes("youtube.com") && urlObj.searchParams.has("v")) {
+        videoId = urlObj.searchParams.get("v") || "";
+      } else if (urlObj.hostname.includes("youtu.be")) {
+        videoId = urlObj.pathname.replace("/", "").split("?")[0];
+      } else if (urlObj.pathname.includes("/embed/")) {
+        return url;
+      }
+
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, onMarkAsCompleted, isCompleted = false }: VideoModalProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -160,95 +213,28 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     }
   }, [getFullscreenElement]);
 
-  if (!content) return null;
+  const videoUrl = content
+    ? ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url))
+    : "";
+  const isYouTube = !!(
+    content?.url &&
+    (content.url.includes("youtube.com") || content.url.includes("youtu.be"))
+  );
+  const isGoogleDrive = !!(content?.url && content.url.includes("drive.google.com"));
 
-  // Convertir URL de YouTube o Google Drive al formato embed si es necesario
-  const convertVideoUrlToEmbed = (url: string): string => {
-    if (!url) return url;
-    
-    try {
-      // Google Drive
-      if (url.includes('drive.google.com')) {
-        // Extraer el ID del archivo de diferentes formatos de Google Drive
-        let fileId = '';
-        
-        // Formato: drive.google.com/file/d/FILE_ID/view
-        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (fileMatch && fileMatch[1]) {
-          fileId = fileMatch[1];
-        }
-        // Formato: drive.google.com/open?id=FILE_ID
-        else if (url.includes('id=')) {
-          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-          if (idMatch && idMatch[1]) {
-            fileId = idMatch[1];
-          }
-        }
-        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
-        else if (url.includes('/folders/')) {
-          // Para carpetas, no podemos hacer embed, retornar URL original
-          return url;
-        }
-        
-        if (fileId) {
-          // Usar el formato preview de Google Drive para videos
-          return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-        
-        return url;
-      }
-      
-      // YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        // Si ya es una URL embed, retornarla tal cual
-        if (url.includes('youtube.com/embed/')) {
-          return url;
-        }
-        
-        const urlObj = new URL(url);
-        let videoId = '';
-        
-        // Formato: youtube.com/watch?v=VIDEO_ID
-        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
-          videoId = urlObj.searchParams.get('v') || '';
-        }
-        // Formato: youtu.be/VIDEO_ID
-        else if (urlObj.hostname.includes('youtu.be')) {
-          videoId = urlObj.pathname.replace('/', '').split('?')[0];
-        }
-        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
-        else if (urlObj.pathname.includes('/embed/')) {
-          return url;
-        }
-        
-        if (videoId) {
-          return `https://www.youtube.com/embed/${videoId}`;
-        }
-      }
-      
-      // Si no es YouTube ni Google Drive, retornar la URL original
-      return url;
-    } catch {
-      // Si no es una URL válida, retornar tal cual
-      return url;
-    }
-  };
-
-  const videoUrl = ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url));
-  const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
-  const isGoogleDrive = content.url.includes('drive.google.com');
-
-  // WebKit (Safari / iOS) a veces no recarga bien el embed si solo cambia `src` en el mismo iframe.
-  // Clave estable por módulo + índice + URL fuerza un nodo nuevo al cambiar de video con las flechas;
-  // `useLayoutEffect` asigna `src` tras el montaje para evitar carreras con el reproductor de YouTube.
-  const iframeMountKey = `embed-${content.id}-${String(content.currentIndex ?? 0)}-${videoUrl}`;
-
+  // Debe ejecutarse siempre (nunca después de un return condicional): si no, React rompe con
+  // "Rendered more hooks than during the previous render" cuando content pasa de null a datos.
   useLayoutEffect(() => {
-    if (!isOpen || (!isYouTube && !isGoogleDrive)) return;
+    if (!isOpen || !content || (!isYouTube && !isGoogleDrive)) return;
     const el = iframeRef.current;
     if (!el || !videoUrl) return;
     el.src = videoUrl;
-  }, [isOpen, isYouTube, isGoogleDrive, videoUrl]);
+  }, [isOpen, content, isYouTube, isGoogleDrive, videoUrl]);
+
+  if (!content) return null;
+
+  // WebKit (Safari / iOS): clave por módulo + índice + URL para remontar iframe al cambiar de video.
+  const iframeMountKey = `embed-${content.id}-${String(content.currentIndex ?? 0)}-${videoUrl}`;
 
   // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
