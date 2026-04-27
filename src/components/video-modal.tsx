@@ -1,13 +1,13 @@
 import {
-  Dialog,
-  DialogContent,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -28,6 +28,59 @@ interface VideoModalProps {
   onPreviousVideo?: () => void;
   onMarkAsCompleted?: () => void;
   isCompleted?: boolean;
+}
+
+function convertVideoUrlToEmbed(url: string): string {
+  if (!url) return url;
+
+  try {
+    if (url.includes("drive.google.com")) {
+      let fileId = "";
+
+      const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileMatch?.[1]) {
+        fileId = fileMatch[1];
+      } else if (url.includes("id=")) {
+        const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (idMatch?.[1]) {
+          fileId = idMatch[1];
+        }
+      } else if (url.includes("/folders/")) {
+        return url;
+      }
+
+      if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+      }
+
+      return url;
+    }
+
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      if (url.includes("youtube.com/embed/")) {
+        return url;
+      }
+
+      const urlObj = new URL(url);
+      let videoId = "";
+
+      if (urlObj.hostname.includes("youtube.com") && urlObj.searchParams.has("v")) {
+        videoId = urlObj.searchParams.get("v") || "";
+      } else if (urlObj.hostname.includes("youtu.be")) {
+        videoId = urlObj.pathname.replace("/", "").split("?")[0];
+      } else if (urlObj.pathname.includes("/embed/")) {
+        return url;
+      }
+
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+      }
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, onMarkAsCompleted, isCompleted = false }: VideoModalProps) => {
@@ -159,83 +212,20 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     }
   }, [getFullscreenElement]);
 
+  const videoUrl = content
+    ? ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url))
+    : "";
+  const isYouTube = !!(
+    content?.url &&
+    (content.url.includes("youtube.com") || content.url.includes("youtu.be"))
+  );
+  const isGoogleDrive = !!(content?.url && content.url.includes("drive.google.com"));
+
   if (!content) return null;
 
-  // Convertir URL de YouTube o Google Drive al formato embed si es necesario
-  const convertVideoUrlToEmbed = (url: string): string => {
-    if (!url) return url;
-    
-    try {
-      // Google Drive
-      if (url.includes('drive.google.com')) {
-        // Extraer el ID del archivo de diferentes formatos de Google Drive
-        let fileId = '';
-        
-        // Formato: drive.google.com/file/d/FILE_ID/view
-        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (fileMatch && fileMatch[1]) {
-          fileId = fileMatch[1];
-        }
-        // Formato: drive.google.com/open?id=FILE_ID
-        else if (url.includes('id=')) {
-          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-          if (idMatch && idMatch[1]) {
-            fileId = idMatch[1];
-          }
-        }
-        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
-        else if (url.includes('/folders/')) {
-          // Para carpetas, no podemos hacer embed, retornar URL original
-          return url;
-        }
-        
-        if (fileId) {
-          // Usar el formato preview de Google Drive para videos
-          return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-        
-        return url;
-      }
-      
-      // YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        // Si ya es una URL embed, retornarla tal cual
-        if (url.includes('youtube.com/embed/')) {
-          return url;
-        }
-        
-        const urlObj = new URL(url);
-        let videoId = '';
-        
-        // Formato: youtube.com/watch?v=VIDEO_ID
-        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
-          videoId = urlObj.searchParams.get('v') || '';
-        }
-        // Formato: youtu.be/VIDEO_ID
-        else if (urlObj.hostname.includes('youtu.be')) {
-          videoId = urlObj.pathname.replace('/', '').split('?')[0];
-        }
-        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
-        else if (urlObj.pathname.includes('/embed/')) {
-          return url;
-        }
-        
-        if (videoId) {
-          return `https://www.youtube.com/embed/${videoId}`;
-        }
-      }
-      
-      // Si no es YouTube ni Google Drive, retornar la URL original
-      return url;
-    } catch {
-      // Si no es una URL válida, retornar tal cual
-      return url;
-    }
-  };
-
-  const videoUrl = convertVideoUrlToEmbed(content.url);
-  const isYouTube = content.url.includes('youtube.com') || content.url.includes('youtu.be');
-  const isGoogleDrive = content.url.includes('drive.google.com');
+  // Un solo iframe por módulo: al cambiar de video con las flechas solo cambia `src` (más rápido
+  // que remontar el iframe en cada índice, que obliga a YouTube a cargar el player desde cero).
+  const iframeSlotKey = `embed-slot-${content.id}`;
 
   // Determinar el título del video (prioriza el título por índice)
   const getVideoTitle = (): string => {
@@ -260,16 +250,36 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   const videoTitle = getVideoTitle();
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className={cn(
-          "max-w-4xl z-[51] [&>button]:hidden",
-          "flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
-          /* Móvil: ocupar pantalla sin translate 50% (evita caja colapsada / solo overlay negro) */
-          "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-          "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-        )}
-      >
+    <DialogPrimitive.Root
+      open={isOpen}
+      modal={false}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        {/* Radix no pinta overlay con modal=false; hace falta para no bloquear pantalla completa del iframe (YouTube). */}
+        <button
+          type="button"
+          aria-label="Cerrar reproductor"
+          className={cn(
+            "fixed inset-0 z-[49] cursor-default border-0 bg-black/80",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          )}
+          data-state={isOpen ? "open" : "closed"}
+          onClick={() => onClose()}
+        />
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed left-[50%] top-[50%] z-[51] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+            "max-w-4xl flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
+            "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
+            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+            "outline-none focus:outline-none"
+          )}
+        >
         <DialogTitle className="sr-only">
           {videoTitle}
         </DialogTitle>
@@ -373,15 +383,16 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 <>
                   <iframe
                     ref={iframeRef}
+                    key={iframeSlotKey}
                     src={videoUrl}
                     title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                     className="absolute top-0 left-0 w-full h-full rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                     allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
                     style={{
                       border: 'none'
                     }}
-                    key={videoUrl}
                   />
                   {isGoogleDrive && (
                     <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs z-10">
@@ -501,8 +512,9 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
             </div>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 };
 
