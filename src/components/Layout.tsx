@@ -6,7 +6,8 @@ const Layout = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Header />
-      <main className="pb-20 md:pb-8">
+      {/* overflow-anchor:none evita microajustes de scroll en Chrome cuando el árbol React se repinta */}
+      <main className="pb-20 md:pb-8 overflow-x-hidden [overflow-anchor:none]">
         <Outlet />
       </main>
       <BottomNavigation />

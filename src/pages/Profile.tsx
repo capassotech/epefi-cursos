@@ -20,16 +20,26 @@ export default function Profile() {
     email: user?.email || "",
   });
 
-  // Actualizar formData cuando cambie el usuario
+  // Sincronizar formulario solo si cambió algo real (evita repintados durante scroll en Chrome)
   useEffect(() => {
-    if (user && !isEditing) {
-      setFormData({
+    if (!user || isEditing) return;
+    setFormData((prev) => {
+      const next = {
         nombre: user.nombre || "",
         apellido: user.apellido || "",
         dni: user.dni || "",
         email: user.email || "",
-      });
-    }
+      };
+      if (
+        prev.nombre === next.nombre &&
+        prev.apellido === next.apellido &&
+        prev.dni === next.dni &&
+        prev.email === next.email
+      ) {
+        return prev;
+      }
+      return next;
+    });
   }, [user, isEditing]);
 
   const handleLogout = async () => {
