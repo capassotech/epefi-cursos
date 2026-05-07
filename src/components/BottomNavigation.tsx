@@ -238,7 +238,7 @@ const BottomNavigation = () => {
               key={id || label}
               onClick={onClick || (() => navigate(path))}
               className={cn(
-                "flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all duration-200",
+                "relative flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-transform duration-200",
                 isActive
                   ? "text-blue-600 dark:text-blue-400"
                   : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"

@@ -62,7 +62,7 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 transform-gpu [backface-visibility:hidden]">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           <div
