@@ -97,8 +97,19 @@
     @apply border-border;
   }
 
+  /*
+   * iOS Chrome / Safari: el scroll del documento se ancla al viewport (html/body).
+   * overflow-anchor solo en <main> no desactiva el ajuste al repintar React → micro-saltos.
+   */
+  html {
+    overflow-anchor: none;
+  }
+
   body {
     @apply bg-background text-foreground;
+    overflow-anchor: none;
+    /* Evita arrastre horizontal que a veces interfiere con el scroll vertical en WebKit */
+    overflow-x: clip;
   }
 }
 
