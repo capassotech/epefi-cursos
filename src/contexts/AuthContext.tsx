@@ -81,6 +81,38 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+function rolesEqual(a: UserProfile["role"], b: UserProfile["role"]): boolean {
+  if (a === b) return true;
+  if (typeof a === "string" || typeof b === "string") {
+    return a === b;
+  }
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") {
+    return false;
+  }
+  const ra = a as UserRole;
+  const rb = b as UserRole;
+  return Boolean(ra.admin) === Boolean(rb.admin) && Boolean(ra.student) === Boolean(rb.student);
+}
+
+/** Evita re-renders y saltos de scroll cuando `/usuarios/me` devuelve los mismos datos. */
+function userProfilesShallowEqual(
+  a: UserProfile | null,
+  b: UserProfile | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.uid === b.uid &&
+    a.email === b.email &&
+    a.nombre === b.nombre &&
+    a.apellido === b.apellido &&
+    a.dni === b.dni &&
+    a.activo === b.activo &&
+    a.fechaRegistro === b.fechaRegistro &&
+    rolesEqual(a.role, b.role)
+  );
+}
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -122,8 +154,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             activo: profileData.activo !== undefined ? profileData.activo : true,
           };
 
-          setUser(updatedProfile);
-          authService.updateStudentDataInStorage(updatedProfile);
+          setUser((prev) => {
+            if (userProfilesShallowEqual(prev, updatedProfile)) {
+              return prev;
+            }
+            authService.updateStudentDataInStorage(updatedProfile);
+            return updatedProfile;
+          });
         } else {
           console.warn("Backend profile fetch failed:", response.status);
         }
