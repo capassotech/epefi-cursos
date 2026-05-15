@@ -83,12 +83,23 @@ function convertVideoUrlToEmbed(url: string): string {
   }
 }
 
+/** iPhone / iPod / iPad (incl. Chrome “CriOS”, que usa WebKit; sin fullscreen API útil en iframes). */
+function isAppleTouchDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iP(hone|od|ad)/i.test(ua)) return true;
+  if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1) return true;
+  return false;
+}
+
 const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, onMarkAsCompleted, isCompleted = false }: VideoModalProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  /** WebKit iOS no aplica requestFullscreen al iframe de YouTube/Drive; simulamos “pantalla completa” con CSS. */
+  const [immersiveEmbed, setImmersiveEmbed] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -102,8 +113,13 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   useEffect(() => {
     if (!isOpen) {
       setIsFullscreen(false);
+      setImmersiveEmbed(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isMobile) setImmersiveEmbed(false);
+  }, [isMobile]);
 
   // Prevenir menú contextual y descarga en móvil
   useEffect(() => {
@@ -173,6 +189,22 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   }, [content?.url]);
 
   const toggleFullscreen = useCallback(async () => {
+    if (immersiveEmbed) {
+      setImmersiveEmbed(false);
+      return;
+    }
+
+    const url = content?.url ?? "";
+    const isEmbed =
+      url.includes("youtube.com") ||
+      url.includes("youtu.be") ||
+      url.includes("drive.google.com");
+
+    if (isEmbed && isAppleTouchDevice()) {
+      setImmersiveEmbed(true);
+      return;
+    }
+
     const el = getFullscreenElement();
     if (!el) return;
 
@@ -210,7 +242,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     } catch (error) {
       console.error("Error al cambiar pantalla completa:", error);
     }
-  }, [getFullscreenElement]);
+  }, [getFullscreenElement, immersiveEmbed, content?.url]);
 
   const videoUrl = content
     ? ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url))
@@ -309,10 +341,10 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   size="icon"
                   className="h-10 w-10 shrink-0 cursor-pointer touch-manipulation sm:hidden"
                   onClick={() => void toggleFullscreen()}
-                  title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-                  aria-label={isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+                  title={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                  aria-label={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
                 >
-                  {isFullscreen ? (
+                  {immersiveEmbed || isFullscreen ? (
                     <Minimize2 className="h-5 w-5" />
                   ) : (
                     <Maximize2 className="h-5 w-5" />
@@ -376,39 +408,66 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
             {/* Fila 2: reproductor — ratio 16:9 estable (padding-bottom evita colapsos con flex en algunos navegadores) */}
             <div
               ref={videoContainerRef}
-              className="relative w-full shrink-0 overflow-hidden rounded-lg video-no-download"
-              style={{ paddingBottom: "56.25%" }}
+              className={cn(
+                "overflow-hidden rounded-lg video-no-download",
+                immersiveEmbed
+                  ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
+                  : "relative w-full shrink-0"
+              )}
+              style={immersiveEmbed ? undefined : { paddingBottom: "56.25%" }}
             >
               {(isYouTube || isGoogleDrive) ? (
                 <>
-                  <iframe
-                    ref={iframeRef}
-                    key={iframeSlotKey}
-                    src={videoUrl}
-                    title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
-                    className="absolute top-0 left-0 w-full h-full rounded-lg"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    style={{
-                      border: 'none'
-                    }}
-                  />
-                  {isGoogleDrive && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs z-10">
-                      <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
-                      <button
-                        type="button"
-                        className="text-orange-400 hover:text-orange-300 underline"
-                        onClick={() => {
-                          const originalUrl = videoUrl.replace('/preview', '/view');
-                          window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                        }}
-                      >
-                        Abrir en Google Drive
-                      </button>
-                    </div>
+                  {immersiveEmbed && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-20 touch-manipulation shadow-md sm:hidden"
+                      onClick={() => setImmersiveEmbed(false)}
+                    >
+                      Salir
+                    </Button>
                   )}
+                  <div
+                    className={cn(
+                      immersiveEmbed
+                        ? "relative aspect-video w-full max-h-[min(100dvh,100svh)]"
+                        : "absolute inset-0"
+                    )}
+                  >
+                    <iframe
+                      ref={iframeRef}
+                      key={iframeSlotKey}
+                      src={videoUrl}
+                      title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
+                      className={cn(
+                        "absolute left-0 top-0 h-full w-full rounded-lg",
+                        immersiveEmbed && "rounded-md sm:rounded-lg"
+                      )}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      style={{
+                        border: "none",
+                      }}
+                    />
+                    {isGoogleDrive && (
+                      <div className="absolute bottom-4 left-4 right-4 z-10 rounded-lg bg-black/70 p-3 text-xs text-white">
+                        <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
+                        <button
+                          type="button"
+                          className="text-orange-400 underline hover:text-orange-300"
+                          onClick={() => {
+                            const originalUrl = videoUrl.replace("/preview", "/view");
+                            window.open(originalUrl, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          Abrir en Google Drive
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <video
