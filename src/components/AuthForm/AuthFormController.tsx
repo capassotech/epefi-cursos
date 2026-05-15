@@ -5,6 +5,11 @@ import { useAuth } from "../../contexts/AuthContext";
 import { toast } from "sonner";
 import authService from "../../services/authService";
 import AuthFormView from "./AuthFormView";
+import {
+  getPasswordRequirements,
+  getPasswordValidationErrors,
+  validatePassword,
+} from "@/lib/passwordValidation";
 
 interface AuthFormProps {
   isLogin?: boolean;
@@ -27,15 +32,6 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
     dni: "",
   });
 
-  const getPasswordRequirements = (password: string) => {
-    return {
-      minLength: password.length >= 8,
-      hasUppercase: /[A-Z]/.test(password),
-      hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-    };
-  };
-
   const validateForm = (
     googleAuth: boolean = false,
     requirePersonalData: boolean = false
@@ -52,16 +48,9 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
       if (!formData.password) {
         newErrors.password = "La contraseña es requerida";
       } else {
-        const requirements = getPasswordRequirements(formData.password);
-        const allRequirementsMet =
-          requirements.minLength &&
-          requirements.hasUppercase &&
-          requirements.hasSpecialChar &&
-          requirements.hasNumber;
-
-        if (!allRequirementsMet) {
-          newErrors.password =
-            "La contraseña no cumple con todos los requisitos";
+        const { valid, errors } = validatePassword(formData.password);
+        if (!valid) {
+          newErrors.password = errors.join(" · ");
         }
       }
     }
@@ -258,6 +247,24 @@ const AuthFormController: React.FC<AuthFormProps> = ({ isLogin = false }) => {
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
+    if (typeof value === "string" && field === "password") {
+      setFormData((prev) => ({ ...prev, password: value }));
+      if (!isLogin) {
+        if (!value) {
+          setErrors((prev) => ({ ...prev, password: "" }));
+        } else {
+          const missing = getPasswordValidationErrors(value);
+          setErrors((prev) => ({
+            ...prev,
+            password: missing.length ? missing.join(" · ") : "",
+          }));
+        }
+      } else if (errors.password) {
+        setErrors((prev) => ({ ...prev, password: "" }));
+      }
+      return;
+    }
+
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
