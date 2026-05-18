@@ -16,6 +16,12 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasswordRequirements } from "./PasswordRequirements";
+import {
+  getPasswordRequirements,
+  getPasswordValidationErrors,
+  isPasswordValid,
+  validatePassword,
+} from "@/lib/passwordValidation";
 import { useTheme } from "@/components/ThemeProvider";
 import EnvironmentBanner from "./EnvironmentBanner";
 
@@ -34,19 +40,23 @@ export default function ForgotPasswordComponent() {
   const params = new URLSearchParams(window.location.search);
   const oobCode = params.get("oobCode");
 
-  const getPasswordRequirements = (password: string) => {
-    return {
-      minLength: password.length >= 8,
-      hasUppercase: /[A-Z]/.test(password),
-      hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password),
-      hasNumber: /[0-9]/.test(password),
-    };
-  };
-
   const passwordRequirements = getPasswordRequirements(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (oobCode) {
+      const { valid, errors } = validatePassword(password);
+      if (!valid) {
+        toast.error("La contraseña no cumple los requisitos", {
+          description: errors.join(" · "),
+        });
+        return;
+      }
+    } else if (!email.trim()) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -206,7 +216,13 @@ export default function ForgotPasswordComponent() {
                       oobCode ? (showPassword ? "text" : "password") : "email"
                     }
                     placeholder={oobCode ? "Nueva Contraseña" : "tu@email.com"}
-                    className="pl-10 form-input"
+                    className={`pl-10 form-input ${
+                      oobCode &&
+                      password.length > 0 &&
+                      !isPasswordValid(password)
+                        ? "border-destructive ring-destructive"
+                        : ""
+                    }`}
                     value={oobCode ? password : email}
                     onChange={(e) =>
                       oobCode
@@ -231,18 +247,28 @@ export default function ForgotPasswordComponent() {
                     </button>
                   )}
                 </div>
-                {(password as string)?.length > 0 && (
+                {oobCode && (
                   <PasswordRequirements
                     passwordRequirements={passwordRequirements}
                   />
                 )}
+                {oobCode &&
+                  password.length > 0 &&
+                  !isPasswordValid(password) && (
+                    <p className="text-sm text-destructive">
+                      {getPasswordValidationErrors(password).join(" · ")}
+                    </p>
+                  )}
               </div>
 
               <Button
                 type="submit"
                 className="w-full btn-gradient dark:btn-gradient-dark hover:opacity-90 transition-all duration-200 font-medium"
                 disabled={
-                  isSubmitting || (oobCode ? !password.trim() : !email.trim())
+                  isSubmitting ||
+                  (oobCode
+                    ? !isPasswordValid(password)
+                    : !email.trim())
                 }
               >
                 {isSubmitting ? (
