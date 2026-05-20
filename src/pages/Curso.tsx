@@ -32,7 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
+import { isYouTubeUrl, toYouTubeEmbedUrl } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import VideoModal from "@/components/video-modal";
@@ -387,32 +387,9 @@ const CourseDetailPage = () => {
         return url;
       }
       
-      // YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        // Si ya es una URL embed, retornarla tal cual
-        if (url.includes('youtube.com/embed/')) {
-          return url;
-        }
-        
-        const urlObj = new URL(url);
-        let videoId = '';
-        
-        // Formato: youtube.com/watch?v=VIDEO_ID
-        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
-          videoId = urlObj.searchParams.get('v') || '';
-        }
-        // Formato: youtu.be/VIDEO_ID
-        else if (urlObj.hostname.includes('youtu.be')) {
-          videoId = urlObj.pathname.replace('/', '').split('?')[0];
-        }
-        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
-        else if (urlObj.pathname.includes('/embed/')) {
-          return url;
-        }
-        
-        if (videoId) {
-          return `https://www.youtube.com/embed/${videoId}`;
-        }
+      // YouTube → embed nocookie minimalista (youtube-nocookie.com)
+      if (isYouTubeUrl(url)) {
+        return toYouTubeEmbedUrl(url);
       }
       
       // Si no es YouTube ni Google Drive, retornar la URL original
@@ -463,14 +440,14 @@ const CourseDetailPage = () => {
     }
     
     // Convertir URL de YouTube o Google Drive al formato embed si es necesario
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(videoUrl));
+    const embedUrl = convertYouTubeToEmbed(videoUrl);
     
     setSelectedVideo({
       id: modulo.id,
       title: modulo.titulo,
       url: embedUrl,
       thumbnail: modulo.url_miniatura,
-      videos: videos.map(v => ensureYouTubeEmbedParams(convertYouTubeToEmbed(v))), // Convertir todos los videos
+      videos: videos.map(v => convertYouTubeToEmbed(v)), // Convertir todos los videos
       videoTitles,
       currentIndex: validIndex,
     });
@@ -514,7 +491,7 @@ const CourseDetailPage = () => {
     if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
     const nextIndex = (selectedVideo.currentIndex + 1) % selectedVideo.videos.length;
     const nextUrl = selectedVideo.videos[nextIndex];
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(nextUrl));
+    const embedUrl = convertYouTubeToEmbed(nextUrl);
     setSelectedVideo({
       ...selectedVideo,
       url: embedUrl,
@@ -527,7 +504,7 @@ const CourseDetailPage = () => {
     if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
     const prevIndex = (selectedVideo.currentIndex - 1 + selectedVideo.videos.length) % selectedVideo.videos.length;
     const prevUrl = selectedVideo.videos[prevIndex];
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(prevUrl));
+    const embedUrl = convertYouTubeToEmbed(prevUrl);
     setSelectedVideo({
       ...selectedVideo,
       url: embedUrl,

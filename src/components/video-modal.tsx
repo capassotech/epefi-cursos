@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
+import { isYouTubeUrl, toYouTubeEmbedUrl } from "@/lib/youtubeEmbed";
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -56,25 +56,8 @@ function convertVideoUrlToEmbed(url: string): string {
       return url;
     }
 
-    if (url.includes("youtube.com") || url.includes("youtu.be")) {
-      if (url.includes("youtube.com/embed/")) {
-        return url;
-      }
-
-      const urlObj = new URL(url);
-      let videoId = "";
-
-      if (urlObj.hostname.includes("youtube.com") && urlObj.searchParams.has("v")) {
-        videoId = urlObj.searchParams.get("v") || "";
-      } else if (urlObj.hostname.includes("youtu.be")) {
-        videoId = urlObj.pathname.replace("/", "").split("?")[0];
-      } else if (urlObj.pathname.includes("/embed/")) {
-        return url;
-      }
-
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
-      }
+    if (isYouTubeUrl(url)) {
+      return toYouTubeEmbedUrl(url);
     }
 
     return url;
@@ -180,7 +163,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
 
   const getFullscreenElement = useCallback((): HTMLElement | null => {
     const url = content?.url ?? "";
-    const isYt = url.includes("youtube.com") || url.includes("youtu.be");
+    const isYt = isYouTubeUrl(url);
     const isGd = url.includes("drive.google.com");
     if (isYt || isGd) {
       return iframeRef.current;
@@ -196,8 +179,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
 
     const url = content?.url ?? "";
     const isEmbed =
-      url.includes("youtube.com") ||
-      url.includes("youtu.be") ||
+      isYouTubeUrl(url) ||
       url.includes("drive.google.com");
 
     if (isEmbed && isAppleTouchDevice()) {
@@ -244,13 +226,8 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     }
   }, [getFullscreenElement, immersiveEmbed, content?.url]);
 
-  const videoUrl = content
-    ? ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url))
-    : "";
-  const isYouTube = !!(
-    content?.url &&
-    (content.url.includes("youtube.com") || content.url.includes("youtu.be"))
-  );
+  const videoUrl = content ? convertVideoUrlToEmbed(content.url) : "";
+  const isYouTube = !!(content?.url && isYouTubeUrl(content.url));
   const isGoogleDrive = !!(content?.url && content.url.includes("drive.google.com"));
 
   if (!content) return null;
@@ -442,16 +419,28 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                       src={videoUrl}
                       title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                       className={cn(
-                        "absolute left-0 top-0 h-full w-full rounded-lg",
+                        "relative z-0 block h-full w-full rounded-lg border-0",
                         immersiveEmbed && "rounded-md sm:rounded-lg"
                       )}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                       allowFullScreen
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      style={{
-                        border: "none",
-                      }}
                     />
+                    {isYouTube && (
+                      <>
+                        <div
+                          className="youtube-overlay-top"
+                          aria-hidden
+                          onClick={(e) => e.preventDefault()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                        />
+                        <div
+                          className="youtube-overlay-bottom"
+                          aria-hidden
+                          onClick={(e) => e.preventDefault()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                        />
+                      </>
+                    )}
                     {isGoogleDrive && (
                       <div className="absolute bottom-4 left-4 right-4 z-10 rounded-lg bg-black/70 p-3 text-xs text-white">
                         <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
