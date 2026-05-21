@@ -170,8 +170,15 @@
       height: clamp(64px, 16%, 88px);
     }
 
+    /* Más alta en móvil: barra de YouTube + “Mirar en YouTube” + expandir pantalla */
     .youtube-overlay-bottom {
-      height: clamp(80px, 22%, 110px);
+      height: clamp(96px, 26%, 130px);
+      background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.95) 0%,
+        rgba(0, 0, 0, 0.7) 70%,
+        transparent 100%
+      );
     }
   }
 }
