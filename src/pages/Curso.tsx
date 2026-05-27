@@ -868,7 +868,7 @@ const CourseDetailPage = () => {
   const CourseSkeleton = () => (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       {/* Header Skeleton */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
           <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
           <div className="flex-1 space-y-2">
@@ -936,7 +936,7 @@ const CourseDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
           <Button
             variant="ghost"
@@ -1493,7 +1493,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
 
   return (
     <div className={cn(
-      "flex min-w-0 items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-all duration-500",
+      "flex min-w-0 items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-colors duration-200",
       !isEnabled 
         ? "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60"
         : isHighlighted 
