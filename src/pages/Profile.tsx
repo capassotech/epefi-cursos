@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+const DNI_REGEX = /^\d{7,8}$/;
+
+function sanitizeDniInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 8);
+}
+
 export default function Profile() {
   const { user, logout, updateProfile, forgotPassword } = useAuth();
   const navigate = useNavigate();
@@ -58,12 +64,20 @@ export default function Profile() {
   const handleSave = async () => {
     if (!user) return;
 
+    const dni = formData.dni.trim();
+    if (dni && !DNI_REGEX.test(dni)) {
+      toast.error("DNI inválido", {
+        description: "El DNI debe tener entre 7 y 8 dígitos numéricos.",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       await updateProfile({
         nombre: formData.nombre,
         apellido: formData.apellido,
-        dni: formData.dni,
+        dni,
         email: formData.email,
       });
       
@@ -248,8 +262,15 @@ export default function Profile() {
                 {isEditing ? (
                   <Input
                     id="dni"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={8}
+                    pattern="\d*"
                     value={formData.dni}
-                    onChange={(e) => handleInputChange("dni", e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("dni", sanitizeDniInput(e.target.value))
+                    }
                     className="w-full"
                     disabled={isSaving}
                   />
