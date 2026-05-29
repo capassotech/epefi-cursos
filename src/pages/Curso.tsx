@@ -1149,9 +1149,11 @@ const CourseDetailPage = () => {
                           Plan de Estudios
                         </h4>
                         {courseDetail.planDeEstudiosFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-                            <Clock className="h-3 w-3" />
-                            Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
+                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -1182,9 +1184,11 @@ const CourseDetailPage = () => {
                           Fechas de Exámenes
                         </h4>
                         {courseDetail.fechasDeExamenesFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-                            <Clock className="h-3 w-3" />
-                            Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
+                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                            </span>
                           </p>
                         )}
                       </div>
