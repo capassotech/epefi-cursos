@@ -730,8 +730,17 @@ const CourseDetailPage = () => {
     let completed = 0;
     let total = 0;
 
+    // Deduplicar el array global de módulos por ID antes de contar, por si el mismo
+    // ID aparece en el array de módulos de más de una materia en Firestore.
+    const seenIds = new Set<string>();
+    const uniqueModulos = modulos.filter((m) => {
+      if (seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+
     materias.forEach(materia => {
-      const materiasModulos = modulos
+      const materiasModulos = uniqueModulos
         .filter(modulo => modulo.id_materia === materia.id)
         .filter(modulo => enabledModules[modulo.id] !== false);
 
@@ -986,7 +995,7 @@ const CourseDetailPage = () => {
       <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
         <div className="flex flex-col gap-4 sm:gap-6">
           {/* Barra de progreso fija */}
-          {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
+          {!loadingProgress && !loadingModulos && !loadingEnabledModules && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
             
             // Función para determinar el color según el progreso
