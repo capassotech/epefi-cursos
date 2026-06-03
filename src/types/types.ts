@@ -14,6 +14,13 @@ export interface Curso {
   fechasDeExamenesUrl?: string; // URL del PDF de fechas de exámenes
   planDeEstudiosFechaActualizacion?: string | Date; // Fecha de última actualización
   fechasDeExamenesFechaActualizacion?: string | Date; // Fecha de última actualización
+  /** Id de formación en Firestore (usado para cargar examen) */
+  idFormacion?: string;
+  id_formacion?: string;
+  formacionId?: string;
+  /** Evaluación embebida en GET /cursos/:id (si existe) */
+  examen?: unknown;
+  evaluacion?: unknown;
 }
 
 export interface Materia {

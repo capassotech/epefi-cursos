@@ -58,8 +58,19 @@ class CoursesService {
     return api.get(`/materias/${id}`);
   }
 
+  /** Obtiene un módulo por id. */
+  getModuloById(moduleId: string) {
+    return api.get(`/modulos/${moduleId}`);
+  }
+
+  /** @deprecated Usar getModuloById; el parámetro es el id del módulo, no de la materia. */
   getModulosByMateriaId(id: string) {
-    return api.get(`/modulos/${id}`);
+    return this.getModuloById(id);
+  }
+
+  /** Todos los módulos de una materia (según materia.modulos en Firestore). */
+  getModulosForMateria(materiaId: string) {
+    return api.get(`/materias/${materiaId}/modulos`);
   }
 
   getStudentModules(userId: string) {
