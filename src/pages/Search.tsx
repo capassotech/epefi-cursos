@@ -193,38 +193,63 @@ const Search = () => {
 
         const results: SearchResult[] = [];
 
-        // Para cada curso, obtener materias y módulos
-        for (const course of courses) {
-          // Agregar el curso a los resultados
+        // Fetch de materias de todos los cursos en paralelo
+        const coursesMateriaData = await Promise.all(
+          courses.map(async (course) => {
+            if (!course.materias?.length) return { course, materias: [] as Materia[] };
+            const responses = await Promise.all(
+              course.materias.map((id: string) =>
+                CoursesService.getMateriasByCourseId(id).catch(() => null)
+              )
+            );
+            const materias: Materia[] = responses
+              .filter(Boolean)
+              .flatMap((r) => {
+                const d = r!.data;
+                return Array.isArray(d) ? d : [d];
+              });
+            return { course, materias };
+          })
+        );
+
+        // IDs únicos de módulos en todos los cursos
+        const allModuleIds = [
+          ...new Set(
+            coursesMateriaData.flatMap(({ materias }) =>
+              materias.flatMap((m) => (m.modulos as string[]) || [])
+            )
+          ),
+        ] as string[];
+
+        // Fetch de todos los módulos en paralelo (deduplicados)
+        const moduleDocs = await Promise.all(
+          allModuleIds.map((id) => CoursesService.getModuloById(id).catch(() => null))
+        );
+        const modulesById: Record<string, Modulo> = {};
+        allModuleIds.forEach((id, i) => {
+          const r = moduleDocs[i];
+          if (r) {
+            const d = r.data;
+            modulesById[id] = Array.isArray(d) ? d[0] : d;
+          }
+        });
+
+        // Construir índice de búsqueda usando los datos ya cargados
+        for (const { course, materias } of coursesMateriaData) {
           const courseResult: SearchResult = {
             id: `course-${course.id}`,
             type: "course",
             title: course.titulo,
             description: course.descripcion || "",
             path: buildCourseUrl(course.id),
-            meta: [],
+            meta: [`${materias.length} materias`],
           };
 
-          // Obtener materias del curso
-          const materias: Materia[] = [];
-          if (course.materias && course.materias.length > 0) {
-            for (const materiaId of course.materias) {
-              try {
-                const materiaResponse = await CoursesService.getMateriasByCourseId(materiaId);
-                const materiaData = materiaResponse.data;
-                const materiasArray = Array.isArray(materiaData) ? materiaData : [materiaData];
-                materias.push(...materiasArray);
-              } catch (error) {
-                console.error(`Error loading materia ${materiaId}:`, error);
-              }
-            }
-          }
-
-          courseResult.meta.push(`${materias.length} materias`);
-
-          // Agregar materias y módulos a los resultados
           for (const materia of materias) {
-            // Agregar la materia
+            const modulos = ((materia.modulos as string[]) || [])
+              .map((id) => modulesById[id])
+              .filter(Boolean) as Modulo[];
+
             const materiaResult: SearchResult = {
               id: `materia-${course.id}-${materia.id}`,
               type: "materia",
@@ -232,29 +257,11 @@ const Search = () => {
               description: "",
               courseTitle: course.titulo,
               path: buildCourseUrl(course.id, materia.id),
-              meta: [],
+              meta: [`${modulos.length} módulos`],
             };
 
-            // Obtener módulos de la materia
-            const modulos: Modulo[] = [];
-            if (materia.modulos && materia.modulos.length > 0) {
-              for (const moduloId of materia.modulos) {
-                try {
-                  const moduloResponse = await CoursesService.getModulosByMateriaId(moduloId);
-                  const moduloData = moduloResponse.data;
-                  const modulosArray = Array.isArray(moduloData) ? moduloData : [moduloData];
-                  modulos.push(...modulosArray);
-                } catch (error) {
-                  console.error(`Error loading modulo ${moduloId}:`, error);
-                }
-              }
-            }
-
-            materiaResult.meta.push(`${modulos.length} módulos`);
-
-            // Agregar módulos
             for (const modulo of modulos) {
-              const moduloResult: SearchResult = {
+              results.push({
                 id: `modulo-${course.id}-${materia.id}-${modulo.id}`,
                 type: "modulo",
                 title: modulo.titulo,
@@ -263,14 +270,16 @@ const Search = () => {
                 subjectName: materia.nombre,
                 path: buildCourseUrl(course.id, materia.id, modulo.id),
                 meta: [],
-              };
-              results.push(moduloResult);
+              });
             }
 
             results.push(materiaResult);
           }
 
-          const totalModulos = materias.reduce((acc, m) => acc + (m.modulos?.length || 0), 0);
+          const totalModulos = materias.reduce(
+            (acc, m) => acc + ((m.modulos as string[])?.length || 0),
+            0
+          );
           courseResult.meta.push(`${totalModulos} módulos`);
           results.push(courseResult);
         }
