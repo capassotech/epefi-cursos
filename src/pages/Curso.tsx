@@ -774,6 +774,25 @@ const CourseDetailPage = () => {
           });
         }
 
+        // Contar documentos
+        if (modulo.url_archivo) {
+          const documents = modulo.url_archivo.includes('|||') 
+            ? modulo.url_archivo.split('|||').filter(url => url.trim())
+            : [modulo.url_archivo];
+          documents.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'document')) {
+              completed++;
+            }
+          });
+        }
+      });
+    });
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
+  };
+
   // Función para formatear fechas
   const formatDate = (date: string | Date | any | undefined): string => {
     if (!date) return "";
