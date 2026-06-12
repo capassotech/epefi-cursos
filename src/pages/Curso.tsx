@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -36,6 +36,9 @@ import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import VideoModal from "@/components/video-modal";
+import CourseExamSection from "@/components/CourseExamSection";
+import { getCourseContentProgress } from "@/lib/courseProgress";
+import { getMissingModuleIds, getModulesForMateria } from "@/lib/courseModules";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
@@ -53,6 +56,7 @@ const CourseDetailPage = () => {
   const [loadingModulos, setLoadingModulos] = useState(true);
   const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
   const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [examProgressRevision, setExamProgressRevision] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(true);
   const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
@@ -196,31 +200,44 @@ const CourseDetailPage = () => {
 
       try {
         setLoadingModulos(true);
-        const allModulosPromises: Promise<Modulo[]>[] = [];
 
-        materias.forEach((materia) => {
-          if (materia.modulos && materia.modulos.length > 0) {
-            materia.modulos.forEach((moduloId) => {
-              allModulosPromises.push(
-                CoursesService.getModulosByMateriaId(moduloId).then((response) => {
-                  const moduloData = response.data;
-                  return Array.isArray(moduloData) ? moduloData : [moduloData];
+        const fetchMateriaModulos = async (materia: Materia): Promise<Modulo[]> => {
+          const assignMateria = (modulo: Modulo): Modulo => ({
+            ...modulo,
+            id: modulo.id,
+            id_materia: materia.id,
+          });
+
+          try {
+            const response = await CoursesService.getModulosForMateria(materia.id);
+            const list = Array.isArray(response.data) ? response.data : [];
+            return list.map((m: Modulo) => assignMateria(m));
+          } catch {
+            const settled = await Promise.allSettled(
+              (materia.modulos ?? []).map((moduloId) =>
+                CoursesService.getModuloById(moduloId).then((response) => {
+                  const moduloData = response.data as Modulo;
+                  const single = Array.isArray(moduloData) ? moduloData[0] : moduloData;
+                  return assignMateria({ ...single, id: single?.id ?? moduloId });
                 })
-              );
-            });
+              )
+            );
+            return settled
+              .filter(
+                (result): result is PromiseFulfilledResult<Modulo> =>
+                  result.status === "fulfilled"
+              )
+              .map((result) => result.value);
           }
+        };
+
+        const modulosByMateria = await Promise.all(materias.map(fetchMateriaModulos));
+        const byId = new Map<string, Modulo>();
+        modulosByMateria.flat().forEach((modulo) => {
+          if (modulo?.id) byId.set(modulo.id, modulo);
         });
 
-        // Si no hay módulos para cargar, establecer loadingModulos en false inmediatamente
-        if (allModulosPromises.length === 0) {
-          setModulos([]);
-          setLoadingModulos(false);
-          return;
-        }
-
-        const modulosArrays = await Promise.all(allModulosPromises);
-        const allModulos = modulosArrays.flat();
-        setModulos(allModulos);
+        setModulos([...byId.values()]);
         setLoadingModulos(false);
       } catch (error) {
         console.error('Error fetching modulos:', error);
@@ -702,6 +719,7 @@ const CourseDetailPage = () => {
 
       // Llamar al backend
       await CoursesService.markContentAsCompleted(user.uid, moduleId, contentIndex, contentType, !isCompleted);
+      setExamProgressRevision((r) => r + 1);
     } catch (error) {
       console.error('Error marking content as completed:', error);
       // Revertir el cambio en caso de error
@@ -755,25 +773,6 @@ const CourseDetailPage = () => {
             }
           });
         }
-
-        // Contar documentos
-        if (modulo.url_archivo) {
-          const documents = modulo.url_archivo.includes('|||') 
-            ? modulo.url_archivo.split('|||').filter(url => url.trim())
-            : [modulo.url_archivo];
-          documents.forEach((_, index) => {
-            total++;
-            if (isContentCompleted(modulo.id, index, 'document')) {
-              completed++;
-            }
-          });
-        }
-      });
-    });
-
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-    return { completed, total, percentage };
-  };
 
   // Función para formatear fechas
   const formatDate = (date: string | Date | any | undefined): string => {
@@ -1059,17 +1058,11 @@ const CourseDetailPage = () => {
                 onValueChange={setExpandedMaterias}
               >
                 {materias
-                  .filter((materia) => {
-                    // Obtener todos los módulos de esta materia
-                    const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
-                    
-                    // Mostrar la materia si tiene módulos (habilitados o deshabilitados)
-                    return materiasModulos.length > 0;
-                  })
+                  .filter((materia) => (materia.modulos?.length ?? 0) > 0)
                   .map((materia) => {
-                    // Mostrar todos los módulos (habilitados y deshabilitados)
-                    const materiasModulos = modulos
-                      .filter(modulo => modulo.id_materia === materia.id);
+                    const materiasModulos = getModulesForMateria(materia, modulos);
+                    const missingModuleIds = getMissingModuleIds(materia, modulos);
+                    const totalEnMateria = materia.modulos?.length ?? materiasModulos.length;
 
                   return (
                     <AccordionItem
@@ -1088,7 +1081,8 @@ const CourseDetailPage = () => {
                                   {materia.nombre}
                                 </span>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                  {materiasModulos.length} módulo{materiasModulos.length !== 1 ? 's' : ''}
+                                  {materiasModulos.length} de {totalEnMateria} módulo
+                                  {totalEnMateria !== 1 ? "s" : ""}
                                 </p>
                               </div>
                             </div>
@@ -1099,9 +1093,9 @@ const CourseDetailPage = () => {
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
                               </div>
-                            ) : materiasModulos.length > 0 ? (
+                            ) : materiasModulos.length > 0 || missingModuleIds.length > 0 ? (
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
-                                {materiasModulos.map((modulo, index) => (
+                                {materiasModulos.map((modulo) => (
                                   <div
                                     key={modulo.id}
                                     ref={(el) => {
@@ -1118,6 +1112,20 @@ const CourseDetailPage = () => {
                                       handleMarkAsCompleted={handleMarkAsCompleted}
                                       onDisabledClick={() => setIsDisabledModuleDialogOpen(true)}
                                     />
+                                  </div>
+                                ))}
+                                {missingModuleIds.map((moduleId) => (
+                                  <div
+                                    key={`missing-${moduleId}`}
+                                    className="rounded-lg border border-dashed border-amber-300 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 p-4"
+                                  >
+                                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                                      Módulo no disponible
+                                    </p>
+                                    <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1">
+                                      Este módulo está en la materia pero no se pudo cargar. Contactá al
+                                      administrador si debería estar visible.
+                                    </p>
                                   </div>
                                 ))}
                               </div>
@@ -1222,6 +1230,19 @@ const CourseDetailPage = () => {
                 </div>
               </div>
             </section>
+          )}
+
+          {user?.uid && courseId && (
+            <CourseExamSection
+              key={courseId}
+              courseId={courseId}
+              coursePayload={courseDetail}
+              progressRevision={examProgressRevision}
+              modulos={modulos}
+              materiaIds={materias.map((m) => m.id)}
+              enabledModules={enabledModules}
+              progress={progress}
+            />
           )}
         </div>
       </main>
@@ -1483,9 +1504,8 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
 
   // Verificar si todos los contenidos del módulo están completados
   const isModuleCompleted = (): boolean => {
-    // Si no hay contenidos, no está completado
     if (documents.length === 0 && videos.length === 0) {
-      return false;
+      return true;
     }
 
     // Verificar que todos los documentos estén completados
