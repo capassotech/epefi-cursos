@@ -99,7 +99,7 @@ const CourseCard = ({
                 )}
                 {course.fechaFinDictado && (
                   <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 opacity-0 sm:opacity-100" />
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span className="font-medium">Fin:</span>
                     <span>{formatDate(course.fechaFinDictado)}</span>
                   </div>
