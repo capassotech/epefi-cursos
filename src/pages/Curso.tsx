@@ -743,14 +743,55 @@ const CourseDetailPage = () => {
     return moduleProgress[contentKey] === true;
   };
 
+  // Calcular progreso del curso
+  const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
+    let completed = 0;
+    let total = 0;
 
-  const calculateCourseProgress = () =>
-    getCourseContentProgress(
-      modulos,
-      materias.map((m) => m.id),
-      enabledModules,
-      progress
-    );
+    // Deduplicar el array global de módulos por ID antes de contar, por si el mismo
+    // ID aparece en el array de módulos de más de una materia en Firestore.
+    const seenIds = new Set<string>();
+    const uniqueModulos = modulos.filter((m) => {
+      if (seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+
+    materias.forEach(materia => {
+      const materiasModulos = uniqueModulos
+        .filter(modulo => modulo.id_materia === materia.id)
+        .filter(modulo => enabledModules[modulo.id] !== false);
+
+      materiasModulos.forEach(modulo => {
+        // Contar videos
+        if (modulo.url_video) {
+          const videos = Array.isArray(modulo.url_video) ? modulo.url_video : [modulo.url_video];
+          videos.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'video')) {
+              completed++;
+            }
+          });
+        }
+
+        // Contar documentos
+        if (modulo.url_archivo) {
+          const documents = modulo.url_archivo.includes('|||') 
+            ? modulo.url_archivo.split('|||').filter(url => url.trim())
+            : [modulo.url_archivo];
+          documents.forEach((_, index) => {
+            total++;
+            if (isContentCompleted(modulo.id, index, 'document')) {
+              completed++;
+            }
+          });
+        }
+      });
+    });
+
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percentage };
+  };
 
   // Función para formatear fechas
   const formatDate = (date: string | Date | any | undefined): string => {
@@ -972,7 +1013,7 @@ const CourseDetailPage = () => {
       <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
         <div className="flex flex-col gap-4 sm:gap-6">
           {/* Barra de progreso fija */}
-          {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
+          {!loadingProgress && !loadingModulos && !loadingEnabledModules && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
             
             // Función para determinar el color según el progreso
