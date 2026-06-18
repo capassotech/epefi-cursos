@@ -151,15 +151,9 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
-  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>(
-    {},
-  );
-  const [progress, setProgress] = useState<
-    Record<string, Record<string, boolean>>
-  >({});
-  const [courseProgressMap, setCourseProgressMap] = useState<
-    Record<string, number>
-  >({});
+  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
+  const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [enrichedCourses, setEnrichedCourses] = useState<Array<{ course: Course; modules: any[] }>>([]);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -326,13 +320,13 @@ const Index = () => {
 
       if (user.activo === false) {
         setCourses([]);
+        setEnrichedCourses([]);
         setLoading(false);
         return;
       }
 
       setLoading(true);
       try {
-        // Obtener cursos, progreso y módulos habilitados en paralelo
         const [coursesResponse, progressResponse, enabledModulesResponse] =
           await Promise.all([
             CoursesService.getAllCoursesPerUser(user.uid),
@@ -354,26 +348,13 @@ const Index = () => {
 
         if (cancelled) return;
 
-        // Usar variables locales para el cálculo (evita leer estado React potencialmente desactualizado)
-        const progressData: Record<
-          string,
-          Record<string, boolean>
-        > = progressResponse.data?.progreso || {};
+        const progressData: Record<string, Record<string, boolean>> =
+          progressResponse.data?.progreso || {};
         const enabledModulesData: Record<string, boolean> =
           enabledModulesResponse.data?.modulos_habilitados || {};
 
-        // Sincronizar estado para posible uso externo
         setProgress(progressData);
         setEnabledModules(enabledModulesData);
-
-        const isItemCompleted = (
-          moduleId: string,
-          contentIndex: number,
-          contentType: "video" | "document",
-        ): boolean => {
-          const key = `${moduleId}_${contentType}_${contentIndex}`;
-          return (progressData[moduleId] || {})[key] === true;
-        };
 
         const coursesData = Array.isArray(coursesResponse.data)
           ? coursesResponse.data
@@ -382,117 +363,82 @@ const Index = () => {
           (course) => course.estado === "activo",
         );
 
-        const coursesWithProgress = await Promise.all(
-          filteredCourses.map(async (course) => {
-            // Obtener materias del curso
-            const materias: any[] = [];
-            if (course.materias && course.materias.length > 0) {
-              for (const materiaId of course.materias) {
-                try {
-                  const r =
-                    await CoursesService.getMateriasByCourseId(materiaId);
-                  const d = r.data;
-                  materias.push(...(Array.isArray(d) ? d : [d]));
-                } catch (error) {
-                  console.error(`Error fetching materia ${materiaId}:`, error);
-                }
-              }
-            }
-
-            // Obtener todos los módulos del curso
-            const allModulos: any[] = [];
-            for (const materia of materias) {
-              if (materia.modulos && Array.isArray(materia.modulos)) {
-                for (const moduloId of materia.modulos) {
-                  try {
-                    const r =
-                      await CoursesService.getModulosByMateriaId(moduloId);
-                    const d = r.data;
-                    allModulos.push(...(Array.isArray(d) ? d : [d]));
-                  } catch (error) {
-                    console.error(`Error fetching modulo ${moduloId}:`, error);
-                  }
-                }
-              }
-            }
-
-            // Deduplicar por ID antes de contar
-            const seenIds = new Set<string>();
-            const uniqueModulos = allModulos.filter((m) => {
-              if (seenIds.has(m.id)) return false;
-              seenIds.add(m.id);
-              return true;
-            });
-
-            if (uniqueModulos.length === 0) {
-              return { course, progress: 0 };
-            }
-
-            // Calcular progreso con el mismo algoritmo que Curso.tsx:
-            // iterar por materia y filtrar por id_materia + estado habilitado.
-            // Esto garantiza que cada módulo se cuente exactamente una vez
-            // bajo la materia a la que pertenece, y excluye módulos deshabilitados.
-            let completed = 0;
-            let total = 0;
-
-            for (const materia of materias) {
-              const materiaModulos = uniqueModulos
-                .filter((m) => m.id_materia === materia.id)
-                .filter((m) => enabledModulesData[m.id] !== false);
-
-              for (const modulo of materiaModulos) {
-                if (modulo.url_video) {
-                  const videos = Array.isArray(modulo.url_video)
-                    ? modulo.url_video
-                    : [modulo.url_video];
-                  videos.forEach((_: string, index: number) => {
-                    total++;
-                    if (isItemCompleted(modulo.id, index, "video")) completed++;
-                  });
-                }
-                if (modulo.url_archivo) {
-                  const docs = modulo.url_archivo.includes("|||")
-                    ? modulo.url_archivo
-                        .split("|||")
-                        .filter((u: string) => u.trim())
-                    : [modulo.url_archivo];
-                  docs.forEach((_: string, index: number) => {
-                    total++;
-                    if (isItemCompleted(modulo.id, index, "document"))
-                      completed++;
-                  });
-                }
-              }
-            }
-
-            if (total === 0) {
-              // Sin contenido contabilizable: el curso se muestra pero con 0%
-              return { course, progress: 0 };
-            }
-
-            const percentage = Math.round((completed / total) * 100);
-            return { course, progress: percentage };
+        const coursesMateriaData = await Promise.all(
+          filteredCourses.map(async (course: Course) => {
+            if (!course.materias?.length) return { course, materias: [] };
+            const materiaResponses = await Promise.all(
+              course.materias.map((id: string) =>
+                CoursesService.getMateriasByCourseId(id).catch(() => null),
+              ),
+            );
+            const materias = materiaResponses
+              .filter(Boolean)
+              .flatMap((r) => {
+                const d = r!.data;
+                return Array.isArray(d) ? d : [d];
+              });
+            return { course, materias };
           }),
         );
 
-        if (cancelled) return;
+        const allModuleIds = [
+          ...new Set(
+            coursesMateriaData.flatMap(({ materias }) =>
+              materias.flatMap((m: any) => m.modulos || []),
+            ),
+          ),
+        ] as string[];
 
-        const validCourses = coursesWithProgress.filter(
-          (item): item is { course: Course; progress: number } => item !== null,
+        const moduleDocs = await Promise.all(
+          allModuleIds.map((id) =>
+            CoursesService.getModuloById(id).catch(() => null),
+          ),
         );
-
-        const visibleCourses = validCourses.map((item) => item.course);
-        const progressMap: Record<string, number> = {};
-        validCourses.forEach((item) => {
-          progressMap[item.course.id] = item.progress;
+        const modulesById: Record<string, any> = {};
+        allModuleIds.forEach((id, i) => {
+          const r = moduleDocs[i];
+          if (r) {
+            const d = r.data;
+            modulesById[id] = Array.isArray(d) ? d[0] : d;
+          }
         });
 
+        const newEnriched: Array<{ course: Course; modules: any[] }> = [];
+        const visibleCourses: Course[] = [];
+
+        for (const { course, materias } of coursesMateriaData) {
+          const moduleIds: string[] = materias.flatMap(
+            (m: any) => m.modulos || [],
+          );
+
+          if (moduleIds.length === 0) {
+            newEnriched.push({ course, modules: [] });
+            visibleCourses.push(course);
+            continue;
+          }
+
+          const hasEnabled = moduleIds.some(
+            (id) => enabledModulesData[id] !== false,
+          );
+          if (!hasEnabled) continue;
+
+          const modules = moduleIds
+            .map((id) => modulesById[id])
+            .filter(Boolean);
+          newEnriched.push({ course, modules });
+          visibleCourses.push(course);
+        }
+
+        if (cancelled) return;
+
         setCourses(visibleCourses);
-        setCourseProgressMap(progressMap);
+        setEnrichedCourses(newEnriched);
       } catch (error) {
         console.error("Error al cargar datos:", error);
-        setCourses([]);
-        setCourseProgressMap({});
+        if (!cancelled) {
+          setCourses([]);
+          setEnrichedCourses([]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -504,6 +450,42 @@ const Index = () => {
       cancelled = true;
     };
   }, [user?.uid, user?.activo]);
+
+  const courseProgressMap = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const { course, modules } of enrichedCourses) {
+      const enabledMods = modules.filter(
+        (m) => m && enabledModules[m.id] !== false,
+      );
+      let completed = 0;
+      let total = 0;
+      for (const modulo of enabledMods) {
+        const moduleProgress = progress[modulo.id] || {};
+        if (modulo.url_video) {
+          const videos = Array.isArray(modulo.url_video)
+            ? modulo.url_video
+            : [modulo.url_video];
+          videos.forEach((_: any, index: number) => {
+            total++;
+            if (moduleProgress[`${modulo.id}_video_${index}`] === true)
+              completed++;
+          });
+        }
+        if (modulo.url_archivo) {
+          const docs = modulo.url_archivo.includes("|||")
+            ? modulo.url_archivo.split("|||").filter((u: string) => u.trim())
+            : [modulo.url_archivo];
+          docs.forEach((_: any, index: number) => {
+            total++;
+            if (moduleProgress[`${modulo.id}_document_${index}`] === true)
+              completed++;
+          });
+        }
+      }
+      map[course.id] = total > 0 ? Math.round((completed / total) * 100) : 0;
+    }
+    return map;
+  }, [enrichedCourses, progress, enabledModules]);
 
   return (
     <>
