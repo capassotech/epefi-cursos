@@ -28,6 +28,41 @@ export interface ExamResultSummary {
   totalPreguntas?: number;
 }
 
+export interface ExamUltimoIntento extends ExamResultSummary {
+  id?: string;
+  intentoNumero?: number;
+  fechaRealizacion?: string;
+}
+
+export interface ExamRealizadoOpcionDetalle {
+  id: string;
+  texto: string;
+  esCorrecta: boolean;
+  seleccionadaPorAlumno: boolean;
+}
+
+export interface ExamRealizadoPreguntaDetalle {
+  orden: number;
+  id: string;
+  texto: string;
+  tipoInput?: string;
+  esCorrecta: boolean;
+  acertada: boolean;
+  respuestasSeleccionadas: Array<{ id: string; texto: string; esCorrecta: boolean }>;
+  respuestasCorrectas: Array<{ id: string; texto: string }>;
+  opciones: ExamRealizadoOpcionDetalle[];
+}
+
+export interface ExamRealizadoDetalle extends ExamUltimoIntento {
+  idExamen: string;
+  idFormacion: string;
+  tituloExamen?: string;
+  tituloFormacion?: string;
+  estado?: string;
+  preguntas?: ExamRealizadoPreguntaDetalle[];
+  detallePreguntas?: ExamRealizadoPreguntaDetalle[];
+}
+
 export interface ExamEstado {
   examenDisponible: boolean;
   puedeRealizar: boolean;
@@ -41,7 +76,7 @@ export interface ExamEstado {
     modulosCompletados: number;
     modulosPendientes: number;
   };
-  ultimoIntento?: ExamResultSummary;
+  ultimoIntento?: ExamUltimoIntento;
 }
 
 export interface ExamAnswerSubmission {

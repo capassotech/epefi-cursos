@@ -6,9 +6,11 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -39,12 +41,15 @@ import {
   type ModuleProgressMap,
 } from "@/lib/courseProgress";
 import ExamService, { getApiErrorMessage } from "@/services/examService";
+import VerExamenRealizadoModal from "@/components/VerExamenRealizadoModal";
 import type { Modulo } from "@/types/types";
 import type {
   CourseExam,
   ExamEstado,
   ExamQuestion,
+  ExamRealizadoDetalle,
   ExamResultSummary,
+  ExamUltimoIntento,
   StudentAnswersMap,
 } from "@/types/exam";
 import { toast } from "sonner";
@@ -54,12 +59,22 @@ type ExamPhase = "idle" | "loading_exam" | "taking" | "result";
 function ExamResultDisplay({
   result,
   prominent = false,
+  showStatus = false,
 }: {
   result: ExamResultSummary;
   prominent?: boolean;
+  showStatus?: boolean;
 }) {
   return (
     <div className={cn("space-y-1", prominent ? "text-center" : "text-left")}>
+      {showStatus && (
+        <Badge
+          variant={result.aprobado ? "default" : "destructive"}
+          className={cn(prominent ? "mx-auto" : "")}
+        >
+          {result.aprobado ? "Aprobado" : "No aprobado"}
+        </Badge>
+      )}
       <p
         className={cn(
           "font-bold text-slate-900 dark:text-slate-100",
@@ -113,8 +128,11 @@ export default function CourseExamSection({
   const [displayQuestions, setDisplayQuestions] = useState<ExamQuestion[]>([]);
   const [answers, setAnswers] = useState<StudentAnswersMap>({});
   const [submitting, setSubmitting] = useState(false);
-  const [lastResult, setLastResult] = useState<ExamResultSummary | null>(null);
+  const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showVerExamenModal, setShowVerExamenModal] = useState(false);
+  const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
+  const [loadingVerExamen, setLoadingVerExamen] = useState(false);
 
   const formacionId = useMemo(
     () => resolveFormacionId(coursePayload, courseId),
@@ -271,6 +289,31 @@ export default function CourseExamSection({
     });
   };
 
+  const handleVerExamenRealizado = useCallback(async () => {
+    const intentoId = lastResult?.id ?? estado?.ultimoIntento?.id;
+    if (!intentoId) {
+      toast.error("No se encontró el registro del examen realizado.");
+      return;
+    }
+
+    setShowVerExamenModal(true);
+    setLoadingVerExamen(true);
+    setExamenDetalle(null);
+
+    try {
+      const detalle = await ExamService.getExamenRealizadoDetalle(intentoId);
+      setExamenDetalle(detalle);
+    } catch (error) {
+      console.error("Error loading exam detail:", error);
+      toast.error("No se pudo cargar el examen realizado", {
+        description: getApiErrorMessage(error, "Intentá nuevamente más tarde."),
+      });
+      setShowVerExamenModal(false);
+    } finally {
+      setLoadingVerExamen(false);
+    }
+  }, [estado?.ultimoIntento?.id, lastResult?.id]);
+
   const handleSubmit = async () => {
     if (!exam || !estado?.idExamen) return;
 
@@ -289,13 +332,16 @@ export default function CourseExamSection({
         respuestas: buildSubmissionPayload(displayQuestions, answers),
       });
 
-      setLastResult({
+      const intentoResultado: ExamUltimoIntento = {
         nota: result.nota,
         aprobado: result.aprobado,
         porcentajeAciertos: result.porcentajeAciertos,
         respuestasCorrectas: result.respuestasCorrectas,
         totalPreguntas: result.totalPreguntas,
-      });
+        ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
+      };
+
+      setLastResult(intentoResultado);
       setPhase("result");
 
       if (result.aprobado) {
@@ -307,13 +353,7 @@ export default function CourseExamSection({
             ? {
                 ...prev,
                 puedeRealizar: false,
-                ultimoIntento: {
-                  nota: result.nota,
-                  aprobado: true,
-                  porcentajeAciertos: result.porcentajeAciertos,
-                  respuestasCorrectas: result.respuestasCorrectas,
-                  totalPreguntas: result.totalPreguntas,
-                },
+                ultimoIntento: intentoResultado,
               }
             : prev
         );
@@ -325,13 +365,7 @@ export default function CourseExamSection({
           prev
             ? {
                 ...prev,
-                ultimoIntento: {
-                  nota: result.nota,
-                  aprobado: false,
-                  porcentajeAciertos: result.porcentajeAciertos,
-                  respuestasCorrectas: result.respuestasCorrectas,
-                  totalPreguntas: result.totalPreguntas,
-                },
+                ultimoIntento: intentoResultado,
               }
             : prev
         );
@@ -374,7 +408,10 @@ export default function CourseExamSection({
   );
 
   const notaMinima = estado?.notaMinima ?? PASSING_GRADE;
-  const passed = lastResult?.aprobado === true || estado?.ultimoIntento?.aprobado === true;
+  const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
+  const passed = ultimoIntento?.aprobado === true;
+  const tieneIntento = ultimoIntento != null;
+  const puedeVerDetalle = Boolean(ultimoIntento?.id);
   const canShowButton =
     !passed && !!estado?.idExamen && (estado.puedeRealizar === true || locallyReady);
 
@@ -490,44 +527,59 @@ export default function CourseExamSection({
               </Alert>
             )}
 
-            {passed && (
-              <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30 p-4 text-center space-y-2">
-                <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto" />
-                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  ¡Aprobaste la evaluación!
-                </p>
-                {(lastResult ?? estado.ultimoIntento) && (
-                  <ExamResultDisplay
-                    result={(lastResult ?? estado.ultimoIntento)!}
-                    prominent
-                  />
+            {tieneIntento && (
+              <div
+                className={cn(
+                  "rounded-lg border p-4 space-y-3",
+                  passed
+                    ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
+                    : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
                 )}
+              >
+                <div className="flex items-start gap-3">
+                  {passed ? (
+                    <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">
+                      {passed ? "¡Aprobaste la evaluación!" : "Último intento"}
+                    </p>
+                    <ExamResultDisplay result={ultimoIntento} showStatus />
+                    {!passed && (
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        No alcanzaste la nota mínima. Podés reintentar.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {puedeVerDetalle && (
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto gap-2"
+                      onClick={() => void handleVerExamenRealizado()}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver examen realizado
+                    </Button>
+                  )}
+                  {!passed && canShowButton && (
+                    <Button className="w-full sm:w-auto gap-2" onClick={() => void openExamModal()}>
+                      <RotateCcw className="h-4 w-4" />
+                      Reintentar evaluación
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
-            {canShowButton && (
-              <div className="space-y-4">
-                {estado.ultimoIntento && !estado.ultimoIntento.aprobado && (
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 p-3 flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-slate-900 dark:text-slate-100">
-                        Último intento
-                      </p>
-                      <ExamResultDisplay result={estado.ultimoIntento} />
-                      <p className="text-slate-600 dark:text-slate-400 mt-1">
-                        No alcanzaste la nota mínima. Podés reintentar.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <Button className="w-full sm:w-auto" onClick={() => void openExamModal()}>
-                  {estado.ultimoIntento && !estado.ultimoIntento.aprobado
-                    ? "Reintentar evaluación"
-                    : "Realizar evaluación"}
-                </Button>
-              </div>
+            {canShowButton && !tieneIntento && (
+              <Button className="w-full sm:w-auto" onClick={() => void openExamModal()}>
+                Realizar evaluación
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -707,27 +759,58 @@ export default function CourseExamSection({
               )}
 
               {phase === "result" && lastResult && !lastResult.aprobado && (
-                <Button
-                  className="w-full sm:w-auto gap-2"
-                  onClick={() => void openExamModal()}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reintentar evaluación
-                </Button>
+                <>
+                  <Button
+                    className="w-full sm:w-auto gap-2"
+                    onClick={() => void openExamModal()}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reintentar evaluación
+                  </Button>
+                  {lastResult.id && (
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto gap-2"
+                      onClick={() => void handleVerExamenRealizado()}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver examen realizado
+                    </Button>
+                  )}
+                </>
               )}
 
               {phase === "result" && lastResult?.aprobado && (
-                <Button
-                  className="w-full sm:w-auto"
-                  onClick={() => handleModalChange(false)}
-                >
-                  Cerrar
-                </Button>
+                <>
+                  {lastResult.id && (
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto gap-2"
+                      onClick={() => void handleVerExamenRealizado()}
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver examen realizado
+                    </Button>
+                  )}
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => handleModalChange(false)}
+                  >
+                    Cerrar
+                  </Button>
+                </>
               )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <VerExamenRealizadoModal
+        open={showVerExamenModal}
+        onOpenChange={setShowVerExamenModal}
+        detalle={examenDetalle}
+        loading={loadingVerExamen}
+      />
     </>
   );
 }
