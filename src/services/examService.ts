@@ -3,7 +3,9 @@ import { getAuth } from "firebase/auth";
 import type {
   CourseExam,
   ExamEstado,
+  ExamRealizadoDetalle,
   ExamResultSummary,
+  ExamUltimoIntento,
   SubmitExamPayload,
   SubmitExamResult,
 } from "@/types/exam";
@@ -95,6 +97,24 @@ function normalizeExamResult(raw: Record<string, unknown>): ExamResultSummary | 
   };
 }
 
+function normalizeUltimoIntento(
+  raw: Record<string, unknown>
+): ExamUltimoIntento | undefined {
+  const summary = normalizeExamResult(raw);
+  if (!summary) return undefined;
+
+  const id = raw.id ?? raw._id;
+  const intentoNumero = Number(raw.intentoNumero ?? raw.intento_numero ?? raw.intento);
+  const fechaRaw = raw.fechaRealizacion ?? raw.fecha_realizacion ?? raw.fecha;
+
+  return {
+    ...summary,
+    ...(typeof id === "string" && id.length > 0 ? { id } : {}),
+    ...(Number.isNaN(intentoNumero) ? {} : { intentoNumero }),
+    ...(typeof fechaRaw === "string" ? { fechaRealizacion: fechaRaw } : {}),
+  };
+}
+
 function normalizeExamEstado(data: unknown): ExamEstado {
   const raw =
     data && typeof data === "object" && !Array.isArray(data)
@@ -104,7 +124,7 @@ function normalizeExamEstado(data: unknown): ExamEstado {
   const ultimo = raw.ultimoIntento ?? raw.ultimo_intento;
   const ultimoIntento =
     ultimo && typeof ultimo === "object"
-      ? normalizeExamResult(ultimo as Record<string, unknown>)
+      ? normalizeUltimoIntento(ultimo as Record<string, unknown>)
       : undefined;
 
   const progresoRaw = raw.progresoFormacion ?? raw.progreso_formacion;
@@ -185,6 +205,78 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
   };
 }
 
+function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
+  const raw =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+
+  const summary =
+    normalizeUltimoIntento(raw) ??
+    normalizeExamResult(raw) ?? {
+      nota: 0,
+      aprobado: false,
+      porcentajeAciertos: 0,
+    };
+
+  const preguntasRaw = raw.detallePreguntas ?? raw.preguntas;
+  const preguntas = Array.isArray(preguntasRaw)
+    ? preguntasRaw.map((item, index) => {
+        const p = item as Record<string, unknown>;
+        const opcionesRaw = p.opciones ?? p.respuestas;
+        const opciones = Array.isArray(opcionesRaw)
+          ? opcionesRaw.map((o) => {
+              const opt = o as Record<string, unknown>;
+              return {
+                id: String(opt.id ?? ""),
+                texto: String(opt.texto ?? opt.text ?? ""),
+                esCorrecta: toBool(opt.esCorrecta ?? opt.correcta),
+                seleccionadaPorAlumno: toBool(
+                  opt.seleccionadaPorAlumno ?? opt.seleccionada ?? opt.selected
+                ),
+              };
+            })
+          : [];
+
+        return {
+          orden: typeof p.orden === "number" ? p.orden : index + 1,
+          id: String(p.id ?? p.idPregunta ?? `q-${index}`),
+          texto: String(p.texto ?? p.pregunta ?? ""),
+          tipoInput: typeof p.tipoInput === "string" ? p.tipoInput : undefined,
+          esCorrecta: toBool(p.esCorrecta ?? p.acertada),
+          acertada: toBool(p.acertada ?? p.esCorrecta),
+          respuestasSeleccionadas: Array.isArray(p.respuestasSeleccionadas)
+            ? (p.respuestasSeleccionadas as Record<string, unknown>[]).map((r) => ({
+                id: String(r.id ?? ""),
+                texto: String(r.texto ?? ""),
+                esCorrecta: toBool(r.esCorrecta),
+              }))
+            : [],
+          respuestasCorrectas: Array.isArray(p.respuestasCorrectas)
+            ? (p.respuestasCorrectas as Record<string, unknown>[]).map((r) => ({
+                id: String(r.id ?? ""),
+                texto: String(r.texto ?? ""),
+              }))
+            : [],
+          opciones,
+        };
+      })
+    : undefined;
+
+  return {
+    ...summary,
+    id: String(raw.id ?? summary.id ?? ""),
+    idExamen: String(raw.idExamen ?? raw.id_examen ?? ""),
+    idFormacion: String(raw.idFormacion ?? raw.id_formacion ?? ""),
+    tituloExamen:
+      typeof raw.tituloExamen === "string" ? raw.tituloExamen : undefined,
+    tituloFormacion:
+      typeof raw.tituloFormacion === "string" ? raw.tituloFormacion : undefined,
+    estado: typeof raw.estado === "string" ? raw.estado : undefined,
+    ...(preguntas ? { preguntas, detallePreguntas: preguntas } : {}),
+  };
+}
+
 class ExamService {
   /** Paso 1: estado al entrar a la formación. */
   async getExamEstado(idFormacion: string): Promise<ExamEstado> {
@@ -204,6 +296,14 @@ class ExamService {
   async submitExam(payload: SubmitExamPayload): Promise<SubmitExamResult> {
     const response = await api.post("/examenes-realizados", payload);
     return normalizeSubmitResult(response.data);
+  }
+
+  /** Detalle del intento (preguntas, respuestas del alumno y correctas). */
+  async getExamenRealizadoDetalle(id: string): Promise<ExamRealizadoDetalle> {
+    const response = await api.get(
+      `/examenes-realizados/alumno/intento/${encodeURIComponent(id)}`
+    );
+    return normalizeExamenRealizadoDetalle(response.data);
   }
 }
 
