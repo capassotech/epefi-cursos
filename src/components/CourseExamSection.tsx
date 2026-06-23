@@ -519,7 +519,7 @@ export default function CourseExamSection({
               </p>
             </div>
 
-            {locallyReady && !estado?.puedeRealizar && (
+            {locallyReady && !passed && (
               <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
                 <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
                   Completaste todo el contenido del curso. Podés realizar la evaluación final.
