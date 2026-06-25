@@ -50,8 +50,18 @@ class CoursesService {
     return api.get(`/cursos/user/${id}`);
   }
 
+  /** Cursos asignados con datos de pantalla de inicio y progreso calculado en servidor. */
+  getStudentHome(id: string) {
+    return api.get(`/cursos/user/${id}/inicio`);
+  }
+
   getCourseById(id: string) {
     return api.get(`/cursos/${id}`);
+  }
+
+  /** Curso completo con materias, módulos, progreso y módulos habilitados. */
+  getStudentCourseContent(id: string) {
+    return api.get(`/cursos/${id}/contenido-alumno`);
   }
 
   getMateriasByCourseId(id: string) {
