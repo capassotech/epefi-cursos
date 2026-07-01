@@ -303,12 +303,10 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-[50%] top-[50%] z-[51] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
+            "fixed left-[50%] top-[50%] z-[51] flex w-[calc(100vw-1.5rem)] max-w-4xl translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden border bg-background p-3 shadow-lg duration-200 sm:w-full sm:p-6",
+            "max-h-[min(90dvh,900px)] rounded-xl sm:rounded-lg",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-            "max-w-4xl flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
-            "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
             "outline-none focus:outline-none"
           )}
         >
@@ -318,22 +316,19 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         <DialogDescription className="sr-only">
           Reproducción del video seleccionado
         </DialogDescription>
-        <div className="w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex w-full flex-col gap-2 sm:gap-4">
-            {/* Fila 1: Título - En mobile el texto puede ocupar varias líneas; botón pantalla completa siempre accesible */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 min-w-0 shrink-0">
-              <div className="flex items-start justify-between gap-2 w-full min-w-0 sm:flex-1 sm:items-center sm:min-w-0">
-                <h3
-                  className={cn(
-                    "min-w-0 flex-1 text-left font-semibold text-gray-900 dark:text-gray-100",
-                    "text-base leading-snug sm:text-lg",
-                    "break-words [overflow-wrap:anywhere]",
-                    "line-clamp-4 sm:line-clamp-2 sm:leading-tight"
-                  )}
+        <div className="flex min-h-0 w-full flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex w-full min-h-0 flex-col gap-2 sm:gap-4">
+            {/* Encabezado compacto: título largo con scroll interno sin expandir el modal */}
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="flex min-w-0 items-start justify-between gap-2 sm:flex-1">
+                <div
+                  className="max-h-[4.5rem] min-w-0 flex-1 overflow-y-auto overscroll-contain pr-1 sm:max-h-[3.25rem]"
                   title={videoTitle}
                 >
-                  {videoTitle}
-                </h3>
+                  <h3 className="text-left text-sm font-semibold leading-snug text-gray-900 break-words [overflow-wrap:anywhere] dark:text-gray-100 sm:text-base sm:leading-tight">
+                    {videoTitle}
+                  </h3>
+                </div>
                 {/* Pantalla completa en mobile: todos los tipos (YouTube/Drive antes no tenían botón) */}
                 <Button
                   type="button"
@@ -405,14 +400,14 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               </div>
             </div>
             
-            {/* Fila 2: reproductor — ratio 16:9 estable (padding-bottom evita colapsos con flex en algunos navegadores) */}
+            {/* Reproductor 16:9 */}
             <div
               ref={videoContainerRef}
               className={cn(
-                "overflow-hidden rounded-lg video-no-download",
+                "relative w-full shrink-0 overflow-hidden rounded-lg video-no-download",
                 immersiveEmbed
                   ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
-                  : "relative w-full shrink-0"
+                  : undefined
               )}
               style={immersiveEmbed ? undefined : { paddingBottom: "56.25%" }}
             >
@@ -503,8 +498,8 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               )}
             </div>
             
-            {/* Fila 3: Botones de visto y cerrar - En mobile ocupa toda la fila */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2">
+            {/* Acciones */}
+            <div className="flex shrink-0 flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center sm:gap-2">
               {/* Controles de navegación para mobile - Solo visible en mobile */}
               {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
                 <div className="flex sm:hidden items-center justify-center gap-2">
@@ -534,32 +529,26 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 </div>
               )}
               
-              {/* Botones de acción */}
-              <div className="flex items-center gap-2 justify-between w-full">
+              <div className="flex items-center gap-2">
                 {onMarkAsCompleted && (
                   <Button
                     type="button"
                     variant={isCompleted ? "default" : "default"}
-                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all ${
-                      isCompleted 
-                        ? 'bg-green-600 hover:bg-green-700 text-white' 
-                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    className={`cursor-pointer px-4 py-2 text-sm font-semibold shadow-md transition-all sm:px-6 sm:py-3 sm:text-base sm:shadow-lg ${
+                      isCompleted
+                        ? "bg-green-600 text-white hover:bg-green-700"
+                        : "bg-red-500 text-white hover:bg-red-600 hover:shadow-xl"
                     }`}
                     onClick={onMarkAsCompleted}
                   >
-                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                    <span className={isMobile ? 'hidden' : ''}>
-                      {isCompleted ? 'Visto' : 'Marcar como visto'}
-                    </span>
-                    <span className={isMobile ? '' : 'hidden'}>
-                      {isCompleted ? 'VISTO' : 'VISTO'}
-                    </span>
+                    <CheckCircle2 className="h-4 w-4 sm:mr-2 sm:h-5 sm:w-5" />
+                    {isCompleted ? "Visto" : "Marcar como visto"}
                   </Button>
                 )}
                 <Button
                   type="button"
                   variant="outline"
-                  className="cursor-pointer ml-auto"
+                  className="cursor-pointer"
                   onClick={() => {
                     onClose();
                     setIsFullscreen(false);

@@ -1467,7 +1467,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isDocCompleted
@@ -1485,7 +1485,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     title={fileName}
                   >
                     <FileText className="h-4 w-4 flex-shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-left">{fileName}</span>
+                    <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{fileName}</span>
                   </Button>
                   <button
                     type="button"
@@ -1517,7 +1517,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
                   )}
                   <span 
-                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                    className={`flex-1 text-sm font-medium min-w-0 line-clamp-2 break-words leading-snug ${
                       isDocCompleted
                         ? 'text-green-800 dark:text-green-200'
                         : 'text-slate-800 dark:text-slate-200'
@@ -1553,7 +1553,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isVideoCompleted
@@ -1571,7 +1571,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     title={videoName}
                   >
                     <Play className="h-4 w-4 flex-shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-left">{videoName}</span>
+                    <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{videoName}</span>
                   </Button>
                   <button
                     type="button"
@@ -1603,7 +1603,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
                   )}
                   <span 
-                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                    className={`flex-1 text-sm font-medium min-w-0 line-clamp-2 break-words leading-snug ${
                       isVideoCompleted
                         ? 'text-green-800 dark:text-green-200'
                         : 'text-slate-800 dark:text-slate-200'
