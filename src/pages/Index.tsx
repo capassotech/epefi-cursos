@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ChevronRight,
@@ -13,10 +13,10 @@ import {
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
 import { buildCourseUrl, Course } from "@/data/courses";
-import CoursesService from "@/services/coursesService";
 import { useAuth } from "@/contexts/AuthContext";
 import CourseLoader from "@/components/CourseLoader";
 import EnvironmentBanner from "@/components/EnvironmentBanner";
+import { useStudentHome } from "@/hooks/useStudentHome";
 
 // Componente para la tarjeta de curso con manejo de carga de imagen
 const CourseCard = ({
@@ -143,17 +143,20 @@ const CourseCard = ({
   );
 };
 
+type StudentHomeCourse = Course & {
+  progresoPorcentaje?: number;
+};
+
 const Index = () => {
   const navigate = useNavigate();
 
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const { data: courses = [], isPending: loading } = useStudentHome(
+    user?.uid,
+    user?.activo
+  );
   const [isMobile, setIsMobile] = useState(false);
-  const [enabledModules, setEnabledModules] = useState<Record<string, boolean>>({});
-  const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
-  const [enrichedCourses, setEnrichedCourses] = useState<Array<{ course: Course; modules: any[] }>>([]);
   const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
@@ -312,181 +315,6 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchAll = async () => {
-      if (!user?.uid) return;
-
-      if (user.activo === false) {
-        setCourses([]);
-        setEnrichedCourses([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const [coursesResponse, progressResponse, enabledModulesResponse] =
-          await Promise.all([
-            CoursesService.getAllCoursesPerUser(user.uid),
-            CoursesService.getStudentProgress(user.uid).catch((err: any) => {
-              if (err?.response?.status === 404) {
-                console.log(
-                  "Endpoint de progreso no disponible todavía, inicializando vacío",
-                );
-              } else {
-                console.error("Error fetching progress:", err);
-              }
-              return { data: { progreso: {} } };
-            }),
-            CoursesService.getStudentModules(user.uid).catch((err: any) => {
-              console.error("Error fetching enabled modules:", err);
-              return { data: { modulos_habilitados: {} } };
-            }),
-          ]);
-
-        if (cancelled) return;
-
-        const progressData: Record<string, Record<string, boolean>> =
-          progressResponse.data?.progreso || {};
-        const enabledModulesData: Record<string, boolean> =
-          enabledModulesResponse.data?.modulos_habilitados || {};
-
-        setProgress(progressData);
-        setEnabledModules(enabledModulesData);
-
-        const coursesData = Array.isArray(coursesResponse.data)
-          ? coursesResponse.data
-          : [];
-        const filteredCourses = coursesData.filter(
-          (course) => course.estado === "activo",
-        );
-
-        const coursesMateriaData = await Promise.all(
-          filteredCourses.map(async (course: Course) => {
-            if (!course.materias?.length) return { course, materias: [] };
-            const materiaResponses = await Promise.all(
-              course.materias.map((id: string) =>
-                CoursesService.getMateriasByCourseId(id).catch(() => null),
-              ),
-            );
-            const materias = materiaResponses
-              .filter(Boolean)
-              .flatMap((r) => {
-                const d = r!.data;
-                return Array.isArray(d) ? d : [d];
-              });
-            return { course, materias };
-          }),
-        );
-
-        const allModuleIds = [
-          ...new Set(
-            coursesMateriaData.flatMap(({ materias }) =>
-              materias.flatMap((m: any) => m.modulos || []),
-            ),
-          ),
-        ] as string[];
-
-        const moduleDocs = await Promise.all(
-          allModuleIds.map((id) =>
-            CoursesService.getModuloById(id).catch(() => null),
-          ),
-        );
-        const modulesById: Record<string, any> = {};
-        allModuleIds.forEach((id, i) => {
-          const r = moduleDocs[i];
-          if (r) {
-            const d = r.data;
-            modulesById[id] = Array.isArray(d) ? d[0] : d;
-          }
-        });
-
-        const newEnriched: Array<{ course: Course; modules: any[] }> = [];
-        const visibleCourses: Course[] = [];
-
-        for (const { course, materias } of coursesMateriaData) {
-          const moduleIds: string[] = materias.flatMap(
-            (m: any) => m.modulos || [],
-          );
-
-          if (moduleIds.length === 0) {
-            newEnriched.push({ course, modules: [] });
-            visibleCourses.push(course);
-            continue;
-          }
-
-          const hasEnabled = moduleIds.some(
-            (id) => enabledModulesData[id] !== false,
-          );
-          if (!hasEnabled) continue;
-
-          const modules = moduleIds
-            .map((id) => modulesById[id])
-            .filter(Boolean);
-          newEnriched.push({ course, modules });
-          visibleCourses.push(course);
-        }
-
-        if (cancelled) return;
-
-        setCourses(visibleCourses);
-        setEnrichedCourses(newEnriched);
-      } catch (error) {
-        console.error("Error al cargar datos:", error);
-        if (!cancelled) {
-          setCourses([]);
-          setEnrichedCourses([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchAll();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid, user?.activo]);
-
-  const courseProgressMap = useMemo<Record<string, number>>(() => {
-    const map: Record<string, number> = {};
-    for (const { course, modules } of enrichedCourses) {
-      const enabledMods = modules.filter(
-        (m) => m && enabledModules[m.id] !== false,
-      );
-      let completed = 0;
-      let total = 0;
-      for (const modulo of enabledMods) {
-        const moduleProgress = progress[modulo.id] || {};
-        if (modulo.url_video) {
-          const videos = Array.isArray(modulo.url_video)
-            ? modulo.url_video
-            : [modulo.url_video];
-          videos.forEach((_: any, index: number) => {
-            total++;
-            if (moduleProgress[`${modulo.id}_video_${index}`] === true)
-              completed++;
-          });
-        }
-        if (modulo.url_archivo) {
-          const docs = modulo.url_archivo.includes("|||")
-            ? modulo.url_archivo.split("|||").filter((u: string) => u.trim())
-            : [modulo.url_archivo];
-          docs.forEach((_: any, index: number) => {
-            total++;
-            if (moduleProgress[`${modulo.id}_document_${index}`] === true)
-              completed++;
-          });
-        }
-      }
-      map[course.id] = total > 0 ? Math.round((completed / total) * 100) : 0;
-    }
-    return map;
-  }, [enrichedCourses, progress, enabledModules]);
-
   return (
     <>
       <EnvironmentBanner />
@@ -612,7 +440,7 @@ const Index = () => {
                       course={course}
                       onNavigate={navigate}
                       formatDate={formatDate}
-                      progressPercentage={courseProgressMap[course.id] || 0}
+                      progressPercentage={course.progresoPorcentaje ?? 0}
                     />
                   ))
                 )}

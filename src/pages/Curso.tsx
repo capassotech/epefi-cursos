@@ -35,6 +35,8 @@ import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
+import { useStudentCourseContent } from "@/hooks/useStudentCourseContent";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
 import { getCourseContentProgress } from "@/lib/courseProgress";
@@ -46,6 +48,8 @@ const CourseDetailPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { data: courseContent, isPending: isCourseContentPending } =
+    useStudentCourseContent(courseId, user?.uid);
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
@@ -110,204 +114,23 @@ const CourseDetailPage = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!courseId) {
-        setLoading(false);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-        return;
-      }
+    if (!courseContent) return;
 
-      try {
-        setLoading(true);
-        setLoadingMaterias(true);
-        setLoadingModulos(true);
-        const response = await CoursesService.getCourseById(courseId);
-        setCourseDetail(response.data);
-      } catch (error) {
-        console.error('Error fetching course:', error);
-        setCourseDetail(null);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourse();
-  }, [courseId]);
+    setCourseDetail(courseContent.curso);
+    setMaterias(courseContent.materias ?? []);
+    setModulos(courseContent.modulos ?? []);
+    setProgress(courseContent.progreso ?? {});
+    setEnabledModules(courseContent.modulos_habilitados ?? {});
+  }, [courseContent]);
 
   useEffect(() => {
-    const fetchMaterias = async () => {
-      if (!courseDetail) {
-        return;
-      }
-
-      if (!courseDetail.materias || courseDetail.materias.length === 0) {
-        setMaterias([]);
-        // Si no hay materias, establecer loadingMaterias en false inmediatamente
-        // y también loadingModulos ya que no hay nada que cargar
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-        return;
-      }
-
-      try {
-        setLoadingMaterias(true);
-        const materiasPromises = courseDetail.materias.map(async (materiaId) => {
-          const responseMateria = await CoursesService.getMateriasByCourseId(materiaId);
-          const materiaData = responseMateria.data;
-          return Array.isArray(materiaData) ? materiaData : [materiaData];
-        });
-
-        const materiasArrays = await Promise.all(materiasPromises);
-        const allMaterias = materiasArrays.flat();
-        setMaterias(allMaterias);
-        // Establecer loadingMaterias en false cuando terminan de cargar las materias
-        // fetchModulos se ejecutará automáticamente cuando materias cambie
-        setLoadingMaterias(false);
-      } catch (error) {
-        console.error('Error fetching materias:', error);
-        setMaterias([]);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-      }
-    };
-
-    if (courseDetail) {
-      fetchMaterias();
-    }
-  }, [courseDetail]);
-
-
-  useEffect(() => {
-    const fetchModulos = async () => {
-      // Solo ejecutar si courseDetail está cargado (para evitar ejecuciones prematuras)
-      if (!courseDetail) {
-        return;
-      }
-
-      // Si loadingMaterias aún es true, esperar a que termine
-      if (loadingMaterias) {
-        return;
-      }
-
-      if (!materias || materias.length === 0) {
-        setModulos([]);
-        setLoadingModulos(false);
-        return;
-      }
-
-      try {
-        setLoadingModulos(true);
-
-        const fetchMateriaModulos = async (materia: Materia): Promise<Modulo[]> => {
-          const assignMateria = (modulo: Modulo): Modulo => ({
-            ...modulo,
-            id: modulo.id,
-            id_materia: materia.id,
-          });
-
-          try {
-            const response = await CoursesService.getModulosForMateria(materia.id);
-            const list = Array.isArray(response.data) ? response.data : [];
-            return list.map((m: Modulo) => assignMateria(m));
-          } catch {
-            const settled = await Promise.allSettled(
-              (materia.modulos ?? []).map((moduloId) =>
-                CoursesService.getModuloById(moduloId).then((response) => {
-                  const moduloData = response.data as Modulo;
-                  const single = Array.isArray(moduloData) ? moduloData[0] : moduloData;
-                  return assignMateria({ ...single, id: single?.id ?? moduloId });
-                })
-              )
-            );
-            return settled
-              .filter(
-                (result): result is PromiseFulfilledResult<Modulo> =>
-                  result.status === "fulfilled"
-              )
-              .map((result) => result.value);
-          }
-        };
-
-        const modulosByMateria = await Promise.all(materias.map(fetchMateriaModulos));
-        const byId = new Map<string, Modulo>();
-        modulosByMateria.flat().forEach((modulo) => {
-          if (modulo?.id) byId.set(modulo.id, modulo);
-        });
-
-        setModulos([...byId.values()]);
-        setLoadingModulos(false);
-      } catch (error) {
-        console.error('Error fetching modulos:', error);
-        setModulos([]);
-        setLoadingModulos(false);
-      }
-    };
-
-    // Solo ejecutar si courseDetail está cargado y loadingMaterias es false
-    if (courseDetail && !loadingMaterias) {
-      fetchModulos();
-    }
-  }, [materias, courseDetail, loadingMaterias]);
-
-  // Cargar módulos habilitados del estudiante
-  useEffect(() => {
-    const fetchEnabledModules = async () => {
-      if (!user?.uid) {
-        setEnabledModules({});
-        setLoadingEnabledModules(false);
-        return;
-      }
-
-      try {
-        setLoadingEnabledModules(true);
-        const response = await CoursesService.getStudentModules(user.uid);
-        const modulosHabilitados = response.data?.modulos_habilitados || {};
-        setEnabledModules(modulosHabilitados);
-      } catch (error) {
-        console.error('Error fetching enabled modules:', error);
-        // Si hay error, asumir que todos los módulos están habilitados por defecto
-        setEnabledModules({});
-      } finally {
-        setLoadingEnabledModules(false);
-      }
-    };
-
-    fetchEnabledModules();
-  }, [user?.uid]);
-
-  // Cargar progreso del estudiante
-  useEffect(() => {
-    const fetchProgress = async () => {
-      if (!user?.uid) {
-        setProgress({});
-        setLoadingProgress(false);
-        return;
-      }
-
-      try {
-        setLoadingProgress(true);
-        const response = await CoursesService.getStudentProgress(user.uid);
-        const progressData = response.data?.progreso || {};
-        setProgress(progressData);
-      } catch (error: any) {
-        // Si el endpoint no existe (404), simplemente inicializar con objeto vacío
-        if (error?.response?.status === 404) {
-          console.log('Endpoint de progreso no disponible todavía, inicializando vacío');
-          setProgress({});
-        } else {
-          console.error('Error fetching progress:', error);
-          setProgress({});
-        }
-      } finally {
-        setLoadingProgress(false);
-      }
-    };
-
-    fetchProgress();
-  }, [user?.uid]);
+    const isInitialLoad = isCourseContentPending && !courseContent;
+    setLoading(isInitialLoad);
+    setLoadingMaterias(isInitialLoad);
+    setLoadingModulos(isInitialLoad);
+    setLoadingProgress(isInitialLoad);
+    setLoadingEnabledModules(isInitialLoad);
+  }, [isCourseContentPending, courseContent]);
 
   // Efecto para posicionar la página al principio cuando se carga el curso
   useEffect(() => {
@@ -709,17 +532,31 @@ const CourseDetailPage = () => {
       const isCompleted = moduleProgress[contentKey] === true;
 
       // Actualizar el estado local primero para feedback inmediato
-      setProgress(prev => ({
-        ...prev,
+      const nextProgress = {
+        ...progress,
         [moduleId]: {
-          ...prev[moduleId],
-          [contentKey]: !isCompleted
-        }
-      }));
+          ...progress[moduleId],
+          [contentKey]: !isCompleted,
+        },
+      };
+      setProgress(nextProgress);
+
+      if (courseId && user.uid) {
+        queryClient.setQueryData(
+          queryKeys.courseContent(courseId, user.uid),
+          (old: typeof courseContent) =>
+            old ? { ...old, progreso: nextProgress } : old
+        );
+      }
 
       // Llamar al backend
       await CoursesService.markContentAsCompleted(user.uid, moduleId, contentIndex, contentType, !isCompleted);
       setExamProgressRevision((r) => r + 1);
+      if (user.uid) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.studentHome(user.uid),
+        });
+      }
     } catch (error) {
       console.error('Error marking content as completed:', error);
       // Revertir el cambio en caso de error
