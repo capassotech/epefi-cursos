@@ -290,7 +290,13 @@ export default function CourseExamSection({
   };
 
   const handleVerExamenRealizado = useCallback(async () => {
-    const intentoId = lastResult?.id ?? estado?.ultimoIntento?.id;
+    const intento = lastResult ?? estado?.ultimoIntento;
+    if (!intento?.aprobado) {
+      toast.error("El detalle del examen solo está disponible cuando aprobás la evaluación.");
+      return;
+    }
+
+    const intentoId = intento.id;
     if (!intentoId) {
       toast.error("No se encontró el registro del examen realizado.");
       return;
@@ -312,7 +318,7 @@ export default function CourseExamSection({
     } finally {
       setLoadingVerExamen(false);
     }
-  }, [estado?.ultimoIntento?.id, lastResult?.id]);
+  }, [estado?.ultimoIntento, lastResult]);
 
   const handleSubmit = async () => {
     if (!exam || !estado?.idExamen) return;
@@ -411,7 +417,8 @@ export default function CourseExamSection({
   const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
   const passed = ultimoIntento?.aprobado === true;
   const tieneIntento = ultimoIntento != null;
-  const puedeVerDetalle = Boolean(ultimoIntento?.id);
+  /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
+  const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
   const canShowButton =
     !passed && !!estado?.idExamen && (estado.puedeRealizar === true || locallyReady);
 
@@ -759,25 +766,13 @@ export default function CourseExamSection({
               )}
 
               {phase === "result" && lastResult && !lastResult.aprobado && (
-                <>
-                  <Button
-                    className="w-full sm:w-auto gap-2"
-                    onClick={() => void openExamModal()}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Reintentar evaluación
-                  </Button>
-                  {lastResult.id && (
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-auto gap-2"
-                      onClick={() => void handleVerExamenRealizado()}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Ver examen realizado
-                    </Button>
-                  )}
-                </>
+                <Button
+                  className="w-full sm:w-auto gap-2"
+                  onClick={() => void openExamModal()}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reintentar evaluación
+                </Button>
               )}
 
               {phase === "result" && lastResult?.aprobado && (
