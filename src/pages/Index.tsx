@@ -89,16 +89,16 @@ const CourseCard = ({
 
             {/* Fechas de dictado - siempre visibles en mobile */}
             {(course.fechaInicioDictado || course.fechaFinDictado) && (
-              <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-0">
+              <div className="mt-1.5 sm:mt-2 space-y-1.5 sm:space-y-2">
                 {course.fechaInicioDictado && (
-                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span className="font-medium">Inicio:</span>
                     <span>{formatDate(course.fechaInicioDictado)}</span>
                   </div>
                 )}
                 {course.fechaFinDictado && (
-                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-1.5 sm:gap-3 text-[10px] sm:text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                     <Calendar className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                     <span className="font-medium">Fin:</span>
                     <span>{formatDate(course.fechaFinDictado)}</span>
