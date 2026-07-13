@@ -1527,7 +1527,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     {fileName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30"
+                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDocCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
                     onClick={() => {
                       if (!isEnabled && onDisabledClick) {
                         onDisabledClick();
@@ -1537,7 +1541,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     }}
                     disabled={!isEnabled}
                   >
-                    <FileText className="h-3.5 w-3.5" />
+                    {isDocCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
                     Ver
                   </Button>
                 </div>
