@@ -28,3 +28,4 @@ export function getMissingModuleIds(materia: Materia, modulos: Modulo[]): string
   const loaded = new Set(modulos.map((m) => m.id));
   return (materia.modulos ?? []).filter((id) => !loaded.has(id));
 }
+

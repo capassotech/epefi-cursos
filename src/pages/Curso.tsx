@@ -39,8 +39,8 @@ import { useStudentCourseContent } from "@/hooks/useStudentCourseContent";
 import { queryClient, queryKeys } from "@/lib/queryClient";
 import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
-import { getCourseContentProgress } from "@/lib/courseProgress";
-import { getMissingModuleIds, getModulesForMateria } from "@/lib/courseModules";
+import { getMissingModuleIds } from "@/lib/courseModules";
+import { getModulesForMateria } from "@/lib/courseModules";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
@@ -980,8 +980,7 @@ const CourseDetailPage = () => {
                                       Módulo no disponible
                                     </p>
                                     <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1">
-                                      Este módulo está en la materia pero no se pudo cargar. Contactá al
-                                      administrador si debería estar visible.
+                                      Este módulo está en la materia pero no está habilitado
                                     </p>
                                   </div>
                                 ))}
