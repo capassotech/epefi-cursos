@@ -980,8 +980,7 @@ const CourseDetailPage = () => {
                                       Módulo no disponible
                                     </p>
                                     <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1">
-                                      Este módulo está en la materia pero no se pudo cargar. Contactá al
-                                      administrador si debería estar visible.
+                                      Este módulo está en la materia pero no está habilitado
                                     </p>
                                   </div>
                                 ))}
