@@ -39,8 +39,8 @@ import { useStudentCourseContent } from "@/hooks/useStudentCourseContent";
 import { queryClient, queryKeys } from "@/lib/queryClient";
 import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
-import { getCourseContentProgress } from "@/lib/courseProgress";
-import { getMissingModuleIds, getModulesForMateria } from "@/lib/courseModules";
+import { getMissingModuleIds } from "@/lib/courseModules";
+import { getModulesForMateria } from "@/lib/courseModules";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
