@@ -83,12 +83,23 @@ function convertVideoUrlToEmbed(url: string): string {
   }
 }
 
+/** iPhone / iPod / iPad (incl. Chrome “CriOS”, que usa WebKit; sin fullscreen API útil en iframes). */
+function isAppleTouchDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iP(hone|od|ad)/i.test(ua)) return true;
+  if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1) return true;
+  return false;
+}
+
 const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, onMarkAsCompleted, isCompleted = false }: VideoModalProps) => {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  /** WebKit iOS no aplica requestFullscreen al iframe de YouTube/Drive; simulamos “pantalla completa” con CSS. */
+  const [immersiveEmbed, setImmersiveEmbed] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -102,8 +113,13 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   useEffect(() => {
     if (!isOpen) {
       setIsFullscreen(false);
+      setImmersiveEmbed(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isMobile) setImmersiveEmbed(false);
+  }, [isMobile]);
 
   // Prevenir menú contextual y descarga en móvil
   useEffect(() => {
@@ -173,6 +189,22 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   }, [content?.url]);
 
   const toggleFullscreen = useCallback(async () => {
+    if (immersiveEmbed) {
+      setImmersiveEmbed(false);
+      return;
+    }
+
+    const url = content?.url ?? "";
+    const isEmbed =
+      url.includes("youtube.com") ||
+      url.includes("youtu.be") ||
+      url.includes("drive.google.com");
+
+    if (isEmbed && isAppleTouchDevice()) {
+      setImmersiveEmbed(true);
+      return;
+    }
+
     const el = getFullscreenElement();
     if (!el) return;
 
@@ -210,7 +242,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
     } catch (error) {
       console.error("Error al cambiar pantalla completa:", error);
     }
-  }, [getFullscreenElement]);
+  }, [getFullscreenElement, immersiveEmbed, content?.url]);
 
   const videoUrl = content
     ? ensureYouTubeEmbedParams(convertVideoUrlToEmbed(content.url))
@@ -271,12 +303,10 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-[50%] top-[50%] z-[51] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200",
+            "fixed left-[50%] top-[50%] z-[51] flex w-[calc(100vw-1.5rem)] max-w-4xl translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden border bg-background p-3 shadow-lg duration-200 sm:w-full sm:p-6",
+            "max-h-[min(90dvh,900px)] rounded-xl sm:rounded-lg",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
-            "max-w-4xl flex max-h-[min(90vh,900px)] flex-col gap-0 overflow-y-auto p-3 sm:p-6",
-            "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:h-auto max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0",
-            "pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
             "outline-none focus:outline-none"
           )}
         >
@@ -286,22 +316,19 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         <DialogDescription className="sr-only">
           Reproducción del video seleccionado
         </DialogDescription>
-        <div className="w-full flex flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex w-full flex-col gap-2 sm:gap-4">
-            {/* Fila 1: Título - En mobile el texto puede ocupar varias líneas; botón pantalla completa siempre accesible */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 min-w-0 shrink-0">
-              <div className="flex items-start justify-between gap-2 w-full min-w-0 sm:flex-1 sm:items-center sm:min-w-0">
-                <h3
-                  className={cn(
-                    "min-w-0 flex-1 text-left font-semibold text-gray-900 dark:text-gray-100",
-                    "text-base leading-snug sm:text-lg",
-                    "break-words [overflow-wrap:anywhere]",
-                    "line-clamp-4 sm:line-clamp-2 sm:leading-tight"
-                  )}
+        <div className="flex min-h-0 w-full flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex w-full min-h-0 flex-col gap-2 sm:gap-4">
+            {/* Encabezado compacto: título largo con scroll interno sin expandir el modal */}
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="flex min-w-0 items-start justify-between gap-2 sm:flex-1">
+                <div
+                  className="max-h-[4.5rem] min-w-0 flex-1 overflow-y-auto overscroll-contain pr-1 sm:max-h-[3.25rem]"
                   title={videoTitle}
                 >
-                  {videoTitle}
-                </h3>
+                  <h3 className="text-left text-sm font-semibold leading-snug text-gray-900 break-words [overflow-wrap:anywhere] dark:text-gray-100 sm:text-base sm:leading-tight">
+                    {videoTitle}
+                  </h3>
+                </div>
                 {/* Pantalla completa en mobile: todos los tipos (YouTube/Drive antes no tenían botón) */}
                 <Button
                   type="button"
@@ -309,10 +336,10 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   size="icon"
                   className="h-10 w-10 shrink-0 cursor-pointer touch-manipulation sm:hidden"
                   onClick={() => void toggleFullscreen()}
-                  title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-                  aria-label={isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+                  title={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                  aria-label={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
                 >
-                  {isFullscreen ? (
+                  {immersiveEmbed || isFullscreen ? (
                     <Minimize2 className="h-5 w-5" />
                   ) : (
                     <Maximize2 className="h-5 w-5" />
@@ -373,42 +400,69 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               </div>
             </div>
             
-            {/* Fila 2: reproductor — ratio 16:9 estable (padding-bottom evita colapsos con flex en algunos navegadores) */}
+            {/* Reproductor 16:9 */}
             <div
               ref={videoContainerRef}
-              className="relative w-full shrink-0 overflow-hidden rounded-lg video-no-download"
-              style={{ paddingBottom: "56.25%" }}
+              className={cn(
+                "relative w-full shrink-0 overflow-hidden rounded-lg video-no-download",
+                immersiveEmbed
+                  ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
+                  : undefined
+              )}
+              style={immersiveEmbed ? undefined : { paddingBottom: "56.25%" }}
             >
               {(isYouTube || isGoogleDrive) ? (
                 <>
-                  <iframe
-                    ref={iframeRef}
-                    key={iframeSlotKey}
-                    src={videoUrl}
-                    title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
-                    className="absolute top-0 left-0 w-full h-full rounded-lg"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                    allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    style={{
-                      border: 'none'
-                    }}
-                  />
-                  {isGoogleDrive && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-black/70 text-white p-3 rounded-lg text-xs z-10">
-                      <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
-                      <button
-                        type="button"
-                        className="text-orange-400 hover:text-orange-300 underline"
-                        onClick={() => {
-                          const originalUrl = videoUrl.replace('/preview', '/view');
-                          window.open(originalUrl, '_blank', 'noopener,noreferrer');
-                        }}
-                      >
-                        Abrir en Google Drive
-                      </button>
-                    </div>
+                  {immersiveEmbed && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-20 touch-manipulation shadow-md sm:hidden"
+                      onClick={() => setImmersiveEmbed(false)}
+                    >
+                      Salir
+                    </Button>
                   )}
+                  <div
+                    className={cn(
+                      immersiveEmbed
+                        ? "relative aspect-video w-full max-h-[min(100dvh,100svh)]"
+                        : "absolute inset-0"
+                    )}
+                  >
+                    <iframe
+                      ref={iframeRef}
+                      key={iframeSlotKey}
+                      src={videoUrl}
+                      title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
+                      className={cn(
+                        "absolute left-0 top-0 h-full w-full rounded-lg",
+                        immersiveEmbed && "rounded-md sm:rounded-lg"
+                      )}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      style={{
+                        border: "none",
+                      }}
+                    />
+                    {isGoogleDrive && (
+                      <div className="absolute bottom-4 left-4 right-4 z-10 rounded-lg bg-black/70 p-3 text-xs text-white">
+                        <p className="mb-2">Si el video no se muestra, puede requerir permisos de acceso.</p>
+                        <button
+                          type="button"
+                          className="text-orange-400 underline hover:text-orange-300"
+                          onClick={() => {
+                            const originalUrl = videoUrl.replace("/preview", "/view");
+                            window.open(originalUrl, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          Abrir en Google Drive
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <video
@@ -444,8 +498,8 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               )}
             </div>
             
-            {/* Fila 3: Botones de visto y cerrar - En mobile ocupa toda la fila */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2">
+            {/* Acciones */}
+            <div className="flex shrink-0 flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center sm:gap-2">
               {/* Controles de navegación para mobile - Solo visible en mobile */}
               {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
                 <div className="flex sm:hidden items-center justify-center gap-2">
@@ -475,32 +529,26 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                 </div>
               )}
               
-              {/* Botones de acción */}
-              <div className="flex items-center gap-2 justify-between w-full">
+              <div className="flex items-center gap-2">
                 {onMarkAsCompleted && (
                   <Button
                     type="button"
                     variant={isCompleted ? "default" : "default"}
-                    className={`cursor-pointer text-base font-semibold px-6 py-3 shadow-lg transition-all ${
-                      isCompleted 
-                        ? 'bg-green-600 hover:bg-green-700 text-white' 
-                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
+                    className={`cursor-pointer px-4 py-2 text-sm font-semibold shadow-md transition-all sm:px-6 sm:py-3 sm:text-base sm:shadow-lg ${
+                      isCompleted
+                        ? "bg-green-600 text-white hover:bg-green-700"
+                        : "bg-red-500 text-white hover:bg-red-600 hover:shadow-xl"
                     }`}
                     onClick={onMarkAsCompleted}
                   >
-                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                    <span className={isMobile ? 'hidden' : ''}>
-                      {isCompleted ? 'Visto' : 'Marcar como visto'}
-                    </span>
-                    <span className={isMobile ? '' : 'hidden'}>
-                      {isCompleted ? 'VISTO' : 'VISTO'}
-                    </span>
+                    <CheckCircle2 className="h-4 w-4 sm:mr-2 sm:h-5 sm:w-5" />
+                    {isCompleted ? "Visto" : "Marcar como visto"}
                   </Button>
                 )}
                 <Button
                   type="button"
                   variant="outline"
-                  className="cursor-pointer ml-auto"
+                  className="cursor-pointer"
                   onClick={() => {
                     onClose();
                     setIsFullscreen(false);

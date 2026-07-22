@@ -50,16 +50,37 @@ class CoursesService {
     return api.get(`/cursos/user/${id}`);
   }
 
+  /** Cursos asignados con datos de pantalla de inicio y progreso calculado en servidor. */
+  getStudentHome(id: string) {
+    return api.get(`/cursos/user/${id}/inicio`);
+  }
+
   getCourseById(id: string) {
     return api.get(`/cursos/${id}`);
+  }
+
+  /** Curso completo con materias, módulos, progreso y módulos habilitados. */
+  getStudentCourseContent(id: string) {
+    return api.get(`/cursos/${id}/contenido-alumno`);
   }
 
   getMateriasByCourseId(id: string) {
     return api.get(`/materias/${id}`);
   }
 
+  /** Obtiene un módulo por id. */
+  getModuloById(moduleId: string) {
+    return api.get(`/modulos/${moduleId}`);
+  }
+
+  /** @deprecated Usar getModuloById; el parámetro es el id del módulo, no de la materia. */
   getModulosByMateriaId(id: string) {
-    return api.get(`/modulos/${id}`);
+    return this.getModuloById(id);
+  }
+
+  /** Todos los módulos de una materia (según materia.modulos en Firestore). */
+  getModulosForMateria(materiaId: string) {
+    return api.get(`/materias/${materiaId}/modulos`);
   }
 
   getStudentModules(userId: string) {

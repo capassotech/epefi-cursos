@@ -1,14 +1,13 @@
 import { Check, X } from "lucide-react";
+import {
+  PASSWORD_MIN_LENGTH,
+  type PasswordRequirementChecks,
+} from "@/lib/passwordValidation";
 
 export const PasswordRequirements = ({
   passwordRequirements,
 }: {
-  passwordRequirements: {
-    minLength: boolean;
-    hasUppercase: boolean;
-    hasSpecialChar: boolean;
-    hasNumber: boolean;
-  };
+  passwordRequirements: PasswordRequirementChecks;
 }) => {
   return (
     <div
@@ -39,7 +38,7 @@ export const PasswordRequirements = ({
                 : "text-muted-foreground"
             }`}
           >
-            Al menos 8 caracteres
+            Al menos {PASSWORD_MIN_LENGTH} caracteres
           </span>
         </div>
         <div className="flex items-center space-x-2">
@@ -55,7 +54,7 @@ export const PasswordRequirements = ({
                 : "text-muted-foreground"
             }`}
           >
-            Una letra mayúscula
+            Al menos una letra mayúscula
           </span>
         </div>
         <div className="flex items-center space-x-2">
@@ -87,7 +86,7 @@ export const PasswordRequirements = ({
                 : "text-muted-foreground"
             }`}
           >
-            Un carácter especial (!@#$%^&*)
+            Al menos un carácter especial (!@#$%^&*…)
           </span>
         </div>
       </div>

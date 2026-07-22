@@ -10,13 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import ThemeToggle from "./ThemeToggle";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/ThemeProvider";
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const { theme } = useTheme();
@@ -29,9 +30,18 @@ const Header = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
+    const trimmed = searchQuery.trim();
+    navigate(
+      trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search"
+    );
+  };
+
+  const goToSearchPage = () => {
+    if (location.pathname === "/search") return;
+    const trimmed = searchQuery.trim();
+    navigate(
+      trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search"
+    );
   };
 
   const handleLogout = async () => {
@@ -87,7 +97,8 @@ const Header = () => {
                   placeholder="Buscar clases o teoría..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  onFocus={goToSearchPage}
+                  className="pl-10 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 cursor-pointer"
                 />
               </div>
             </form>

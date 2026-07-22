@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -35,7 +35,12 @@ import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
+import { useStudentCourseContent } from "@/hooks/useStudentCourseContent";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import VideoModal from "@/components/video-modal";
+import CourseExamSection from "@/components/CourseExamSection";
+import { getCourseContentProgress } from "@/lib/courseProgress";
+import { getMissingModuleIds, getModulesForMateria } from "@/lib/courseModules";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
@@ -43,6 +48,8 @@ const CourseDetailPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const { data: courseContent, isPending: isCourseContentPending } =
+    useStudentCourseContent(courseId, user?.uid);
   const [courseDetail, setCourseDetail] = useState<Curso | null>(null);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [modulos, setModulos] = useState<Modulo[]>([]);
@@ -53,6 +60,7 @@ const CourseDetailPage = () => {
   const [loadingModulos, setLoadingModulos] = useState(true);
   const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
   const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
+  const [examProgressRevision, setExamProgressRevision] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(true);
   const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
@@ -106,191 +114,23 @@ const CourseDetailPage = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!courseId) {
-        setLoading(false);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-        return;
-      }
+    if (!courseContent) return;
 
-      try {
-        setLoading(true);
-        setLoadingMaterias(true);
-        setLoadingModulos(true);
-        const response = await CoursesService.getCourseById(courseId);
-        setCourseDetail(response.data);
-      } catch (error) {
-        console.error('Error fetching course:', error);
-        setCourseDetail(null);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourse();
-  }, [courseId]);
+    setCourseDetail(courseContent.curso);
+    setMaterias(courseContent.materias ?? []);
+    setModulos(courseContent.modulos ?? []);
+    setProgress(courseContent.progreso ?? {});
+    setEnabledModules(courseContent.modulos_habilitados ?? {});
+  }, [courseContent]);
 
   useEffect(() => {
-    const fetchMaterias = async () => {
-      if (!courseDetail) {
-        return;
-      }
-
-      if (!courseDetail.materias || courseDetail.materias.length === 0) {
-        setMaterias([]);
-        // Si no hay materias, establecer loadingMaterias en false inmediatamente
-        // y también loadingModulos ya que no hay nada que cargar
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-        return;
-      }
-
-      try {
-        setLoadingMaterias(true);
-        const materiasPromises = courseDetail.materias.map(async (materiaId) => {
-          const responseMateria = await CoursesService.getMateriasByCourseId(materiaId);
-          const materiaData = responseMateria.data;
-          return Array.isArray(materiaData) ? materiaData : [materiaData];
-        });
-
-        const materiasArrays = await Promise.all(materiasPromises);
-        const allMaterias = materiasArrays.flat();
-        setMaterias(allMaterias);
-        // Establecer loadingMaterias en false cuando terminan de cargar las materias
-        // fetchModulos se ejecutará automáticamente cuando materias cambie
-        setLoadingMaterias(false);
-      } catch (error) {
-        console.error('Error fetching materias:', error);
-        setMaterias([]);
-        setLoadingMaterias(false);
-        setLoadingModulos(false);
-      }
-    };
-
-    if (courseDetail) {
-      fetchMaterias();
-    }
-  }, [courseDetail]);
-
-
-  useEffect(() => {
-    const fetchModulos = async () => {
-      // Solo ejecutar si courseDetail está cargado (para evitar ejecuciones prematuras)
-      if (!courseDetail) {
-        return;
-      }
-
-      // Si loadingMaterias aún es true, esperar a que termine
-      if (loadingMaterias) {
-        return;
-      }
-
-      if (!materias || materias.length === 0) {
-        setModulos([]);
-        setLoadingModulos(false);
-        return;
-      }
-
-      try {
-        setLoadingModulos(true);
-        const allModulosPromises: Promise<Modulo[]>[] = [];
-
-        materias.forEach((materia) => {
-          if (materia.modulos && materia.modulos.length > 0) {
-            materia.modulos.forEach((moduloId) => {
-              allModulosPromises.push(
-                CoursesService.getModulosByMateriaId(moduloId).then((response) => {
-                  const moduloData = response.data;
-                  return Array.isArray(moduloData) ? moduloData : [moduloData];
-                })
-              );
-            });
-          }
-        });
-
-        // Si no hay módulos para cargar, establecer loadingModulos en false inmediatamente
-        if (allModulosPromises.length === 0) {
-          setModulos([]);
-          setLoadingModulos(false);
-          return;
-        }
-
-        const modulosArrays = await Promise.all(allModulosPromises);
-        const allModulos = modulosArrays.flat();
-        setModulos(allModulos);
-        setLoadingModulos(false);
-      } catch (error) {
-        console.error('Error fetching modulos:', error);
-        setModulos([]);
-        setLoadingModulos(false);
-      }
-    };
-
-    // Solo ejecutar si courseDetail está cargado y loadingMaterias es false
-    if (courseDetail && !loadingMaterias) {
-      fetchModulos();
-    }
-  }, [materias, courseDetail, loadingMaterias]);
-
-  // Cargar módulos habilitados del estudiante
-  useEffect(() => {
-    const fetchEnabledModules = async () => {
-      if (!user?.uid) {
-        setEnabledModules({});
-        setLoadingEnabledModules(false);
-        return;
-      }
-
-      try {
-        setLoadingEnabledModules(true);
-        const response = await CoursesService.getStudentModules(user.uid);
-        const modulosHabilitados = response.data?.modulos_habilitados || {};
-        setEnabledModules(modulosHabilitados);
-      } catch (error) {
-        console.error('Error fetching enabled modules:', error);
-        // Si hay error, asumir que todos los módulos están habilitados por defecto
-        setEnabledModules({});
-      } finally {
-        setLoadingEnabledModules(false);
-      }
-    };
-
-    fetchEnabledModules();
-  }, [user?.uid]);
-
-  // Cargar progreso del estudiante
-  useEffect(() => {
-    const fetchProgress = async () => {
-      if (!user?.uid) {
-        setProgress({});
-        setLoadingProgress(false);
-        return;
-      }
-
-      try {
-        setLoadingProgress(true);
-        const response = await CoursesService.getStudentProgress(user.uid);
-        const progressData = response.data?.progreso || {};
-        setProgress(progressData);
-      } catch (error: any) {
-        // Si el endpoint no existe (404), simplemente inicializar con objeto vacío
-        if (error?.response?.status === 404) {
-          console.log('Endpoint de progreso no disponible todavía, inicializando vacío');
-          setProgress({});
-        } else {
-          console.error('Error fetching progress:', error);
-          setProgress({});
-        }
-      } finally {
-        setLoadingProgress(false);
-      }
-    };
-
-    fetchProgress();
-  }, [user?.uid]);
+    const isInitialLoad = isCourseContentPending && !courseContent;
+    setLoading(isInitialLoad);
+    setLoadingMaterias(isInitialLoad);
+    setLoadingModulos(isInitialLoad);
+    setLoadingProgress(isInitialLoad);
+    setLoadingEnabledModules(isInitialLoad);
+  }, [isCourseContentPending, courseContent]);
 
   // Efecto para posicionar la página al principio cuando se carga el curso
   useEffect(() => {
@@ -692,16 +532,31 @@ const CourseDetailPage = () => {
       const isCompleted = moduleProgress[contentKey] === true;
 
       // Actualizar el estado local primero para feedback inmediato
-      setProgress(prev => ({
-        ...prev,
+      const nextProgress = {
+        ...progress,
         [moduleId]: {
-          ...prev[moduleId],
-          [contentKey]: !isCompleted
-        }
-      }));
+          ...progress[moduleId],
+          [contentKey]: !isCompleted,
+        },
+      };
+      setProgress(nextProgress);
+
+      if (courseId && user.uid) {
+        queryClient.setQueryData(
+          queryKeys.courseContent(courseId, user.uid),
+          (old: typeof courseContent) =>
+            old ? { ...old, progreso: nextProgress } : old
+        );
+      }
 
       // Llamar al backend
       await CoursesService.markContentAsCompleted(user.uid, moduleId, contentIndex, contentType, !isCompleted);
+      setExamProgressRevision((r) => r + 1);
+      if (user.uid) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.studentHome(user.uid),
+        });
+      }
     } catch (error) {
       console.error('Error marking content as completed:', error);
       // Revertir el cambio en caso de error
@@ -730,8 +585,17 @@ const CourseDetailPage = () => {
     let completed = 0;
     let total = 0;
 
+    // Deduplicar el array global de módulos por ID antes de contar, por si el mismo
+    // ID aparece en el array de módulos de más de una materia en Firestore.
+    const seenIds = new Set<string>();
+    const uniqueModulos = modulos.filter((m) => {
+      if (seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+
     materias.forEach(materia => {
-      const materiasModulos = modulos
+      const materiasModulos = uniqueModulos
         .filter(modulo => modulo.id_materia === materia.id)
         .filter(modulo => enabledModules[modulo.id] !== false);
 
@@ -983,10 +847,10 @@ const CourseDetailPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
+      <main className="mx-auto w-full max-w-6xl py-4 sm:py-6">
         <div className="flex flex-col gap-4 sm:gap-6">
-          {/* Barra de progreso fija */}
-          {!loadingProgress && !loadingModulos && materias.length > 0 && (() => {
+          {/* Barra de progreso fija — sin márgenes negativos (evita glitch sticky en mobile) */}
+          {!loadingProgress && !loadingModulos && !loadingEnabledModules && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
             
             // Función para determinar el color según el progreso
@@ -1004,7 +868,7 @@ const CourseDetailPage = () => {
             };
 
             return (
-              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
+              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
                 {/* Texto solo visible en desktop */}
                 <div className="hidden sm:flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
@@ -1036,6 +900,7 @@ const CourseDetailPage = () => {
             );
           })()}
 
+          <div className="flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
           <section className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 px-1">
               <School className="h-4 w-4 text-orange-500" />
@@ -1050,17 +915,11 @@ const CourseDetailPage = () => {
                 onValueChange={setExpandedMaterias}
               >
                 {materias
-                  .filter((materia) => {
-                    // Obtener todos los módulos de esta materia
-                    const materiasModulos = modulos.filter(modulo => modulo.id_materia === materia.id);
-                    
-                    // Mostrar la materia si tiene módulos (habilitados o deshabilitados)
-                    return materiasModulos.length > 0;
-                  })
+                  .filter((materia) => (materia.modulos?.length ?? 0) > 0)
                   .map((materia) => {
-                    // Mostrar todos los módulos (habilitados y deshabilitados)
-                    const materiasModulos = modulos
-                      .filter(modulo => modulo.id_materia === materia.id);
+                    const materiasModulos = getModulesForMateria(materia, modulos);
+                    const missingModuleIds = getMissingModuleIds(materia, modulos);
+                    const totalEnMateria = materia.modulos?.length ?? materiasModulos.length;
 
                   return (
                     <AccordionItem
@@ -1079,7 +938,8 @@ const CourseDetailPage = () => {
                                   {materia.nombre}
                                 </span>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                  {materiasModulos.length} módulo{materiasModulos.length !== 1 ? 's' : ''}
+                                  {materiasModulos.length} de {totalEnMateria} módulo
+                                  {totalEnMateria !== 1 ? "s" : ""}
                                 </p>
                               </div>
                             </div>
@@ -1090,9 +950,9 @@ const CourseDetailPage = () => {
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
                               </div>
-                            ) : materiasModulos.length > 0 ? (
+                            ) : materiasModulos.length > 0 || missingModuleIds.length > 0 ? (
                               <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
-                                {materiasModulos.map((modulo, index) => (
+                                {materiasModulos.map((modulo) => (
                                   <div
                                     key={modulo.id}
                                     ref={(el) => {
@@ -1109,6 +969,20 @@ const CourseDetailPage = () => {
                                       handleMarkAsCompleted={handleMarkAsCompleted}
                                       onDisabledClick={() => setIsDisabledModuleDialogOpen(true)}
                                     />
+                                  </div>
+                                ))}
+                                {missingModuleIds.map((moduleId) => (
+                                  <div
+                                    key={`missing-${moduleId}`}
+                                    className="rounded-lg border border-dashed border-amber-300 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/30 p-4"
+                                  >
+                                    <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                                      Módulo no disponible
+                                    </p>
+                                    <p className="text-xs text-amber-800/90 dark:text-amber-200/90 mt-1">
+                                      Este módulo está en la materia pero no se pudo cargar. Contactá al
+                                      administrador si debería estar visible.
+                                    </p>
                                   </div>
                                 ))}
                               </div>
@@ -1149,9 +1023,11 @@ const CourseDetailPage = () => {
                           Plan de Estudios
                         </h4>
                         {courseDetail.planDeEstudiosFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-                            <Clock className="h-3 w-3" />
-                            Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
+                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -1182,9 +1058,11 @@ const CourseDetailPage = () => {
                           Fechas de Exámenes
                         </h4>
                         {courseDetail.fechasDeExamenesFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
-                            <Clock className="h-3 w-3" />
-                            Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
+                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                            <span>
+                              Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -1210,6 +1088,20 @@ const CourseDetailPage = () => {
               </div>
             </section>
           )}
+
+          {user?.uid && courseId && (
+            <CourseExamSection
+              key={courseId}
+              courseId={courseId}
+              coursePayload={courseDetail}
+              progressRevision={examProgressRevision}
+              modulos={modulos}
+              materiaIds={materias.map((m) => m.id)}
+              enabledModules={enabledModules}
+              progress={progress}
+            />
+          )}
+          </div>
         </div>
       </main>
 
@@ -1470,9 +1362,8 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
 
   // Verificar si todos los contenidos del módulo están completados
   const isModuleCompleted = (): boolean => {
-    // Si no hay contenidos, no está completado
     if (documents.length === 0 && videos.length === 0) {
-      return false;
+      return true;
     }
 
     // Verificar que todos los documentos estén completados
@@ -1578,7 +1469,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isDocCompleted
@@ -1596,7 +1487,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     title={fileName}
                   >
                     <FileText className="h-4 w-4 flex-shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-left">{fileName}</span>
+                    <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{fileName}</span>
                   </Button>
                   <button
                     type="button"
@@ -1628,7 +1519,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     <File className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
                   )}
                   <span 
-                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                    className={`flex-1 text-sm font-medium min-w-0 line-clamp-2 break-words leading-snug ${
                       isDocCompleted
                         ? 'text-green-800 dark:text-green-200'
                         : 'text-slate-800 dark:text-slate-200'
@@ -1638,7 +1529,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     {fileName}
                   </span>
                   <Button
-                    className="h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30"
+                    className={`h-8 px-3 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDocCompleted
+                        ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                        : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+                    }`}
                     onClick={() => {
                       if (!isEnabled && onDisabledClick) {
                         onDisabledClick();
@@ -1648,7 +1543,11 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     }}
                     disabled={!isEnabled}
                   >
-                    <FileText className="h-3.5 w-3.5" />
+                    {isDocCompleted ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5" />
+                    )}
                     Ver
                   </Button>
                 </div>
@@ -1664,7 +1563,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-10 px-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isVideoCompleted
@@ -1682,7 +1581,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     title={videoName}
                   >
                     <Play className="h-4 w-4 flex-shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-left">{videoName}</span>
+                    <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{videoName}</span>
                   </Button>
                   <button
                     type="button"
@@ -1714,7 +1613,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     <Play className="h-5 w-5 text-orange-500 dark:text-orange-400 flex-shrink-0" />
                   )}
                   <span 
-                    className={`flex-1 text-sm font-medium truncate min-w-0 ${
+                    className={`flex-1 text-sm font-medium min-w-0 line-clamp-2 break-words leading-snug ${
                       isVideoCompleted
                         ? 'text-green-800 dark:text-green-200'
                         : 'text-slate-800 dark:text-slate-200'
