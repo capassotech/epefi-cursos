@@ -6,7 +6,8 @@ const Layout = () => {
   return (
     <div className="min-h-dvh min-h-screen bg-background text-foreground">
       <Header />
-      <main className="pb-20 md:pb-8 overflow-x-hidden">
+      {/* overflow-x-clip evita scroll horizontal sin romper position:sticky (a diferencia de hidden) */}
+      <main className="pb-20 md:pb-8 overflow-x-clip">
         <Outlet />
       </main>
       <BottomNavigation />

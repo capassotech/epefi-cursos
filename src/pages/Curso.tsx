@@ -847,9 +847,9 @@ const CourseDetailPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-6 lg:px-6">
+      <main className="mx-auto w-full max-w-6xl py-4 sm:py-6">
         <div className="flex flex-col gap-4 sm:gap-6">
-          {/* Barra de progreso fija */}
+          {/* Barra de progreso fija — sin márgenes negativos (evita glitch sticky en mobile) */}
           {!loadingProgress && !loadingModulos && !loadingEnabledModules && materias.length > 0 && (() => {
             const courseProgress = calculateCourseProgress();
             
@@ -868,7 +868,7 @@ const CourseDetailPage = () => {
             };
 
             return (
-              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 -mx-3 sm:-mx-4 lg:-mx-6 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
+              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
                 {/* Texto solo visible en desktop */}
                 <div className="hidden sm:flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
@@ -900,6 +900,7 @@ const CourseDetailPage = () => {
             );
           })()}
 
+          <div className="flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
           <section className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 px-1">
               <School className="h-4 w-4 text-orange-500" />
@@ -1100,6 +1101,7 @@ const CourseDetailPage = () => {
               progress={progress}
             />
           )}
+          </div>
         </div>
       </main>
 
