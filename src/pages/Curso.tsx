@@ -41,6 +41,7 @@ import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
 import { getMissingModuleIds } from "@/lib/courseModules";
 import { getModulesForMateria } from "@/lib/courseModules";
+import { isModuleFullyCompleted } from "@/lib/courseProgress";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
@@ -920,6 +921,9 @@ const CourseDetailPage = () => {
                     const materiasModulos = getModulesForMateria(materia, modulos);
                     const missingModuleIds = getMissingModuleIds(materia, modulos);
                     const totalEnMateria = materia.modulos?.length ?? materiasModulos.length;
+                    const modulosCompletados = materiasModulos.filter((modulo) =>
+                      isModuleFullyCompleted(modulo, progress)
+                    ).length;
 
                   return (
                     <AccordionItem
@@ -938,7 +942,7 @@ const CourseDetailPage = () => {
                                   {materia.nombre}
                                 </span>
                                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                  {materiasModulos.length} de {totalEnMateria} módulo
+                                  {modulosCompletados} de {totalEnMateria} módulo
                                   {totalEnMateria !== 1 ? "s" : ""}
                                 </p>
                               </div>
