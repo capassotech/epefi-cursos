@@ -17,6 +17,8 @@ export interface CourseExam {
   id: string;
   idFormacion?: string;
   titulo?: string;
+  /** Duración total en minutos (default 90). */
+  duracionMinutos?: number;
   preguntas: ExamQuestion[];
 }
 
@@ -69,6 +71,7 @@ export interface ExamEstado {
   formacionCompleta: boolean;
   idExamen?: string;
   titulo?: string;
+  duracionMinutos?: number;
   notaMinima?: number;
   mensaje?: string;
   progresoFormacion?: {
@@ -88,6 +91,7 @@ export interface SubmitExamPayload {
   idExamen: string;
   idFormacion: string;
   respuestas: ExamAnswerSubmission[];
+  motivoCierre?: "tiempo" | "abandono" | "envio";
 }
 
 export interface ExamAttempt extends ExamResultSummary {

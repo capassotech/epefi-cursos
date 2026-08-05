@@ -42,6 +42,28 @@ export function buildSubmissionPayload(
   }));
 }
 
+/** Incluye todas las preguntas; las no respondidas van con array vacío (cierre forzado). */
+export function buildForcedClosePayload(
+  questions: ExamQuestion[],
+  answers: StudentAnswersMap
+) {
+  return questions.map((q) => ({
+    idPregunta: q.id,
+    respuestasSeleccionadas: answers[q.id] ?? [],
+  }));
+}
+
+export function formatExamCountdown(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  if (hours > 0) {
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 /** Muestra 10 en lugar de 10.0; conserva decimales si los hay (ej. 7.5). */
 export function formatNota(nota: number): string {
   return String(parseFloat(nota.toFixed(1)));

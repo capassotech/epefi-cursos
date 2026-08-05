@@ -140,6 +140,7 @@ function normalizeExamEstado(data: unknown): ExamEstado {
 
   const idExamen = raw.idExamen ?? raw.id_examen;
   const titulo = raw.tituloExamen ?? raw.titulo ?? raw.title;
+  const duracionRaw = Number(raw.duracionMinutos ?? raw.duracion_minutos);
 
   return {
     examenDisponible: toBool(raw.examenDisponible ?? raw.examen_disponible),
@@ -147,6 +148,8 @@ function normalizeExamEstado(data: unknown): ExamEstado {
     formacionCompleta: toBool(raw.formacionCompleta ?? raw.formacion_completa),
     idExamen: typeof idExamen === "string" && idExamen.length > 0 ? idExamen : undefined,
     titulo: typeof titulo === "string" ? titulo : undefined,
+    duracionMinutos:
+      !Number.isNaN(duracionRaw) && duracionRaw > 0 ? duracionRaw : 90,
     notaMinima: 7,
     progresoFormacion,
     ultimoIntento,
@@ -161,6 +164,7 @@ function normalizeStudentExam(data: unknown, idExamen: string): CourseExam | nul
   if (!Array.isArray(preguntasRaw) || preguntasRaw.length === 0) return null;
 
   const titulo = raw.titulo ?? raw.title;
+  const duracionRaw = Number(raw.duracionMinutos ?? raw.duracion_minutos);
 
   return {
     id: String(raw.id ?? idExamen),
@@ -171,6 +175,8 @@ function normalizeStudentExam(data: unknown, idExamen: string): CourseExam | nul
           ? raw.id_formacion
           : undefined,
     titulo: typeof titulo === "string" ? titulo : undefined,
+    duracionMinutos:
+      !Number.isNaN(duracionRaw) && duracionRaw > 0 ? duracionRaw : 90,
     preguntas: mapPreguntas(preguntasRaw as Record<string, unknown>[]),
   };
 }

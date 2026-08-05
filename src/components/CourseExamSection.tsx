@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   XCircle,
   FileText,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,11 +23,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { resolveFormacionId } from "@/lib/formacionId";
 import {
+  buildForcedClosePayload,
   buildSubmissionPayload,
+  formatExamCountdown,
   formatNota,
   formatPorcentaje,
   isMultipleChoiceQuestion,
@@ -133,6 +146,25 @@ export default function CourseExamSection({
   const [showVerExamenModal, setShowVerExamenModal] = useState(false);
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
   const [loadingVerExamen, setLoadingVerExamen] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+
+  const submittingRef = useRef(false);
+  const answersRef = useRef<StudentAnswersMap>({});
+  const displayQuestionsRef = useRef<ExamQuestion[]>([]);
+  const phaseRef = useRef<ExamPhase>("idle");
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    displayQuestionsRef.current = displayQuestions;
+  }, [displayQuestions]);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
 
   const formacionId = useMemo(
     () => resolveFormacionId(coursePayload, courseId),
@@ -144,6 +176,8 @@ export default function CourseExamSection({
     setExam(null);
     setDisplayQuestions([]);
     setAnswers({});
+    setRemainingSeconds(null);
+    setCloseConfirmOpen(false);
   }, []);
 
   const loadEstado = useCallback(async (options?: { silent?: boolean }) => {
@@ -191,6 +225,8 @@ export default function CourseExamSection({
       setPhase("loading_exam");
       setAnswers({});
       setLastResult(null);
+      setRemainingSeconds(null);
+      setCloseConfirmOpen(false);
 
       try {
         const examData = await ExamService.getExamForStudent(idExamen);
@@ -202,6 +238,11 @@ export default function CourseExamSection({
         }
         setExam(examData);
         setDisplayQuestions(sortQuestionsByOrder(examData.preguntas));
+        const minutos =
+          examData.duracionMinutos && examData.duracionMinutos > 0
+            ? examData.duracionMinutos
+            : 90;
+        setRemainingSeconds(minutos * 60);
         setPhase("taking");
       } catch (error) {
         console.error("Error loading exam questions:", error);
@@ -213,6 +254,7 @@ export default function CourseExamSection({
         });
         setPhase("idle");
         setModalOpen(false);
+        setRemainingSeconds(null);
         void loadEstado({ silent: true });
       }
     },
@@ -266,11 +308,117 @@ export default function CourseExamSection({
 
   const handleModalChange = (open: boolean) => {
     if (!open && submitting) return;
+    if (!open && phaseRef.current === "taking") {
+      setCloseConfirmOpen(true);
+      return;
+    }
     if (!open) {
       resetExamSession();
     }
     setModalOpen(open);
   };
+
+  const applySubmitResult = useCallback(
+    (
+      result: Awaited<ReturnType<typeof ExamService.submitExam>>,
+      motivo: "tiempo" | "abandono" | "envio"
+    ) => {
+      const intentoResultado: ExamUltimoIntento = {
+        nota: result.nota,
+        aprobado: result.aprobado,
+        porcentajeAciertos: result.porcentajeAciertos,
+        respuestasCorrectas: result.respuestasCorrectas,
+        totalPreguntas: result.totalPreguntas,
+        ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
+      };
+
+      setLastResult(intentoResultado);
+      setPhase("result");
+      setRemainingSeconds(null);
+
+      if (motivo === "tiempo") {
+        toast.warning("Tiempo agotado", {
+          description:
+            result.mensaje ||
+            "Se agotó el tiempo. El intento quedó registrado.",
+        });
+      } else if (motivo === "abandono") {
+        toast.info("Evaluación cerrada", {
+          description:
+            result.mensaje ||
+            "Cerraste la evaluación. El intento quedó registrado.",
+        });
+      } else if (result.aprobado) {
+        toast.success("¡Felicitaciones!", {
+          description: `Aprobaste con ${formatPorcentaje(result.porcentajeAciertos)} de aciertos.`,
+        });
+      } else {
+        toast.info("Evaluación no aprobada", {
+          description: `Obtuviste ${formatPorcentaje(result.porcentajeAciertos)} de aciertos. Podés reintentar cuando quieras.`,
+        });
+      }
+
+      setEstado((prev) =>
+        prev
+          ? {
+              ...prev,
+              puedeRealizar: result.aprobado ? false : prev.puedeRealizar,
+              ultimoIntento: intentoResultado,
+            }
+          : prev
+      );
+    },
+    []
+  );
+
+  const submitExamAttempt = useCallback(
+    async (motivo: "tiempo" | "abandono" | "envio") => {
+      if (!exam || !estado?.idExamen || !formacionId) return;
+      if (submittingRef.current) return;
+
+      const questions = displayQuestionsRef.current;
+      const currentAnswers = answersRef.current;
+
+      if (motivo === "envio") {
+        if (!validateAllQuestionsAnswered(questions, currentAnswers)) {
+          toast.error("Completá todas las preguntas", {
+            description:
+              "Debés responder cada pregunta antes de enviar la evaluación.",
+          });
+          return;
+        }
+      }
+
+      submittingRef.current = true;
+      setSubmitting(true);
+      try {
+        const respuestas =
+          motivo === "envio"
+            ? buildSubmissionPayload(questions, currentAnswers)
+            : buildForcedClosePayload(questions, currentAnswers);
+
+        const result = await ExamService.submitExam({
+          idExamen: estado.idExamen,
+          idFormacion: formacionId,
+          respuestas,
+          motivoCierre: motivo,
+        });
+
+        applySubmitResult(result, motivo);
+      } catch (error: unknown) {
+        console.error("Error submitting exam:", error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "No se pudo enviar la evaluación. Intentá nuevamente.";
+        toast.error("Error al enviar", { description: message });
+      } finally {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
+    },
+    [applySubmitResult, exam, estado?.idExamen, formacionId]
+  );
 
   const handleSingleSelect = (questionId: string, optionId: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: [optionId] }));
@@ -288,6 +436,27 @@ export default function CourseExamSection({
       };
     });
   };
+
+  // Contador mientras se rinde
+  useEffect(() => {
+    if (phase !== "taking") return;
+
+    const timerId = window.setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev == null) return prev;
+        return Math.max(0, prev - 1);
+      });
+    }, 1000);
+
+    return () => window.clearInterval(timerId);
+  }, [phase]);
+
+  // Al llegar a 0, cerrar y registrar intento
+  useEffect(() => {
+    if (phase === "taking" && remainingSeconds === 0 && !submittingRef.current) {
+      void submitExamAttempt("tiempo");
+    }
+  }, [phase, remainingSeconds, submitExamAttempt]);
 
   const handleVerExamenRealizado = useCallback(async () => {
     const intento = lastResult ?? estado?.ultimoIntento;
@@ -320,72 +489,13 @@ export default function CourseExamSection({
     }
   }, [estado?.ultimoIntento, lastResult]);
 
-  const handleSubmit = async () => {
-    if (!exam || !estado?.idExamen) return;
+  const handleSubmit = () => {
+    void submitExamAttempt("envio");
+  };
 
-    if (!validateAllQuestionsAnswered(displayQuestions, answers)) {
-      toast.error("Completá todas las preguntas", {
-        description: "Debés responder cada pregunta antes de enviar la evaluación.",
-      });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const result = await ExamService.submitExam({
-        idExamen: estado.idExamen,
-        idFormacion: formacionId,
-        respuestas: buildSubmissionPayload(displayQuestions, answers),
-      });
-
-      const intentoResultado: ExamUltimoIntento = {
-        nota: result.nota,
-        aprobado: result.aprobado,
-        porcentajeAciertos: result.porcentajeAciertos,
-        respuestasCorrectas: result.respuestasCorrectas,
-        totalPreguntas: result.totalPreguntas,
-        ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
-      };
-
-      setLastResult(intentoResultado);
-      setPhase("result");
-
-      if (result.aprobado) {
-        toast.success("¡Felicitaciones!", {
-          description: `Aprobaste con ${formatPorcentaje(result.porcentajeAciertos)} de aciertos.`,
-        });
-        setEstado((prev) =>
-          prev
-            ? {
-                ...prev,
-                puedeRealizar: false,
-                ultimoIntento: intentoResultado,
-              }
-            : prev
-        );
-      } else {
-        toast.info("Evaluación no aprobada", {
-          description: `Obtuviste ${formatPorcentaje(result.porcentajeAciertos)} de aciertos. Podés reintentar cuando quieras.`,
-        });
-        setEstado((prev) =>
-          prev
-            ? {
-                ...prev,
-                ultimoIntento: intentoResultado,
-              }
-            : prev
-        );
-      }
-    } catch (error: unknown) {
-      console.error("Error submitting exam:", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "No se pudo enviar la evaluación. Intentá nuevamente.";
-      toast.error("Error al enviar", { description: message });
-    } finally {
-      setSubmitting(false);
-    }
+  const confirmAbandonExam = () => {
+    setCloseConfirmOpen(false);
+    void submitExamAttempt("abandono");
   };
 
   const contentProgress = useMemo(() => {
@@ -599,20 +709,51 @@ export default function CourseExamSection({
             "max-h-[min(90dvh,900px)] flex flex-col"
           )}
           onInteractOutside={(e) => {
-            if (submitting || phase === "taking") e.preventDefault();
+            if (submitting || phase === "taking") {
+              e.preventDefault();
+              if (phase === "taking" && !submitting) {
+                setCloseConfirmOpen(true);
+              }
+            }
           }}
           onEscapeKeyDown={(e) => {
-            if (submitting) e.preventDefault();
+            if (submitting || phase === "taking") {
+              e.preventDefault();
+              if (phase === "taking" && !submitting) {
+                setCloseConfirmOpen(true);
+              }
+            }
           }}
         >
-          <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
-            <DialogTitle className="text-left pr-8">{sectionTitle}</DialogTitle>
+          <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0 space-y-2">
+            <div className="flex items-start justify-between gap-3 pr-6">
+              <DialogTitle className="text-left">{sectionTitle}</DialogTitle>
+              {phase === "taking" && remainingSeconds != null && (
+                <div
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-semibold tabular-nums shrink-0",
+                    remainingSeconds <= 60
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
+                      : remainingSeconds <= 300
+                        ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  )}
+                  aria-live="polite"
+                  aria-label="Tiempo restante"
+                >
+                  <Timer className="h-4 w-4" />
+                  {formatExamCountdown(remainingSeconds)}
+                </div>
+              )}
+            </div>
             <DialogDescription className="text-left">
               Nota mínima para aprobar: {notaMinima}
               {displayQuestions.length > 0 && phase === "taking" && (
                 <span className="block mt-0.5">
                   {displayQuestions.length} pregunta
                   {displayQuestions.length !== 1 ? "s" : ""}
+                  {" · "}
+                  Tiempo disponible: {exam?.duracionMinutos ?? estado?.duracionMinutos ?? 90} min
                 </span>
               )}
             </DialogDescription>
@@ -758,7 +899,7 @@ export default function CourseExamSection({
                   <Button
                     variant="outline"
                     disabled={submitting}
-                    onClick={() => handleModalChange(false)}
+                    onClick={() => setCloseConfirmOpen(true)}
                   >
                     Cancelar
                   </Button>
@@ -799,6 +940,32 @@ export default function CourseExamSection({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cerrar la evaluación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si cerrás ahora, se registrará como un intento perdido con las
+              respuestas que hayas marcado hasta el momento. Esta acción no se
+              puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Seguir rindiendo</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmAbandonExam();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {submitting ? "Registrando..." : "Cerrar y registrar intento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <VerExamenRealizadoModal
         open={showVerExamenModal}
