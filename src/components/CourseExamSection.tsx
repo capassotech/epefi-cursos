@@ -8,6 +8,7 @@ import {
   XCircle,
   FileText,
   Timer,
+  Hourglass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
@@ -42,6 +44,8 @@ import {
   formatExamCountdown,
   formatNota,
   formatPorcentaje,
+  hasDesarrolloQuestions,
+  isDesarrolloQuestion,
   isMultipleChoiceQuestion,
   PASSING_GRADE,
   sortQuestionsByOrder,
@@ -64,6 +68,7 @@ import type {
   ExamResultSummary,
   ExamUltimoIntento,
   StudentAnswersMap,
+  StudentTextAnswersMap,
 } from "@/types/exam";
 import { toast } from "sonner";
 
@@ -140,6 +145,7 @@ export default function CourseExamSection({
   const [phase, setPhase] = useState<ExamPhase>("idle");
   const [displayQuestions, setDisplayQuestions] = useState<ExamQuestion[]>([]);
   const [answers, setAnswers] = useState<StudentAnswersMap>({});
+  const [textAnswers, setTextAnswers] = useState<StudentTextAnswersMap>({});
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -151,12 +157,17 @@ export default function CourseExamSection({
 
   const submittingRef = useRef(false);
   const answersRef = useRef<StudentAnswersMap>({});
+  const textAnswersRef = useRef<StudentTextAnswersMap>({});
   const displayQuestionsRef = useRef<ExamQuestion[]>([]);
   const phaseRef = useRef<ExamPhase>("idle");
 
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+
+  useEffect(() => {
+    textAnswersRef.current = textAnswers;
+  }, [textAnswers]);
 
   useEffect(() => {
     displayQuestionsRef.current = displayQuestions;
@@ -176,6 +187,7 @@ export default function CourseExamSection({
     setExam(null);
     setDisplayQuestions([]);
     setAnswers({});
+    setTextAnswers({});
     setRemainingSeconds(null);
     setCloseConfirmOpen(false);
   }, []);
@@ -224,6 +236,7 @@ export default function CourseExamSection({
     async (idExamen: string) => {
       setPhase("loading_exam");
       setAnswers({});
+      setTextAnswers({});
       setLastResult(null);
       setRemainingSeconds(null);
       setCloseConfirmOpen(false);
@@ -323,6 +336,7 @@ export default function CourseExamSection({
       result: Awaited<ReturnType<typeof ExamService.submitExam>>,
       motivo: "tiempo" | "abandono" | "envio"
     ) => {
+      const pendienteCorreccion = result.estado === "pendiente_correccion";
       const intentoResultado: ExamUltimoIntento = {
         nota: result.nota,
         aprobado: result.aprobado,
@@ -330,13 +344,20 @@ export default function CourseExamSection({
         respuestasCorrectas: result.respuestasCorrectas,
         totalPreguntas: result.totalPreguntas,
         ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
+        ...(result.estado ? { estado: result.estado } : {}),
       };
 
       setLastResult(intentoResultado);
       setPhase("result");
       setRemainingSeconds(null);
 
-      if (motivo === "tiempo") {
+      if (pendienteCorreccion) {
+        toast.success("Evaluación enviada", {
+          description:
+            result.mensaje ||
+            "Contiene preguntas de desarrollo: será corregida en las próximas horas.",
+        });
+      } else if (motivo === "tiempo") {
         toast.warning("Tiempo agotado", {
           description:
             result.mensaje ||
@@ -362,7 +383,10 @@ export default function CourseExamSection({
         prev
           ? {
               ...prev,
-              puedeRealizar: result.aprobado ? false : prev.puedeRealizar,
+              puedeRealizar:
+                result.aprobado || pendienteCorreccion
+                  ? false
+                  : prev.puedeRealizar,
               ultimoIntento: intentoResultado,
             }
           : prev
@@ -378,9 +402,16 @@ export default function CourseExamSection({
 
       const questions = displayQuestionsRef.current;
       const currentAnswers = answersRef.current;
+      const currentTextAnswers = textAnswersRef.current;
 
       if (motivo === "envio") {
-        if (!validateAllQuestionsAnswered(questions, currentAnswers)) {
+        if (
+          !validateAllQuestionsAnswered(
+            questions,
+            currentAnswers,
+            currentTextAnswers
+          )
+        ) {
           toast.error("Completá todas las preguntas", {
             description:
               "Debés responder cada pregunta antes de enviar la evaluación.",
@@ -394,8 +425,12 @@ export default function CourseExamSection({
       try {
         const respuestas =
           motivo === "envio"
-            ? buildSubmissionPayload(questions, currentAnswers)
-            : buildForcedClosePayload(questions, currentAnswers);
+            ? buildSubmissionPayload(questions, currentAnswers, currentTextAnswers)
+            : buildForcedClosePayload(
+                questions,
+                currentAnswers,
+                currentTextAnswers
+              );
 
         const result = await ExamService.submitExam({
           idExamen: estado.idExamen,
@@ -435,6 +470,10 @@ export default function CourseExamSection({
         [questionId]: current.filter((id) => id !== optionId),
       };
     });
+  };
+
+  const handleTextAnswerChange = (questionId: string, value: string) => {
+    setTextAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
   // Contador mientras se rinde
@@ -527,10 +566,21 @@ export default function CourseExamSection({
   const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
   const passed = ultimoIntento?.aprobado === true;
   const tieneIntento = ultimoIntento != null;
+  /** Con preguntas de desarrollo el intento espera corrección manual. */
+  const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
   /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
   const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
   const canShowButton =
-    !passed && !!estado?.idExamen && (estado.puedeRealizar === true || locallyReady);
+    !passed &&
+    !esperandoCorreccion &&
+    !!estado?.idExamen &&
+    (estado.puedeRealizar === true || locallyReady);
+
+  /** El examen en curso requiere corrección manual al enviarse. */
+  const examRequiereCorreccion = useMemo(
+    () => hasDesarrolloQuestions(displayQuestions),
+    [displayQuestions]
+  );
 
   const sectionTitle = useMemo(
     () => estado?.titulo?.trim() || exam?.titulo?.trim() || "Evaluación de la formación",
@@ -636,7 +686,7 @@ export default function CourseExamSection({
               </p>
             </div>
 
-            {locallyReady && !passed && (
+            {locallyReady && !passed && !esperandoCorreccion && (
               <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
                 <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
                   Completaste todo el contenido del curso. Podés realizar la evaluación final.
@@ -644,7 +694,38 @@ export default function CourseExamSection({
               </Alert>
             )}
 
-            {tieneIntento && (
+            {esperandoCorreccion && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+                <div className="flex items-start gap-3">
+                  <Hourglass className="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-amber-900 dark:text-amber-100">
+                        Evaluación enviada
+                      </p>
+                      <Badge
+                        variant="outline"
+                        className="border-amber-300 text-amber-800 dark:border-amber-700 dark:text-amber-200"
+                      >
+                        En espera de corrección
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Tu evaluación incluye preguntas de desarrollo, así que la
+                      corrige un docente. Vas a ver la nota y el resultado en las
+                      próximas horas.
+                    </p>
+                    {ultimoIntento?.intentoNumero != null && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Intento {ultimoIntento.intentoNumero}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tieneIntento && !esperandoCorreccion && (
               <div
                 className={cn(
                   "rounded-lg border p-4 space-y-3",
@@ -769,9 +850,25 @@ export default function CourseExamSection({
 
             {phase === "taking" && exam && (
               <div className="space-y-5">
+                {examRequiereCorreccion && (
+                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
+                    <Hourglass className="h-4 w-4 text-amber-600" />
+                    <AlertTitle className="text-amber-900 dark:text-amber-100">
+                      Esta evaluación se corrige manualmente
+                    </AlertTitle>
+                    <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
+                      Incluye preguntas de desarrollo, por lo que al enviarla queda
+                      en espera de corrección y vas a recibir la nota en las
+                      próximas horas.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {displayQuestions.map((question, index) => {
+                  const esDesarrollo = isDesarrolloQuestion(question);
                   const isMultiple = isMultipleChoiceQuestion(question);
                   const selected = answers[question.id] ?? [];
+                  const textoRespuesta = textAnswers[question.id] ?? "";
 
                   return (
                     <div
@@ -783,12 +880,26 @@ export default function CourseExamSection({
                         {question.texto}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {isMultiple
-                          ? "Podés seleccionar más de una respuesta"
-                          : "Seleccioná una respuesta"}
+                        {esDesarrollo
+                          ? "Escribí tu respuesta. La corrige un docente."
+                          : isMultiple
+                            ? "Podés seleccionar más de una respuesta"
+                            : "Seleccioná una respuesta"}
                       </p>
 
-                      {isMultiple ? (
+                      {esDesarrollo ? (
+                        <Textarea
+                          id={`modal-${question.id}-desarrollo`}
+                          value={textoRespuesta}
+                          onChange={(e) =>
+                            handleTextAnswerChange(question.id, e.target.value)
+                          }
+                          disabled={submitting}
+                          rows={5}
+                          placeholder="Escribí tu respuesta acá..."
+                          className="resize-y min-h-[120px]"
+                        />
+                      ) : isMultiple ? (
                         <div className="space-y-2">
                           {question.opciones.map((option) => (
                             <div
@@ -849,33 +960,52 @@ export default function CourseExamSection({
               </div>
             )}
 
-            {phase === "result" && lastResult && (
-              <div className="space-y-4 py-4">
-                <div
-                  className={cn(
-                    "rounded-lg border p-6 text-center space-y-2",
-                    lastResult.aprobado
-                      ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
-                      : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30"
-                  )}
-                >
-                  {lastResult.aprobado ? (
-                    <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-                  ) : (
-                    <XCircle className="h-12 w-12 text-orange-500 mx-auto" />
-                  )}
-                  <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {lastResult.aprobado ? "¡Aprobaste!" : "No aprobaste"}
-                  </p>
-                  <ExamResultDisplay result={lastResult} prominent />
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {lastResult.aprobado
-                      ? `Felicitaciones, alcanzaste la nota mínima de ${notaMinima}.`
-                      : `Necesitás al menos ${notaMinima} para aprobar. Tu resultado quedó registrado.`}
-                  </p>
+            {phase === "result" &&
+              lastResult &&
+              (lastResult.estado === "pendiente_correccion" ? (
+                <div className="space-y-4 py-4">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center space-y-2 dark:border-amber-900 dark:bg-amber-950/30">
+                    <Hourglass className="h-12 w-12 text-amber-600 mx-auto" />
+                    <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+                      Evaluación en espera de corrección
+                    </p>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Recibimos tus respuestas. Como la evaluación tiene preguntas
+                      de desarrollo, la corrige un docente y vas a ver la nota en
+                      las próximas horas.
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      No hace falta que la vuelvas a enviar.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="space-y-4 py-4">
+                  <div
+                    className={cn(
+                      "rounded-lg border p-6 text-center space-y-2",
+                      lastResult.aprobado
+                        ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
+                        : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30"
+                    )}
+                  >
+                    {lastResult.aprobado ? (
+                      <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
+                    ) : (
+                      <XCircle className="h-12 w-12 text-orange-500 mx-auto" />
+                    )}
+                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {lastResult.aprobado ? "¡Aprobaste!" : "No aprobaste"}
+                    </p>
+                    <ExamResultDisplay result={lastResult} prominent />
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {lastResult.aprobado
+                        ? `Felicitaciones, alcanzaste la nota mínima de ${notaMinima}.`
+                        : `Necesitás al menos ${notaMinima} para aprobar. Tu resultado quedó registrado.`}
+                    </p>
+                  </div>
+                </div>
+              ))}
           </div>
 
           {(phase === "taking" || phase === "result") && (
@@ -906,15 +1036,28 @@ export default function CourseExamSection({
                 </>
               )}
 
-              {phase === "result" && lastResult && !lastResult.aprobado && (
-                <Button
-                  className="w-full sm:w-auto gap-2"
-                  onClick={() => void openExamModal()}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reintentar evaluación
-                </Button>
-              )}
+              {phase === "result" &&
+                lastResult?.estado === "pendiente_correccion" && (
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => handleModalChange(false)}
+                  >
+                    Entendido
+                  </Button>
+                )}
+
+              {phase === "result" &&
+                lastResult &&
+                !lastResult.aprobado &&
+                lastResult.estado !== "pendiente_correccion" && (
+                  <Button
+                    className="w-full sm:w-auto gap-2"
+                    onClick={() => void openExamModal()}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Reintentar evaluación
+                  </Button>
+                )}
 
               {phase === "result" && lastResult?.aprobado && (
                 <>
