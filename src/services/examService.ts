@@ -2,12 +2,14 @@ import axios from "axios";
 import { getAuth } from "firebase/auth";
 import type {
   CourseExam,
+  EstadoExamenRealizado,
   ExamEstado,
   ExamRealizadoDetalle,
   ExamResultSummary,
   ExamUltimoIntento,
   SubmitExamPayload,
   SubmitExamResult,
+  TipoPregunta,
 } from "@/types/exam";
 
 const API_BASE_URL =
@@ -41,6 +43,28 @@ function toBool(value: unknown): boolean {
   return value === true || value === "true" || value === 1;
 }
 
+/** Los exámenes legacy no traen tipoPregunta: se infiere del tipoInput. */
+function normalizeTipoPregunta(
+  rawTipoPregunta: unknown,
+  rawTipoInput: unknown
+): TipoPregunta {
+  if (rawTipoPregunta === "desarrollo") return "desarrollo";
+  if (rawTipoPregunta === "opcion_multiple") return "opcion_multiple";
+  if (
+    typeof rawTipoInput === "string" &&
+    rawTipoInput.toLowerCase().includes("textarea")
+  ) {
+    return "desarrollo";
+  }
+  return "opcion_multiple";
+}
+
+function normalizeEstadoCorreccion(raw: unknown): EstadoExamenRealizado | undefined {
+  if (raw === "pendiente_correccion") return "pendiente_correccion";
+  if (raw === "completado") return "completado";
+  return undefined;
+}
+
 function mapPreguntas(preguntasRaw: Record<string, unknown>[]): CourseExam["preguntas"] {
   return preguntasRaw.map((p, index) => {
     const opcionesRaw = p.respuestas ?? p.opciones ?? p.options ?? [];
@@ -53,20 +77,24 @@ function mapPreguntas(preguntasRaw: Record<string, unknown>[]): CourseExam["preg
       : [];
 
     const tipoInput = p.tipoInput ?? p.tipo ?? p.inputType;
+    const tipoPregunta = normalizeTipoPregunta(p.tipoPregunta, tipoInput);
 
     return {
       id: String(p.id ?? p._id ?? `q-${index}`),
       texto: String(p.texto ?? p.text ?? p.pregunta ?? p.enunciado ?? ""),
       orden: typeof p.orden === "number" ? p.orden : index,
       tipoInput: typeof tipoInput === "string" ? tipoInput : undefined,
+      tipoPregunta,
       tipo:
-        typeof tipoInput === "string"
-          ? tipoInput.toLowerCase().includes("checkbox") ||
-            tipoInput.toLowerCase().includes("multi")
-            ? "checkbox"
-            : "radio"
-          : undefined,
-      opciones,
+        tipoPregunta === "desarrollo"
+          ? undefined
+          : typeof tipoInput === "string"
+            ? tipoInput.toLowerCase().includes("checkbox") ||
+              tipoInput.toLowerCase().includes("multi")
+              ? "checkbox"
+              : "radio"
+            : undefined,
+      opciones: tipoPregunta === "desarrollo" ? [] : opciones,
     };
   });
 }
@@ -107,11 +135,16 @@ function normalizeUltimoIntento(
   const intentoNumero = Number(raw.intentoNumero ?? raw.intento_numero ?? raw.intento);
   const fechaRaw = raw.fechaRealizacion ?? raw.fecha_realizacion ?? raw.fecha;
 
+  const estado = normalizeEstadoCorreccion(
+    raw.estado ?? raw.estadoCorreccion ?? raw.estado_correccion
+  );
+
   return {
     ...summary,
     ...(typeof id === "string" && id.length > 0 ? { id } : {}),
     ...(Number.isNaN(intentoNumero) ? {} : { intentoNumero }),
     ...(typeof fechaRaw === "string" ? { fechaRealizacion: fechaRaw } : {}),
+    ...(estado ? { estado } : {}),
   };
 }
 
@@ -200,10 +233,15 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
       porcentajeAciertos: 0,
     };
 
+  const estado = normalizeEstadoCorreccion(
+    resultado.estado ?? raw.estado ?? resultado.estadoCorreccion
+  );
+
   return {
     ...summary,
     mensaje: typeof raw.message === "string" ? raw.message : undefined,
     puedeReintentar: toBool(resultado.puedeReintentar ?? raw.puedeReintentar),
+    ...(estado ? { estado } : {}),
     examenRealizado: {
       id: String(resultado.id ?? ""),
       ...summary,
@@ -217,7 +255,7 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
       ? (data as Record<string, unknown>)
       : {};
 
-  const summary =
+  const summary: ExamUltimoIntento =
     normalizeUltimoIntento(raw) ??
     normalizeExamResult(raw) ?? {
       nota: 0,
@@ -249,6 +287,10 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
           id: String(p.id ?? p.idPregunta ?? `q-${index}`),
           texto: String(p.texto ?? p.pregunta ?? ""),
           tipoInput: typeof p.tipoInput === "string" ? p.tipoInput : undefined,
+          tipoPregunta: normalizeTipoPregunta(p.tipoPregunta, p.tipoInput),
+          ...(typeof p.respuestaDesarrollo === "string"
+            ? { respuestaDesarrollo: p.respuestaDesarrollo }
+            : {}),
           esCorrecta: toBool(p.esCorrecta ?? p.acertada),
           acertada: toBool(p.acertada ?? p.esCorrecta),
           respuestasSeleccionadas: Array.isArray(p.respuestasSeleccionadas)
@@ -278,7 +320,7 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
       typeof raw.tituloExamen === "string" ? raw.tituloExamen : undefined,
     tituloFormacion:
       typeof raw.tituloFormacion === "string" ? raw.tituloFormacion : undefined,
-    estado: typeof raw.estado === "string" ? raw.estado : undefined,
+    estadoCorreccion: normalizeEstadoCorreccion(raw.estadoCorreccion),
     ...(preguntas ? { preguntas, detallePreguntas: preguntas } : {}),
   };
 }

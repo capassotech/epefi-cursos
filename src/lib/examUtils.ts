@@ -1,4 +1,9 @@
-import type { ExamEstado, ExamQuestion, StudentAnswersMap } from "@/types/exam";
+import type {
+  ExamEstado,
+  ExamQuestion,
+  StudentAnswersMap,
+  StudentTextAnswersMap,
+} from "@/types/exam";
 
 const PASSING_GRADE = 7;
 
@@ -6,8 +11,21 @@ export function isPassingGrade(nota: number, minGrade = PASSING_GRADE): boolean 
   return nota >= minGrade;
 }
 
+/** Pregunta abierta: se responde con texto y la corrige un administrador. */
+export function isDesarrolloQuestion(question: ExamQuestion): boolean {
+  if (question.tipoPregunta === "desarrollo") return true;
+  return (question.tipoInput ?? "").toLowerCase().includes("textarea");
+}
+
+/** True si el examen requiere corrección manual. */
+export function hasDesarrolloQuestions(questions: ExamQuestion[]): boolean {
+  return questions.some(isDesarrolloQuestion);
+}
+
 /** Radio/checkbox según tipoInput del backend. */
 export function isMultipleChoiceQuestion(question: ExamQuestion): boolean {
+  if (isDesarrolloQuestion(question)) return false;
+
   const tipo = (question.tipoInput ?? question.tipo ?? "").toLowerCase();
   if (tipo.includes("checkbox") || tipo === "multiple" || tipo.includes("multi")) {
     return true;
@@ -24,33 +42,51 @@ export function sortQuestionsByOrder(questions: ExamQuestion[]): ExamQuestion[] 
 
 export function validateAllQuestionsAnswered(
   questions: ExamQuestion[],
-  answers: StudentAnswersMap
+  answers: StudentAnswersMap,
+  textAnswers: StudentTextAnswersMap = {}
 ): boolean {
   return questions.every((q) => {
+    if (isDesarrolloQuestion(q)) {
+      return (textAnswers[q.id] ?? "").trim().length > 0;
+    }
     const selected = answers[q.id] ?? [];
     return selected.length > 0;
   });
 }
 
-export function buildSubmissionPayload(
-  questions: ExamQuestion[],
-  answers: StudentAnswersMap
+function buildAnswerEntry(
+  question: ExamQuestion,
+  answers: StudentAnswersMap,
+  textAnswers: StudentTextAnswersMap
 ) {
-  return questions.map((q) => ({
-    idPregunta: q.id,
-    respuestasSeleccionadas: answers[q.id] ?? [],
-  }));
+  if (isDesarrolloQuestion(question)) {
+    return {
+      idPregunta: question.id,
+      respuestasSeleccionadas: [] as string[],
+      respuestaDesarrollo: (textAnswers[question.id] ?? "").trim(),
+    };
+  }
+  return {
+    idPregunta: question.id,
+    respuestasSeleccionadas: answers[question.id] ?? [],
+  };
 }
 
-/** Incluye todas las preguntas; las no respondidas van con array vacío (cierre forzado). */
+export function buildSubmissionPayload(
+  questions: ExamQuestion[],
+  answers: StudentAnswersMap,
+  textAnswers: StudentTextAnswersMap = {}
+) {
+  return questions.map((q) => buildAnswerEntry(q, answers, textAnswers));
+}
+
+/** Incluye todas las preguntas; las no respondidas van vacías (cierre forzado). */
 export function buildForcedClosePayload(
   questions: ExamQuestion[],
-  answers: StudentAnswersMap
+  answers: StudentAnswersMap,
+  textAnswers: StudentTextAnswersMap = {}
 ) {
-  return questions.map((q) => ({
-    idPregunta: q.id,
-    respuestasSeleccionadas: answers[q.id] ?? [],
-  }));
+  return questions.map((q) => buildAnswerEntry(q, answers, textAnswers));
 }
 
 export function formatExamCountdown(totalSeconds: number): string {
