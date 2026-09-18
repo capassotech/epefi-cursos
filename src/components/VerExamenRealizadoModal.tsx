@@ -20,18 +20,53 @@ interface VerExamenRealizadoModalProps {
   loading: boolean;
 }
 
-function RespuestaDesarrollo({ texto }: { texto?: string }) {
+function RespuestaDesarrollo({
+  texto,
+  puntos,
+  puntosObtenidos,
+  comentario,
+}: {
+  texto?: string;
+  puntos?: number;
+  puntosObtenidos?: number;
+  comentario?: string;
+}) {
+  const tienePuntaje =
+    typeof puntosObtenidos === "number" && typeof puntos === "number";
+
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Tu respuesta
-      </p>
-      <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
-        {texto?.trim() || "Sin respuesta"}
-      </p>
-      <p className="text-xs text-muted-foreground">
-        Pregunta de desarrollo corregida por un docente.
-      </p>
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Tu respuesta
+        </p>
+        <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+          {texto?.trim() || "Sin respuesta"}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 space-y-2 dark:border-blue-900 dark:bg-blue-950/30">
+        <p className="text-xs font-medium text-blue-800 uppercase tracking-wide dark:text-blue-200">
+          Corrección del docente
+        </p>
+        {tienePuntaje && (
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            Puntaje:{" "}
+            <strong>
+              {puntosObtenidos} / {puntos} pts
+            </strong>
+          </p>
+        )}
+        {comentario?.trim() ? (
+          <p className="whitespace-pre-wrap text-sm text-blue-900 dark:text-blue-100">
+            {comentario.trim()}
+          </p>
+        ) : (
+          <p className="text-sm text-blue-700/80 dark:text-blue-300/80">
+            Sin comentario del docente.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -167,27 +202,43 @@ export default function VerExamenRealizadoModal({
                       <CardTitle className="text-base font-medium leading-snug">
                         Pregunta {pregunta.orden || index + 1}: {pregunta.texto}
                       </CardTitle>
-                      <Badge
-                        variant={pregunta.acertada ? "default" : "destructive"}
-                        className="flex-shrink-0"
-                      >
-                        {pregunta.acertada ? (
-                          <>
-                            <Check className="w-3 h-3 mr-1" />
-                            Correcta
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3 mr-1" />
-                            Incorrecta
-                          </>
-                        )}
-                      </Badge>
+                      {pregunta.tipoPregunta === "desarrollo" &&
+                      typeof pregunta.puntosObtenidos === "number" &&
+                      typeof pregunta.puntos === "number" ? (
+                        <Badge
+                          variant={pregunta.acertada ? "default" : "secondary"}
+                          className="flex-shrink-0"
+                        >
+                          {pregunta.puntosObtenidos} / {pregunta.puntos} pts
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant={pregunta.acertada ? "default" : "destructive"}
+                          className="flex-shrink-0"
+                        >
+                          {pregunta.acertada ? (
+                            <>
+                              <Check className="w-3 h-3 mr-1" />
+                              Correcta
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-3 h-3 mr-1" />
+                              Incorrecta
+                            </>
+                          )}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
                     {pregunta.tipoPregunta === "desarrollo" ? (
-                      <RespuestaDesarrollo texto={pregunta.respuestaDesarrollo} />
+                      <RespuestaDesarrollo
+                        texto={pregunta.respuestaDesarrollo}
+                        puntos={pregunta.puntos}
+                        puntosObtenidos={pregunta.puntosObtenidos}
+                        comentario={pregunta.comentario}
+                      />
                     ) : (
                       <OpcionesPregunta opciones={pregunta.opciones} />
                     )}
