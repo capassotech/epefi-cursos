@@ -60,11 +60,17 @@ export interface ExamRealizadoPreguntaDetalle {
   tipoPregunta?: TipoPregunta;
   esCorrecta: boolean;
   acertada: boolean;
+  /** Puntos máximos de la pregunta. */
+  puntos?: number;
+  /** Puntos asignados en la corrección. */
+  puntosObtenidos?: number;
   respuestasSeleccionadas: Array<{ id: string; texto: string; esCorrecta: boolean }>;
   respuestasCorrectas: Array<{ id: string; texto: string }>;
   opciones: ExamRealizadoOpcionDetalle[];
   /** Texto escrito por el alumno en preguntas de desarrollo. */
   respuestaDesarrollo?: string;
+  /** Comentario / observación del docente al corregir. */
+  comentario?: string;
 }
 
 export interface ExamRealizadoDetalle extends ExamUltimoIntento {

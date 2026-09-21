@@ -282,14 +282,22 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
             })
           : [];
 
+        const puntos = Number(p.puntos);
+        const puntosObtenidos = Number(p.puntosObtenidos);
+
         return {
           orden: typeof p.orden === "number" ? p.orden : index + 1,
           id: String(p.id ?? p.idPregunta ?? `q-${index}`),
           texto: String(p.texto ?? p.pregunta ?? ""),
           tipoInput: typeof p.tipoInput === "string" ? p.tipoInput : undefined,
           tipoPregunta: normalizeTipoPregunta(p.tipoPregunta, p.tipoInput),
+          ...(Number.isFinite(puntos) ? { puntos } : {}),
+          ...(Number.isFinite(puntosObtenidos) ? { puntosObtenidos } : {}),
           ...(typeof p.respuestaDesarrollo === "string"
             ? { respuestaDesarrollo: p.respuestaDesarrollo }
+            : {}),
+          ...(typeof p.comentario === "string" && p.comentario.trim()
+            ? { comentario: p.comentario.trim() }
             : {}),
           esCorrecta: toBool(p.esCorrecta ?? p.acertada),
           acertada: toBool(p.acertada ?? p.esCorrecta),
