@@ -3,14 +3,21 @@ export interface ExamOption {
   texto: string;
 }
 
+export type TipoPregunta = "opcion_multiple" | "desarrollo";
+
+/** Estado de corrección del intento. */
+export type EstadoExamenRealizado = "completado" | "pendiente_correccion";
+
 export interface ExamQuestion {
   id: string;
   texto: string;
   orden?: number;
   opciones: ExamOption[];
-  /** Viene del backend: "radio" | "checkbox". */
+  /** Viene del backend: "radio" | "checkbox" | "textarea". */
   tipoInput?: string;
   tipo?: "unica" | "multiple" | "radio" | "checkbox";
+  /** Por defecto opcion_multiple (exámenes legacy). */
+  tipoPregunta?: TipoPregunta;
 }
 
 export interface CourseExam {
@@ -34,6 +41,8 @@ export interface ExamUltimoIntento extends ExamResultSummary {
   id?: string;
   intentoNumero?: number;
   fechaRealizacion?: string;
+  /** "pendiente_correccion" cuando el examen tiene preguntas de desarrollo. */
+  estado?: EstadoExamenRealizado;
 }
 
 export interface ExamRealizadoOpcionDetalle {
@@ -48,11 +57,20 @@ export interface ExamRealizadoPreguntaDetalle {
   id: string;
   texto: string;
   tipoInput?: string;
+  tipoPregunta?: TipoPregunta;
   esCorrecta: boolean;
   acertada: boolean;
+  /** Puntos máximos de la pregunta. */
+  puntos?: number;
+  /** Puntos asignados en la corrección. */
+  puntosObtenidos?: number;
   respuestasSeleccionadas: Array<{ id: string; texto: string; esCorrecta: boolean }>;
   respuestasCorrectas: Array<{ id: string; texto: string }>;
   opciones: ExamRealizadoOpcionDetalle[];
+  /** Texto escrito por el alumno en preguntas de desarrollo. */
+  respuestaDesarrollo?: string;
+  /** Comentario / observación del docente al corregir. */
+  comentario?: string;
 }
 
 export interface ExamRealizadoDetalle extends ExamUltimoIntento {
@@ -60,7 +78,7 @@ export interface ExamRealizadoDetalle extends ExamUltimoIntento {
   idFormacion: string;
   tituloExamen?: string;
   tituloFormacion?: string;
-  estado?: string;
+  estadoCorreccion?: EstadoExamenRealizado;
   preguntas?: ExamRealizadoPreguntaDetalle[];
   detallePreguntas?: ExamRealizadoPreguntaDetalle[];
 }
@@ -74,6 +92,10 @@ export interface ExamEstado {
   duracionMinutos?: number;
   notaMinima?: number;
   mensaje?: string;
+  intentosUsados?: number;
+  intentosMaximos?: number;
+  intentosAgotados?: boolean;
+  mensajeBloqueo?: string;
   progresoFormacion?: {
     totalModulos: number;
     modulosCompletados: number;
@@ -85,6 +107,8 @@ export interface ExamEstado {
 export interface ExamAnswerSubmission {
   idPregunta: string;
   respuestasSeleccionadas: string[];
+  /** Solo en preguntas de desarrollo. */
+  respuestaDesarrollo?: string;
 }
 
 export interface SubmitExamPayload {
@@ -107,6 +131,14 @@ export interface SubmitExamResult extends ExamResultSummary {
   examenRealizado?: ExamAttempt;
   mensaje?: string;
   puedeReintentar?: boolean;
+  estado?: EstadoExamenRealizado;
+  intentoNumero?: number;
+  intentosUsados?: number;
+  intentosMaximos?: number;
 }
 
+/** Opciones seleccionadas por pregunta de opción múltiple. */
 export type StudentAnswersMap = Record<string, string[]>;
+
+/** Texto ingresado por pregunta de desarrollo. */
+export type StudentTextAnswersMap = Record<string, string>;

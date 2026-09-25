@@ -8,13 +8,134 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Check, X, FileText } from "lucide-react";
 import { formatNota, formatPorcentaje } from "@/lib/examUtils";
-import type { ExamRealizadoDetalle } from "@/types/exam";
+import type {
+  ExamRealizadoDetalle,
+  ExamRealizadoOpcionDetalle,
+} from "@/types/exam";
 
 interface VerExamenRealizadoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   detalle: ExamRealizadoDetalle | null;
   loading: boolean;
+}
+
+function RespuestaDesarrollo({
+  texto,
+  puntos,
+  puntosObtenidos,
+  comentario,
+}: {
+  texto?: string;
+  puntos?: number;
+  puntosObtenidos?: number;
+  comentario?: string;
+}) {
+  const tienePuntaje =
+    typeof puntosObtenidos === "number" && typeof puntos === "number";
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Tu respuesta
+        </p>
+        <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50/50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+          {texto?.trim() || "Sin respuesta"}
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 space-y-2 dark:border-blue-900 dark:bg-blue-950/30">
+        <p className="text-xs font-medium text-blue-800 uppercase tracking-wide dark:text-blue-200">
+          Corrección del docente
+        </p>
+        {tienePuntaje && (
+          <p className="text-sm text-blue-900 dark:text-blue-100">
+            Puntaje:{" "}
+            <strong>
+              {puntosObtenidos} / {puntos} pts
+            </strong>
+          </p>
+        )}
+        {comentario?.trim() ? (
+          <p className="whitespace-pre-wrap text-sm text-blue-900 dark:text-blue-100">
+            {comentario.trim()}
+          </p>
+        ) : (
+          <p className="text-sm text-blue-700/80 dark:text-blue-300/80">
+            Sin comentario del docente.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OpcionesPregunta({
+  opciones,
+}: {
+  opciones: ExamRealizadoOpcionDetalle[];
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        Opciones
+      </p>
+      {opciones.map((opcion) => (
+        <div
+          key={opcion.id}
+          className={`p-3 rounded-lg border text-sm ${
+            opcion.esCorrecta
+              ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20"
+              : opcion.seleccionadaPorAlumno
+                ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20"
+                : "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <span className="flex-shrink-0 mt-0.5">
+              {opcion.esCorrecta ? (
+                <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+              ) : opcion.seleccionadaPorAlumno ? (
+                <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+              ) : (
+                <span className="w-4 h-4 block" />
+              )}
+            </span>
+            <div className="flex-1 min-w-0">
+              <span
+                className={
+                  opcion.esCorrecta
+                    ? "font-medium text-green-800 dark:text-green-200"
+                    : opcion.seleccionadaPorAlumno
+                      ? "font-medium text-red-800 dark:text-red-200"
+                      : "text-slate-700 dark:text-slate-300"
+                }
+              >
+                {opcion.texto}
+              </span>
+              {opcion.esCorrecta && (
+                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                  (Respuesta correcta)
+                </span>
+              )}
+              {opcion.seleccionadaPorAlumno && (
+                <span
+                  className={`ml-2 text-xs ${
+                    opcion.esCorrecta
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  (Tu elección)
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function VerExamenRealizadoModal({
@@ -81,83 +202,46 @@ export default function VerExamenRealizadoModal({
                       <CardTitle className="text-base font-medium leading-snug">
                         Pregunta {pregunta.orden || index + 1}: {pregunta.texto}
                       </CardTitle>
-                      <Badge
-                        variant={pregunta.acertada ? "default" : "destructive"}
-                        className="flex-shrink-0"
-                      >
-                        {pregunta.acertada ? (
-                          <>
-                            <Check className="w-3 h-3 mr-1" />
-                            Correcta
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3 h-3 mr-1" />
-                            Incorrecta
-                          </>
-                        )}
-                      </Badge>
+                      {pregunta.tipoPregunta === "desarrollo" &&
+                      typeof pregunta.puntosObtenidos === "number" &&
+                      typeof pregunta.puntos === "number" ? (
+                        <Badge
+                          variant={pregunta.acertada ? "default" : "secondary"}
+                          className="flex-shrink-0"
+                        >
+                          {pregunta.puntosObtenidos} / {pregunta.puntos} pts
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant={pregunta.acertada ? "default" : "destructive"}
+                          className="flex-shrink-0"
+                        >
+                          {pregunta.acertada ? (
+                            <>
+                              <Check className="w-3 h-3 mr-1" />
+                              Correcta
+                            </>
+                          ) : (
+                            <>
+                              <X className="w-3 h-3 mr-1" />
+                              Incorrecta
+                            </>
+                          )}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Opciones
-                      </p>
-                      {pregunta.opciones.map((opcion) => (
-                        <div
-                          key={opcion.id}
-                          className={`p-3 rounded-lg border text-sm ${
-                            opcion.esCorrecta
-                              ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20"
-                              : opcion.seleccionadaPorAlumno
-                                ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20"
-                                : "border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <span className="flex-shrink-0 mt-0.5">
-                              {opcion.esCorrecta ? (
-                                <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              ) : opcion.seleccionadaPorAlumno ? (
-                                <X className="w-4 h-4 text-red-600 dark:text-red-400" />
-                              ) : (
-                                <span className="w-4 h-4 block" />
-                              )}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <span
-                                className={
-                                  opcion.esCorrecta
-                                    ? "font-medium text-green-800 dark:text-green-200"
-                                    : opcion.seleccionadaPorAlumno
-                                      ? "font-medium text-red-800 dark:text-red-200"
-                                      : "text-slate-700 dark:text-slate-300"
-                                }
-                              >
-                                {opcion.texto}
-                              </span>
-                              {opcion.esCorrecta && (
-                                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                                  (Respuesta correcta)
-                                </span>
-                              )}
-                              {opcion.seleccionadaPorAlumno && (
-                                <span
-                                  className={`ml-2 text-xs ${
-                                    opcion.esCorrecta
-                                      ? "text-green-600 dark:text-green-400"
-                                      : "text-red-600 dark:text-red-400"
-                                  }`}
-                                >
-                                  (Tu elección)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    {pregunta.tipoPregunta === "desarrollo" ? (
+                      <RespuestaDesarrollo
+                        texto={pregunta.respuestaDesarrollo}
+                        puntos={pregunta.puntos}
+                        puntosObtenidos={pregunta.puntosObtenidos}
+                        comentario={pregunta.comentario}
+                      />
+                    ) : (
+                      <OpcionesPregunta opciones={pregunta.opciones} />
+                    )}
                   </CardContent>
                 </Card>
               ))
