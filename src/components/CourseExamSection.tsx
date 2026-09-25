@@ -298,6 +298,17 @@ export default function CourseExamSection({
         return;
       }
 
+      if (fresh.intentosAgotados) {
+        toast.error("Evaluación bloqueada", {
+          description:
+            fresh.mensajeBloqueo ||
+            "Alcanzaste el máximo de intentos. Ya no podés volver a realizarla.",
+        });
+        setModalOpen(false);
+        setPhase("idle");
+        return;
+      }
+
       if (!fresh.puedeRealizar && !readyNow) {
         toast.error("Evaluación no disponible", {
           description:
@@ -343,6 +354,7 @@ export default function CourseExamSection({
         porcentajeAciertos: result.porcentajeAciertos,
         respuestasCorrectas: result.respuestasCorrectas,
         totalPreguntas: result.totalPreguntas,
+        ...(result.intentoNumero != null ? { intentoNumero: result.intentoNumero } : {}),
         ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
         ...(result.estado ? { estado: result.estado } : {}),
       };
@@ -373,20 +385,38 @@ export default function CourseExamSection({
         toast.success("¡Felicitaciones!", {
           description: `Aprobaste con ${formatPorcentaje(result.porcentajeAciertos)} de aciertos.`,
         });
+      } else if (!result.puedeReintentar) {
+        toast.error("Evaluación bloqueada", {
+          description:
+            result.mensaje ||
+            "Alcanzaste el máximo de intentos. Ya no podés volver a realizarla.",
+        });
       } else {
         toast.info("Evaluación no aprobada", {
-          description: `Obtuviste ${formatPorcentaje(result.porcentajeAciertos)} de aciertos. Podés reintentar cuando quieras.`,
+          description:
+            result.mensaje ||
+            `Obtuviste ${formatPorcentaje(result.porcentajeAciertos)} de aciertos. Podés reintentar cuando quieras.`,
         });
       }
+
+      const maxIntentos = result.intentosMaximos ?? 3;
+      const usados = result.intentosUsados ?? result.intentoNumero;
+      const agotoIntentos =
+        !result.aprobado &&
+        !pendienteCorreccion &&
+        result.puedeReintentar !== true &&
+        typeof usados === "number" &&
+        usados >= maxIntentos;
 
       setEstado((prev) =>
         prev
           ? {
               ...prev,
-              puedeRealizar:
-                result.aprobado || pendienteCorreccion
-                  ? false
-                  : prev.puedeRealizar,
+              puedeRealizar: result.puedeReintentar === true,
+              intentosUsados: usados ?? prev.intentosUsados,
+              intentosMaximos: maxIntentos,
+              intentosAgotados: agotoIntentos,
+              mensajeBloqueo: agotoIntentos ? result.mensaje : undefined,
               ultimoIntento: intentoResultado,
             }
           : prev
@@ -568,11 +598,16 @@ export default function CourseExamSection({
   const tieneIntento = ultimoIntento != null;
   /** Con preguntas de desarrollo el intento espera corrección manual. */
   const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
+  const intentosMaximos = estado?.intentosMaximos ?? 3;
+  const intentosUsados = estado?.intentosUsados ?? 0;
+  const intentosAgotados = estado?.intentosAgotados === true;
+  const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
   /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
   const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
   const canShowButton =
     !passed &&
     !esperandoCorreccion &&
+    !intentosAgotados &&
     !!estado?.idExamen &&
     (estado.puedeRealizar === true || locallyReady);
 
@@ -683,13 +718,28 @@ export default function CourseExamSection({
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
                 Nota mínima para aprobar: {notaMinima}
+                {" · "}
+                Intentos usados: {intentosUsados} de {intentosMaximos}
               </p>
             </div>
 
-            {locallyReady && !passed && !esperandoCorreccion && (
+            {locallyReady && !passed && !esperandoCorreccion && !intentosAgotados && (
               <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
                 <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
                   Completaste todo el contenido del curso. Podés realizar la evaluación final.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {intentosAgotados && (
+              <Alert className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30">
+                <Lock className="h-4 w-4 text-red-600" />
+                <AlertTitle className="text-red-900 dark:text-red-100">
+                  Evaluación bloqueada
+                </AlertTitle>
+                <AlertDescription className="text-red-800 dark:text-red-200">
+                  {estado?.mensajeBloqueo ||
+                    `Alcanzaste el máximo de ${intentosMaximos} intentos. Ya no podés volver a realizar esta evaluación.`}
                 </AlertDescription>
               </Alert>
             )}
@@ -745,9 +795,18 @@ export default function CourseExamSection({
                       {passed ? "¡Aprobaste la evaluación!" : "Último intento"}
                     </p>
                     <ExamResultDisplay result={ultimoIntento} showStatus />
-                    {!passed && (
+                    {!passed && !intentosAgotados && (
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        No alcanzaste la nota mínima. Podés reintentar.
+                        No alcanzaste la nota mínima. Te{" "}
+                        {intentosRestantes === 1 ? "queda" : "quedan"}{" "}
+                        {intentosRestantes}{" "}
+                        {intentosRestantes === 1 ? "intento" : "intentos"}.
+                      </p>
+                    )}
+                    {!passed && intentosAgotados && (
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        No alcanzaste la nota mínima y usaste los {intentosMaximos}{" "}
+                        intentos disponibles.
                       </p>
                     )}
                   </div>
@@ -1001,7 +1060,10 @@ export default function CourseExamSection({
                     <p className="text-sm text-slate-600 dark:text-slate-400">
                       {lastResult.aprobado
                         ? `Felicitaciones, alcanzaste la nota mínima de ${notaMinima}.`
-                        : `Necesitás al menos ${notaMinima} para aprobar. Tu resultado quedó registrado.`}
+                        : intentosAgotados
+                          ? estado?.mensajeBloqueo ||
+                            `Alcanzaste el máximo de ${intentosMaximos} intentos. La evaluación quedó bloqueada.`
+                          : `Necesitás al menos ${notaMinima} para aprobar. Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`}
                     </p>
                   </div>
                 </div>
@@ -1049,13 +1111,28 @@ export default function CourseExamSection({
               {phase === "result" &&
                 lastResult &&
                 !lastResult.aprobado &&
-                lastResult.estado !== "pendiente_correccion" && (
+                lastResult.estado !== "pendiente_correccion" &&
+                !intentosAgotados &&
+                estado?.puedeRealizar && (
                   <Button
                     className="w-full sm:w-auto gap-2"
                     onClick={() => void openExamModal()}
                   >
                     <RotateCcw className="h-4 w-4" />
                     Reintentar evaluación
+                  </Button>
+                )}
+
+              {phase === "result" &&
+                lastResult &&
+                !lastResult.aprobado &&
+                lastResult.estado !== "pendiente_correccion" &&
+                (intentosAgotados || !estado?.puedeRealizar) && (
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => handleModalChange(false)}
+                  >
+                    Cerrar
                   </Button>
                 )}
 
