@@ -174,6 +174,9 @@ function normalizeExamEstado(data: unknown): ExamEstado {
   const idExamen = raw.idExamen ?? raw.id_examen;
   const titulo = raw.tituloExamen ?? raw.titulo ?? raw.title;
   const duracionRaw = Number(raw.duracionMinutos ?? raw.duracion_minutos);
+  const intentosUsados = Number(raw.intentosUsados ?? raw.intentos_usados);
+  const intentosMaximos = Number(raw.intentosMaximos ?? raw.intentos_maximos ?? 3);
+  const mensajeBloqueo = raw.mensajeBloqueo ?? raw.mensaje_bloqueo;
 
   return {
     examenDisponible: toBool(raw.examenDisponible ?? raw.examen_disponible),
@@ -184,6 +187,10 @@ function normalizeExamEstado(data: unknown): ExamEstado {
     duracionMinutos:
       !Number.isNaN(duracionRaw) && duracionRaw > 0 ? duracionRaw : 90,
     notaMinima: 7,
+    intentosUsados: Number.isFinite(intentosUsados) ? intentosUsados : 0,
+    intentosMaximos: Number.isFinite(intentosMaximos) && intentosMaximos > 0 ? intentosMaximos : 3,
+    intentosAgotados: toBool(raw.intentosAgotados ?? raw.intentos_agotados),
+    mensajeBloqueo: typeof mensajeBloqueo === "string" ? mensajeBloqueo : undefined,
     progresoFormacion,
     ultimoIntento,
   };
@@ -236,12 +243,20 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
   const estado = normalizeEstadoCorreccion(
     resultado.estado ?? raw.estado ?? resultado.estadoCorreccion
   );
+  const intentoNumero = Number(resultado.intentoNumero ?? raw.intentoNumero);
+  const intentosUsados = Number(resultado.intentosUsados ?? raw.intentosUsados);
+  const intentosMaximos = Number(
+    resultado.intentosMaximos ?? raw.intentosMaximos
+  );
 
   return {
     ...summary,
     mensaje: typeof raw.message === "string" ? raw.message : undefined,
     puedeReintentar: toBool(resultado.puedeReintentar ?? raw.puedeReintentar),
     ...(estado ? { estado } : {}),
+    ...(Number.isFinite(intentoNumero) ? { intentoNumero } : {}),
+    ...(Number.isFinite(intentosUsados) ? { intentosUsados } : {}),
+    ...(Number.isFinite(intentosMaximos) ? { intentosMaximos } : {}),
     examenRealizado: {
       id: String(resultado.id ?? ""),
       ...summary,

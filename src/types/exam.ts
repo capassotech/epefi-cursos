@@ -92,6 +92,10 @@ export interface ExamEstado {
   duracionMinutos?: number;
   notaMinima?: number;
   mensaje?: string;
+  intentosUsados?: number;
+  intentosMaximos?: number;
+  intentosAgotados?: boolean;
+  mensajeBloqueo?: string;
   progresoFormacion?: {
     totalModulos: number;
     modulosCompletados: number;
@@ -128,6 +132,9 @@ export interface SubmitExamResult extends ExamResultSummary {
   mensaje?: string;
   puedeReintentar?: boolean;
   estado?: EstadoExamenRealizado;
+  intentoNumero?: number;
+  intentosUsados?: number;
+  intentosMaximos?: number;
 }
 
 /** Opciones seleccionadas por pregunta de opción múltiple. */
