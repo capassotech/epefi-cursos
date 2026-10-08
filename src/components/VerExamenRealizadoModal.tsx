@@ -232,6 +232,16 @@ export default function VerExamenRealizadoModal({
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
+                    {pregunta.imagenUrl ? (
+                      <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
+                        <img
+                          src={pregunta.imagenUrl}
+                          alt={`Imagen de la pregunta ${pregunta.orden || index + 1}`}
+                          className="max-h-64 w-full object-contain rounded"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : null}
                     {pregunta.tipoPregunta === "desarrollo" ? (
                       <RespuestaDesarrollo
                         texto={pregunta.respuestaDesarrollo}

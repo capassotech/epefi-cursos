@@ -18,6 +18,8 @@ export interface ExamQuestion {
   tipo?: "unica" | "multiple" | "radio" | "checkbox";
   /** Por defecto opcion_multiple (exámenes legacy). */
   tipoPregunta?: TipoPregunta;
+  /** Imagen de apoyo / enunciado visual (Firebase Storage URL). */
+  imagenUrl?: string;
 }
 
 export interface CourseExam {
@@ -58,6 +60,7 @@ export interface ExamRealizadoPreguntaDetalle {
   texto: string;
   tipoInput?: string;
   tipoPregunta?: TipoPregunta;
+  imagenUrl?: string;
   esCorrecta: boolean;
   acertada: boolean;
   /** Puntos máximos de la pregunta. */

@@ -85,6 +85,10 @@ function mapPreguntas(preguntasRaw: Record<string, unknown>[]): CourseExam["preg
       orden: typeof p.orden === "number" ? p.orden : index,
       tipoInput: typeof tipoInput === "string" ? tipoInput : undefined,
       tipoPregunta,
+      imagenUrl:
+        typeof p.imagenUrl === "string" && p.imagenUrl.trim()
+          ? p.imagenUrl.trim()
+          : undefined,
       tipo:
         tipoPregunta === "desarrollo"
           ? undefined
@@ -306,6 +310,9 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
           texto: String(p.texto ?? p.pregunta ?? ""),
           tipoInput: typeof p.tipoInput === "string" ? p.tipoInput : undefined,
           tipoPregunta: normalizeTipoPregunta(p.tipoPregunta, p.tipoInput),
+          ...(typeof p.imagenUrl === "string" && p.imagenUrl.trim()
+            ? { imagenUrl: p.imagenUrl.trim() }
+            : {}),
           ...(Number.isFinite(puntos) ? { puntos } : {}),
           ...(Number.isFinite(puntosObtenidos) ? { puntosObtenidos } : {}),
           ...(typeof p.respuestaDesarrollo === "string"
