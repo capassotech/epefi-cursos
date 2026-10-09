@@ -938,6 +938,16 @@ export default function CourseExamSection({
                         <span className="text-orange-500 mr-2">{index + 1}.</span>
                         {question.texto}
                       </p>
+                      {question.imagenUrl ? (
+                        <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
+                          <img
+                            src={question.imagenUrl}
+                            alt={`Imagen de la pregunta ${index + 1}`}
+                            className="max-h-72 w-full object-contain rounded"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : null}
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {esDesarrollo
                           ? "Escribí tu respuesta. La corrige un docente."
