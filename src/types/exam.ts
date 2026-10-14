@@ -90,6 +90,7 @@ export interface ExamEstado {
   examenDisponible: boolean;
   puedeRealizar: boolean;
   formacionCompleta: boolean;
+  requiereCompletarCurso?: boolean;
   idExamen?: string;
   titulo?: string;
   duracionMinutos?: number;
