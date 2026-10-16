@@ -598,8 +598,14 @@ export default function CourseExamSection({
   const tieneIntento = ultimoIntento != null;
   /** Con preguntas de desarrollo el intento espera corrección manual. */
   const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
-  const intentosMaximos = estado?.intentosMaximos ?? 3;
-  const intentosUsados = estado?.intentosUsados ?? 0;
+  const intentosMaximos =
+    typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
+      ? estado.intentosMaximos
+      : 3;
+  const intentosUsados =
+    typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
+      ? estado.intentosUsados
+      : 0;
   const intentosAgotados = estado?.intentosAgotados === true;
   const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
   /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
