@@ -592,7 +592,10 @@ export default function CourseExamSection({
     [modulos, materiaIds, enabledModules, progress, estado?.idExamen]
   );
 
-  const notaMinima = estado?.notaMinima ?? PASSING_GRADE;
+  const notaMinima =
+    typeof estado?.notaMinima === "number" && estado.notaMinima > 0
+      ? estado.notaMinima / 10
+      : PASSING_GRADE;
   const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
   const passed = ultimoIntento?.aprobado === true;
   const tieneIntento = ultimoIntento != null;

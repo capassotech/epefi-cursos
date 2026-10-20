@@ -190,7 +190,10 @@ function normalizeExamEstado(data: unknown): ExamEstado {
     titulo: typeof titulo === "string" ? titulo : undefined,
     duracionMinutos:
       !Number.isNaN(duracionRaw) && duracionRaw > 0 ? duracionRaw : 90,
-    notaMinima: 7,
+    notaMinima:
+      typeof raw.notaMinima === "number" && raw.notaMinima > 0
+        ? raw.notaMinima
+        : 70,
     intentosUsados: Number.isFinite(intentosUsados) ? intentosUsados : 0,
     intentosMaximos: Number.isFinite(intentosMaximos) && intentosMaximos > 0 ? intentosMaximos : 3,
     intentosAgotados: toBool(raw.intentosAgotados ?? raw.intentos_agotados),
