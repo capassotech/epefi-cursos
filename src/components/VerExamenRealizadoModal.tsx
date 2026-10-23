@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, FileText } from "lucide-react";
+import { Loader2, Check, X, FileText, Minus } from "lucide-react";
 import { formatNota, formatPorcentaje } from "@/lib/examUtils";
 import type {
   ExamRealizadoDetalle,
@@ -211,24 +211,35 @@ export default function VerExamenRealizadoModal({
                         >
                           {pregunta.puntosObtenidos} / {pregunta.puntos} pts
                         </Badge>
-                      ) : (
-                        <Badge
-                          variant={pregunta.acertada ? "default" : "destructive"}
-                          className="flex-shrink-0"
-                        >
-                          {pregunta.acertada ? (
-                            <>
-                              <Check className="w-3 h-3 mr-1" />
-                              Correcta
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-3 h-3 mr-1" />
-                              Incorrecta
-                            </>
-                          )}
-                        </Badge>
-                      )}
+                      ) : (() => {
+                          const esParcial =
+                            !pregunta.acertada &&
+                            typeof pregunta.puntosObtenidos === "number" &&
+                            pregunta.puntosObtenidos > 0;
+                          return (
+                            <Badge
+                              variant={pregunta.acertada ? "default" : esParcial ? "secondary" : "destructive"}
+                              className="flex-shrink-0"
+                            >
+                              {pregunta.acertada ? (
+                                <>
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Correcta
+                                </>
+                              ) : esParcial ? (
+                                <>
+                                  <Minus className="w-3 h-3 mr-1" />
+                                  Parcial
+                                </>
+                              ) : (
+                                <>
+                                  <X className="w-3 h-3 mr-1" />
+                                  Incorrecta
+                                </>
+                              )}
+                            </Badge>
+                          );
+                        })()}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">

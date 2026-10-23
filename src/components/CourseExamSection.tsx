@@ -529,12 +529,8 @@ export default function CourseExamSection({
 
   const handleVerExamenRealizado = useCallback(async () => {
     const intento = lastResult ?? estado?.ultimoIntento;
-    if (!intento?.aprobado) {
-      toast.error("El detalle del examen solo está disponible cuando aprobás la evaluación.");
-      return;
-    }
 
-    const intentoId = intento.id;
+    const intentoId = intento?.id;
     if (!intentoId) {
       toast.error("No se encontró el registro del examen realizado.");
       return;
@@ -611,8 +607,8 @@ export default function CourseExamSection({
       : 0;
   const intentosAgotados = estado?.intentosAgotados === true;
   const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
-  /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
-  const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
+  /** Disponible para cualquier intento ya corregido (aprobado o no). */
+  const puedeVerDetalle = Boolean(!esperandoCorreccion && tieneIntento && ultimoIntento?.id);
   const canShowButton =
     !passed &&
     !esperandoCorreccion &&
