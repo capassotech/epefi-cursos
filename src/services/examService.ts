@@ -182,10 +182,17 @@ function normalizeExamEstado(data: unknown): ExamEstado {
   const intentosMaximos = Number(raw.intentosMaximos ?? raw.intentos_maximos ?? 3);
   const mensajeBloqueo = raw.mensajeBloqueo ?? raw.mensaje_bloqueo;
 
+  const examenHabilitadoRaw = raw.examenHabilitado ?? raw.examen_habilitado;
+  const examenHabilitado =
+    examenHabilitadoRaw === undefined || examenHabilitadoRaw === null
+      ? true
+      : toBool(examenHabilitadoRaw);
+
   return {
     examenDisponible: toBool(raw.examenDisponible ?? raw.examen_disponible),
     puedeRealizar: toBool(raw.puedeRealizar ?? raw.puede_realizar),
     formacionCompleta: toBool(raw.formacionCompleta ?? raw.formacion_completa),
+    examenHabilitado,
     idExamen: typeof idExamen === "string" && idExamen.length > 0 ? idExamen : undefined,
     titulo: typeof titulo === "string" ? titulo : undefined,
     duracionMinutos:

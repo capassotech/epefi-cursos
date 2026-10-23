@@ -298,6 +298,17 @@ export default function CourseExamSection({
         return;
       }
 
+      if (fresh.examenHabilitado === false) {
+        toast.error("Evaluación no disponible", {
+          description:
+            fresh.mensajeBloqueo ||
+            "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios.",
+        });
+        setModalOpen(false);
+        setPhase("idle");
+        return;
+      }
+
       if (fresh.intentosAgotados) {
         toast.error("Evaluación bloqueada", {
           description:
@@ -598,13 +609,21 @@ export default function CourseExamSection({
   const tieneIntento = ultimoIntento != null;
   /** Con preguntas de desarrollo el intento espera corrección manual. */
   const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
-  const intentosMaximos = estado?.intentosMaximos ?? 3;
-  const intentosUsados = estado?.intentosUsados ?? 0;
+  const intentosMaximos =
+    typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
+      ? estado.intentosMaximos
+      : 3;
+  const intentosUsados =
+    typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
+      ? estado.intentosUsados
+      : 0;
   const intentosAgotados = estado?.intentosAgotados === true;
+  const examenHabilitado = estado?.examenHabilitado !== false;
   const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
   /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
   const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
   const canShowButton =
+    examenHabilitado &&
     !passed &&
     !esperandoCorreccion &&
     !intentosAgotados &&
@@ -723,7 +742,24 @@ export default function CourseExamSection({
               </p>
             </div>
 
-            {locallyReady && !passed && !esperandoCorreccion && !intentosAgotados && (
+            {!examenHabilitado && (
+              <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+                <Lock className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">
+                  Evaluación no disponible
+                </AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  {estado?.mensajeBloqueo ||
+                    "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios. Si tenés alguna consulta, comunicate con tu profesor."}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {examenHabilitado &&
+              locallyReady &&
+              !passed &&
+              !esperandoCorreccion &&
+              !intentosAgotados && (
               <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
                 <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
                   Completaste todo el contenido del curso. Podés realizar la evaluación final.
@@ -731,7 +767,7 @@ export default function CourseExamSection({
               </Alert>
             )}
 
-            {intentosAgotados && (
+            {examenHabilitado && intentosAgotados && (
               <Alert className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30">
                 <Lock className="h-4 w-4 text-red-600" />
                 <AlertTitle className="text-red-900 dark:text-red-100">
@@ -1122,13 +1158,14 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.estado !== "pendiente_correccion" &&
+                examenHabilitado &&
                 !intentosAgotados &&
                 estado?.puedeRealizar && (
                   <Button
                     className="w-full sm:w-auto gap-2"
                     onClick={() => void openExamModal()}
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="w-4 h-4" />
                     Reintentar evaluación
                   </Button>
                 )}
