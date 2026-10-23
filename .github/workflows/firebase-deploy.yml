@@ -43,6 +43,7 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_QA }}"
           channelId: live
           projectId: epefi-cursos-qa
+          firebaseToolsVersion: "13.29.1"  
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
