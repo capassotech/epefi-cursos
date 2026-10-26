@@ -90,6 +90,8 @@ export interface ExamEstado {
   examenDisponible: boolean;
   puedeRealizar: boolean;
   formacionCompleta: boolean;
+  /** Si falta, se considera habilitado (compatibilidad). */
+  examenHabilitado?: boolean;
   requiereCompletarCurso?: boolean;
   idExamen?: string;
   titulo?: string;
