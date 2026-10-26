@@ -263,6 +263,13 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
     resultado.intentosMaximos ?? raw.intentosMaximos
   );
 
+  const publicacionManualDeNota =
+    raw.publicacionManualDeNota !== undefined
+      ? toBool(raw.publicacionManualDeNota)
+      : resultado.publicacionManualDeNota !== undefined
+        ? toBool(resultado.publicacionManualDeNota)
+        : undefined;
+
   return {
     ...summary,
     mensaje: typeof raw.message === "string" ? raw.message : undefined,
@@ -271,6 +278,7 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
     ...(Number.isFinite(intentoNumero) ? { intentoNumero } : {}),
     ...(Number.isFinite(intentosUsados) ? { intentosUsados } : {}),
     ...(Number.isFinite(intentosMaximos) ? { intentosMaximos } : {}),
+    ...(publicacionManualDeNota !== undefined ? { publicacionManualDeNota } : {}),
     examenRealizado: {
       id: String(resultado.id ?? ""),
       ...summary,

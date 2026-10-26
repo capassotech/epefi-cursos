@@ -69,6 +69,7 @@ import type {
   ExamUltimoIntento,
   StudentAnswersMap,
   StudentTextAnswersMap,
+  SubmitExamResult,
 } from "@/types/exam";
 import { toast } from "sonner";
 
@@ -148,6 +149,7 @@ export default function CourseExamSection({
   const [textAnswers, setTextAnswers] = useState<StudentTextAnswersMap>({});
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
+  const [lastResultPublicacionManual, setLastResultPublicacionManual] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showVerExamenModal, setShowVerExamenModal] = useState(false);
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
@@ -190,6 +192,7 @@ export default function CourseExamSection({
     setTextAnswers({});
     setRemainingSeconds(null);
     setCloseConfirmOpen(false);
+    setLastResultPublicacionManual(false);
   }, []);
 
   const loadEstado = useCallback(async (options?: { silent?: boolean }) => {
@@ -355,10 +358,12 @@ export default function CourseExamSection({
 
   const applySubmitResult = useCallback(
     (
-      result: Awaited<ReturnType<typeof ExamService.submitExam>>,
+      result: SubmitExamResult,
       motivo: "tiempo" | "abandono" | "envio"
     ) => {
       const pendienteCorreccion = result.estado === "pendiente_correccion";
+      const publicacionManual = result.publicacionManualDeNota === true;
+      setLastResultPublicacionManual(publicacionManual);
       const intentoResultado: ExamUltimoIntento = {
         nota: result.nota,
         aprobado: result.aprobado,
@@ -374,11 +379,13 @@ export default function CourseExamSection({
       setPhase("result");
       setRemainingSeconds(null);
 
-      if (pendienteCorreccion) {
+      if (publicacionManual || pendienteCorreccion) {
         toast.success("Evaluación enviada", {
           description:
             result.mensaje ||
-            "Contiene preguntas de desarrollo: será corregida en las próximas horas.",
+            (publicacionManual && !pendienteCorreccion
+              ? "La nota será publicada por el administrador en las próximas horas."
+              : "Contiene preguntas de desarrollo: será corregida en las próximas horas."),
         });
       } else if (motivo === "tiempo") {
         toast.warning("Tiempo agotado", {
@@ -848,7 +855,7 @@ export default function CourseExamSection({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {puedeVerDetalle && (
+                  {passed && puedeVerDetalle && (
                     <Button
                       variant="outline"
                       className="w-full sm:w-auto gap-2"
@@ -1066,17 +1073,17 @@ export default function CourseExamSection({
 
             {phase === "result" &&
               lastResult &&
-              (lastResult.estado === "pendiente_correccion" ? (
+              (lastResult.estado === "pendiente_correccion" || lastResultPublicacionManual ? (
                 <div className="space-y-4 py-4">
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center space-y-2 dark:border-amber-900 dark:bg-amber-950/30">
                     <Hourglass className="h-12 w-12 text-amber-600 mx-auto" />
                     <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
-                      Evaluación en espera de corrección
+                      Evaluación enviada
                     </p>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Recibimos tus respuestas. Como la evaluación tiene preguntas
-                      de desarrollo, la corrige un docente y vas a ver la nota en
-                      las próximas horas.
+                      {lastResultPublicacionManual && lastResult.estado !== "pendiente_correccion"
+                        ? "Tu evaluación fue enviada. La nota será publicada por el administrador en las próximas horas."
+                        : "Recibimos tus respuestas. La evaluación la corrige un docente y vas a ver la nota en las próximas horas."}
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       No hace falta que la vuelvas a enviar.
@@ -1144,7 +1151,7 @@ export default function CourseExamSection({
               )}
 
               {phase === "result" &&
-                lastResult?.estado === "pendiente_correccion" && (
+                (lastResult?.estado === "pendiente_correccion" || lastResultPublicacionManual) && (
                   <Button
                     className="w-full sm:w-auto"
                     onClick={() => handleModalChange(false)}
@@ -1157,6 +1164,7 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.estado !== "pendiente_correccion" &&
+                !lastResultPublicacionManual &&
                 examenHabilitado &&
                 !intentosAgotados &&
                 estado?.puedeRealizar && (
@@ -1173,6 +1181,7 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.estado !== "pendiente_correccion" &&
+                !lastResultPublicacionManual &&
                 (intentosAgotados || !estado?.puedeRealizar) && (
                   <Button
                     className="w-full sm:w-auto"

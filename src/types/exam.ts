@@ -141,6 +141,8 @@ export interface SubmitExamResult extends ExamResultSummary {
   intentoNumero?: number;
   intentosUsados?: number;
   intentosMaximos?: number;
+  /** Cuando es true, la nota no se muestra hasta que el admin la publique. */
+  publicacionManualDeNota?: boolean;
 }
 
 /** Opciones seleccionadas por pregunta de opción múltiple. */
