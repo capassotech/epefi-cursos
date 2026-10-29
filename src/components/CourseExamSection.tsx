@@ -803,9 +803,9 @@ export default function CourseExamSection({
                       </Badge>
                     </div>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Tu evaluación incluye preguntas de desarrollo, así que la
-                      corrige un docente. Vas a ver la nota y el resultado en las
-                      próximas horas.
+                      {examRequiereCorreccion
+                        ? "Tu evaluación incluye preguntas de desarrollo, así que la corrige un docente. Vas a ver la nota y el resultado en las próximas horas."
+                        : "Tu evaluación fue enviada correctamente. La nota será publicada por el docente lo antes posible."}
                     </p>
                     {ultimoIntento?.intentoNumero != null && (
                       <p className="text-xs text-amber-700 dark:text-amber-300">
