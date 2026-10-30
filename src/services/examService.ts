@@ -85,6 +85,10 @@ function mapPreguntas(preguntasRaw: Record<string, unknown>[]): CourseExam["preg
       orden: typeof p.orden === "number" ? p.orden : index,
       tipoInput: typeof tipoInput === "string" ? tipoInput : undefined,
       tipoPregunta,
+      imagenUrl:
+        typeof p.imagenUrl === "string" && p.imagenUrl.trim()
+          ? p.imagenUrl.trim()
+          : undefined,
       tipo:
         tipoPregunta === "desarrollo"
           ? undefined
@@ -178,15 +182,25 @@ function normalizeExamEstado(data: unknown): ExamEstado {
   const intentosMaximos = Number(raw.intentosMaximos ?? raw.intentos_maximos ?? 3);
   const mensajeBloqueo = raw.mensajeBloqueo ?? raw.mensaje_bloqueo;
 
+  const examenHabilitadoRaw = raw.examenHabilitado ?? raw.examen_habilitado;
+  const examenHabilitado =
+    examenHabilitadoRaw === undefined || examenHabilitadoRaw === null
+      ? true
+      : toBool(examenHabilitadoRaw);
+
   return {
     examenDisponible: toBool(raw.examenDisponible ?? raw.examen_disponible),
     puedeRealizar: toBool(raw.puedeRealizar ?? raw.puede_realizar),
     formacionCompleta: toBool(raw.formacionCompleta ?? raw.formacion_completa),
+    examenHabilitado,
     idExamen: typeof idExamen === "string" && idExamen.length > 0 ? idExamen : undefined,
     titulo: typeof titulo === "string" ? titulo : undefined,
     duracionMinutos:
       !Number.isNaN(duracionRaw) && duracionRaw > 0 ? duracionRaw : 90,
-    notaMinima: 7,
+    notaMinima:
+      typeof raw.notaMinima === "number" && raw.notaMinima > 0
+        ? raw.notaMinima
+        : 70,
     intentosUsados: Number.isFinite(intentosUsados) ? intentosUsados : 0,
     intentosMaximos: Number.isFinite(intentosMaximos) && intentosMaximos > 0 ? intentosMaximos : 3,
     intentosAgotados: toBool(raw.intentosAgotados ?? raw.intentos_agotados),
@@ -249,6 +263,13 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
     resultado.intentosMaximos ?? raw.intentosMaximos
   );
 
+  const publicacionManualDeNota =
+    raw.publicacionManualDeNota !== undefined
+      ? toBool(raw.publicacionManualDeNota)
+      : resultado.publicacionManualDeNota !== undefined
+        ? toBool(resultado.publicacionManualDeNota)
+        : undefined;
+
   return {
     ...summary,
     mensaje: typeof raw.message === "string" ? raw.message : undefined,
@@ -257,6 +278,7 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
     ...(Number.isFinite(intentoNumero) ? { intentoNumero } : {}),
     ...(Number.isFinite(intentosUsados) ? { intentosUsados } : {}),
     ...(Number.isFinite(intentosMaximos) ? { intentosMaximos } : {}),
+    ...(publicacionManualDeNota !== undefined ? { publicacionManualDeNota } : {}),
     examenRealizado: {
       id: String(resultado.id ?? ""),
       ...summary,
@@ -306,6 +328,9 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
           texto: String(p.texto ?? p.pregunta ?? ""),
           tipoInput: typeof p.tipoInput === "string" ? p.tipoInput : undefined,
           tipoPregunta: normalizeTipoPregunta(p.tipoPregunta, p.tipoInput),
+          ...(typeof p.imagenUrl === "string" && p.imagenUrl.trim()
+            ? { imagenUrl: p.imagenUrl.trim() }
+            : {}),
           ...(Number.isFinite(puntos) ? { puntos } : {}),
           ...(Number.isFinite(puntosObtenidos) ? { puntosObtenidos } : {}),
           ...(typeof p.respuestaDesarrollo === "string"

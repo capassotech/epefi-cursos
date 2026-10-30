@@ -69,6 +69,7 @@ import type {
   ExamUltimoIntento,
   StudentAnswersMap,
   StudentTextAnswersMap,
+  SubmitExamResult,
 } from "@/types/exam";
 import { toast } from "sonner";
 
@@ -148,6 +149,7 @@ export default function CourseExamSection({
   const [textAnswers, setTextAnswers] = useState<StudentTextAnswersMap>({});
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
+  const [lastResultPublicacionManual, setLastResultPublicacionManual] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showVerExamenModal, setShowVerExamenModal] = useState(false);
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
@@ -190,6 +192,7 @@ export default function CourseExamSection({
     setTextAnswers({});
     setRemainingSeconds(null);
     setCloseConfirmOpen(false);
+    setLastResultPublicacionManual(false);
   }, []);
 
   const loadEstado = useCallback(async (options?: { silent?: boolean }) => {
@@ -298,6 +301,17 @@ export default function CourseExamSection({
         return;
       }
 
+      if (fresh.examenHabilitado === false) {
+        toast.error("Evaluación no disponible", {
+          description:
+            fresh.mensajeBloqueo ||
+            "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios.",
+        });
+        setModalOpen(false);
+        setPhase("idle");
+        return;
+      }
+
       if (fresh.intentosAgotados) {
         toast.error("Evaluación bloqueada", {
           description:
@@ -344,10 +358,12 @@ export default function CourseExamSection({
 
   const applySubmitResult = useCallback(
     (
-      result: Awaited<ReturnType<typeof ExamService.submitExam>>,
+      result: SubmitExamResult,
       motivo: "tiempo" | "abandono" | "envio"
     ) => {
       const pendienteCorreccion = result.estado === "pendiente_correccion";
+      const publicacionManual = result.publicacionManualDeNota === true;
+      setLastResultPublicacionManual(publicacionManual);
       const intentoResultado: ExamUltimoIntento = {
         nota: result.nota,
         aprobado: result.aprobado,
@@ -363,11 +379,13 @@ export default function CourseExamSection({
       setPhase("result");
       setRemainingSeconds(null);
 
-      if (pendienteCorreccion) {
+      if (publicacionManual || pendienteCorreccion) {
         toast.success("Evaluación enviada", {
           description:
             result.mensaje ||
-            "Contiene preguntas de desarrollo: será corregida en las próximas horas.",
+            (publicacionManual && !pendienteCorreccion
+              ? "La nota será publicada por el administrador en las próximas horas."
+              : "Contiene preguntas de desarrollo: será corregida en las próximas horas."),
         });
       } else if (motivo === "tiempo") {
         toast.warning("Tiempo agotado", {
@@ -529,12 +547,8 @@ export default function CourseExamSection({
 
   const handleVerExamenRealizado = useCallback(async () => {
     const intento = lastResult ?? estado?.ultimoIntento;
-    if (!intento?.aprobado) {
-      toast.error("El detalle del examen solo está disponible cuando aprobás la evaluación.");
-      return;
-    }
 
-    const intentoId = intento.id;
+    const intentoId = intento?.id;
     if (!intentoId) {
       toast.error("No se encontró el registro del examen realizado.");
       return;
@@ -592,19 +606,30 @@ export default function CourseExamSection({
     [modulos, materiaIds, enabledModules, progress, estado?.idExamen]
   );
 
-  const notaMinima = estado?.notaMinima ?? PASSING_GRADE;
+  const notaMinima =
+    typeof estado?.notaMinima === "number" && estado.notaMinima > 0
+      ? estado.notaMinima / 10
+      : PASSING_GRADE;
   const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
   const passed = ultimoIntento?.aprobado === true;
   const tieneIntento = ultimoIntento != null;
   /** Con preguntas de desarrollo el intento espera corrección manual. */
   const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
-  const intentosMaximos = estado?.intentosMaximos ?? 3;
-  const intentosUsados = estado?.intentosUsados ?? 0;
+  const intentosMaximos =
+    typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
+      ? estado.intentosMaximos
+      : 3;
+  const intentosUsados =
+    typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
+      ? estado.intentosUsados
+      : 0;
   const intentosAgotados = estado?.intentosAgotados === true;
+  const examenHabilitado = estado?.examenHabilitado !== false;
   const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
-  /** Solo tras aprobar: no mostrar correctas si aún puede reintentar. */
-  const puedeVerDetalle = Boolean(passed && ultimoIntento?.id);
+  /** Disponible para cualquier intento ya corregido (aprobado o no). */
+  const puedeVerDetalle = Boolean(!esperandoCorreccion && tieneIntento && ultimoIntento?.id);
   const canShowButton =
+    examenHabilitado &&
     !passed &&
     !esperandoCorreccion &&
     !intentosAgotados &&
@@ -723,7 +748,24 @@ export default function CourseExamSection({
               </p>
             </div>
 
-            {locallyReady && !passed && !esperandoCorreccion && !intentosAgotados && (
+            {!examenHabilitado && (
+              <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+                <Lock className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">
+                  Evaluación no disponible
+                </AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  {estado?.mensajeBloqueo ||
+                    "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios. Si tenés alguna consulta, comunicate con tu profesor."}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {examenHabilitado &&
+              locallyReady &&
+              !passed &&
+              !esperandoCorreccion &&
+              !intentosAgotados && (
               <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
                 <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
                   Completaste todo el contenido del curso. Podés realizar la evaluación final.
@@ -731,7 +773,7 @@ export default function CourseExamSection({
               </Alert>
             )}
 
-            {intentosAgotados && (
+            {examenHabilitado && intentosAgotados && (
               <Alert className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30">
                 <Lock className="h-4 w-4 text-red-600" />
                 <AlertTitle className="text-red-900 dark:text-red-100">
@@ -761,9 +803,9 @@ export default function CourseExamSection({
                       </Badge>
                     </div>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Tu evaluación incluye preguntas de desarrollo, así que la
-                      corrige un docente. Vas a ver la nota y el resultado en las
-                      próximas horas.
+                      {examRequiereCorreccion
+                        ? "Tu evaluación incluye preguntas de desarrollo, así que la corrige un docente. Vas a ver la nota y el resultado en las próximas horas."
+                        : "Tu evaluación fue enviada correctamente. La nota será publicada por el docente lo antes posible."}
                     </p>
                     {ultimoIntento?.intentoNumero != null && (
                       <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -813,7 +855,7 @@ export default function CourseExamSection({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {puedeVerDetalle && (
+                  {passed && puedeVerDetalle && (
                     <Button
                       variant="outline"
                       className="w-full sm:w-auto gap-2"
@@ -938,6 +980,16 @@ export default function CourseExamSection({
                         <span className="text-orange-500 mr-2">{index + 1}.</span>
                         {question.texto}
                       </p>
+                      {question.imagenUrl ? (
+                        <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
+                          <img
+                            src={question.imagenUrl}
+                            alt={`Imagen de la pregunta ${index + 1}`}
+                            className="max-h-72 w-full object-contain rounded"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : null}
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {esDesarrollo
                           ? "Escribí tu respuesta. La corrige un docente."
@@ -1021,17 +1073,17 @@ export default function CourseExamSection({
 
             {phase === "result" &&
               lastResult &&
-              (lastResult.estado === "pendiente_correccion" ? (
+              (lastResult.estado === "pendiente_correccion" || lastResultPublicacionManual ? (
                 <div className="space-y-4 py-4">
                   <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center space-y-2 dark:border-amber-900 dark:bg-amber-950/30">
                     <Hourglass className="h-12 w-12 text-amber-600 mx-auto" />
                     <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
-                      Evaluación en espera de corrección
+                      Evaluación enviada
                     </p>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Recibimos tus respuestas. Como la evaluación tiene preguntas
-                      de desarrollo, la corrige un docente y vas a ver la nota en
-                      las próximas horas.
+                      {lastResultPublicacionManual && lastResult.estado !== "pendiente_correccion"
+                        ? "Tu evaluación fue enviada. La nota será publicada por el administrador en las próximas horas."
+                        : "Recibimos tus respuestas. La evaluación la corrige un docente y vas a ver la nota en las próximas horas."}
                     </p>
                     <p className="text-xs text-amber-700 dark:text-amber-300">
                       No hace falta que la vuelvas a enviar.
@@ -1099,7 +1151,7 @@ export default function CourseExamSection({
               )}
 
               {phase === "result" &&
-                lastResult?.estado === "pendiente_correccion" && (
+                (lastResult?.estado === "pendiente_correccion" || lastResultPublicacionManual) && (
                   <Button
                     className="w-full sm:w-auto"
                     onClick={() => handleModalChange(false)}
@@ -1112,13 +1164,15 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.estado !== "pendiente_correccion" &&
+                !lastResultPublicacionManual &&
+                examenHabilitado &&
                 !intentosAgotados &&
                 estado?.puedeRealizar && (
                   <Button
                     className="w-full sm:w-auto gap-2"
                     onClick={() => void openExamModal()}
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="w-4 h-4" />
                     Reintentar evaluación
                   </Button>
                 )}
@@ -1127,6 +1181,7 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.estado !== "pendiente_correccion" &&
+                !lastResultPublicacionManual &&
                 (intentosAgotados || !estado?.puedeRealizar) && (
                   <Button
                     className="w-full sm:w-auto"

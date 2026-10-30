@@ -37,12 +37,13 @@ jobs:
         run: npm run build:qa
 
       - name: Deploy to Firebase QA
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        uses: FirebaseExtended/action-hosting-deploy@v0.9.0
         with:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_QA }}"
           channelId: live
           projectId: epefi-cursos-qa
+          firebaseToolsVersion: "13.29.1"  
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -80,4 +81,5 @@ jobs:
           firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}"
           channelId: live
           projectId: epefi-cursos
+          firebaseToolsVersion: "13.29.1" 
 

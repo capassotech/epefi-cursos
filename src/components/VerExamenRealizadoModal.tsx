@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, FileText } from "lucide-react";
+import { Loader2, Check, X, FileText, Minus, Hourglass } from "lucide-react";
 import { formatNota, formatPorcentaje } from "@/lib/examUtils";
 import type {
   ExamRealizadoDetalle,
@@ -146,6 +146,16 @@ export default function VerExamenRealizadoModal({
 }: VerExamenRealizadoModalProps) {
   const preguntas = detalle?.detallePreguntas ?? detalle?.preguntas ?? [];
 
+  /**
+   * Pendiente de corrección manual (sin preguntas de desarrollo):
+   * la nota aún no fue publicada por el admin.
+   */
+  const tieneDesarrollo = preguntas.some((p) => p.tipoPregunta === "desarrollo");
+  const esPendientePublicacion =
+    (detalle?.estadoCorreccion === "pendiente_correccion" ||
+      detalle?.estado === "pendiente_correccion") &&
+    !tieneDesarrollo;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
@@ -166,26 +176,35 @@ export default function VerExamenRealizadoModal({
           </p>
         ) : (
           <div className="overflow-y-auto pr-2 space-y-4 flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground mb-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <span>
-                  Nota:{" "}
-                  <strong className="text-foreground">{formatNota(detalle.nota)}</strong>
-                </span>
-                <span>
-                  Aciertos:{" "}
-                  <strong className="text-foreground">
-                    {formatPorcentaje(detalle.porcentajeAciertos)}
-                  </strong>
-                </span>
-                <Badge variant={detalle.aprobado ? "default" : "destructive"}>
-                  {detalle.aprobado ? "Aprobado" : "No aprobado"}
-                </Badge>
+            {esPendientePublicacion ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 dark:border-amber-900 dark:bg-amber-950/30">
+                <Hourglass className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  La nota de este examen será publicada por el administrador en las próximas horas.
+                </p>
               </div>
-              {detalle.intentoNumero != null && (
-                <span>Intento {detalle.intentoNumero}</span>
-              )}
-            </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground mb-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span>
+                    Nota:{" "}
+                    <strong className="text-foreground">{formatNota(detalle.nota)}</strong>
+                  </span>
+                  <span>
+                    Aciertos:{" "}
+                    <strong className="text-foreground">
+                      {formatPorcentaje(detalle.porcentajeAciertos)}
+                    </strong>
+                  </span>
+                  <Badge variant={detalle.aprobado ? "default" : "destructive"}>
+                    {detalle.aprobado ? "Aprobado" : "No aprobado"}
+                  </Badge>
+                </div>
+                {detalle.intentoNumero != null && (
+                  <span>Intento {detalle.intentoNumero}</span>
+                )}
+              </div>
+            )}
 
             {preguntas.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -211,27 +230,48 @@ export default function VerExamenRealizadoModal({
                         >
                           {pregunta.puntosObtenidos} / {pregunta.puntos} pts
                         </Badge>
-                      ) : (
-                        <Badge
-                          variant={pregunta.acertada ? "default" : "destructive"}
-                          className="flex-shrink-0"
-                        >
-                          {pregunta.acertada ? (
-                            <>
-                              <Check className="w-3 h-3 mr-1" />
-                              Correcta
-                            </>
-                          ) : (
-                            <>
-                              <X className="w-3 h-3 mr-1" />
-                              Incorrecta
-                            </>
-                          )}
-                        </Badge>
-                      )}
+                      ) : (() => {
+                          const esParcial =
+                            !pregunta.acertada &&
+                            typeof pregunta.puntosObtenidos === "number" &&
+                            pregunta.puntosObtenidos > 0;
+                          return (
+                            <Badge
+                              variant={pregunta.acertada ? "default" : esParcial ? "secondary" : "destructive"}
+                              className="flex-shrink-0"
+                            >
+                              {pregunta.acertada ? (
+                                <>
+                                  <Check className="w-3 h-3 mr-1" />
+                                  Correcta
+                                </>
+                              ) : esParcial ? (
+                                <>
+                                  <Minus className="w-3 h-3 mr-1" />
+                                  Parcial
+                                </>
+                              ) : (
+                                <>
+                                  <X className="w-3 h-3 mr-1" />
+                                  Incorrecta
+                                </>
+                              )}
+                            </Badge>
+                          );
+                        })()}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3 pt-0">
+                    {pregunta.imagenUrl ? (
+                      <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
+                        <img
+                          src={pregunta.imagenUrl}
+                          alt={`Imagen de la pregunta ${pregunta.orden || index + 1}`}
+                          className="max-h-64 w-full object-contain rounded"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : null}
                     {pregunta.tipoPregunta === "desarrollo" ? (
                       <RespuestaDesarrollo
                         texto={pregunta.respuestaDesarrollo}

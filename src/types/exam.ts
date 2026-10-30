@@ -18,6 +18,8 @@ export interface ExamQuestion {
   tipo?: "unica" | "multiple" | "radio" | "checkbox";
   /** Por defecto opcion_multiple (exámenes legacy). */
   tipoPregunta?: TipoPregunta;
+  /** Imagen de apoyo / enunciado visual (Firebase Storage URL). */
+  imagenUrl?: string;
 }
 
 export interface CourseExam {
@@ -58,6 +60,7 @@ export interface ExamRealizadoPreguntaDetalle {
   texto: string;
   tipoInput?: string;
   tipoPregunta?: TipoPregunta;
+  imagenUrl?: string;
   esCorrecta: boolean;
   acertada: boolean;
   /** Puntos máximos de la pregunta. */
@@ -87,6 +90,9 @@ export interface ExamEstado {
   examenDisponible: boolean;
   puedeRealizar: boolean;
   formacionCompleta: boolean;
+  /** Si falta, se considera habilitado (compatibilidad). */
+  examenHabilitado?: boolean;
+  requiereCompletarCurso?: boolean;
   idExamen?: string;
   titulo?: string;
   duracionMinutos?: number;
@@ -135,6 +141,8 @@ export interface SubmitExamResult extends ExamResultSummary {
   intentoNumero?: number;
   intentosUsados?: number;
   intentosMaximos?: number;
+  /** Cuando es true, la nota no se muestra hasta que el admin la publique. */
+  publicacionManualDeNota?: boolean;
 }
 
 /** Opciones seleccionadas por pregunta de opción múltiple. */
