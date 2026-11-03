@@ -9,9 +9,12 @@ import {
   Lock,
   RotateCcw,
   Timer,
+  WifiOff,
   X,
   XCircle,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { clearExamDraft, loadExamDraft, saveExamDraft } from "@/lib/examDraft";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -71,6 +74,8 @@ export default function Evaluacion() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const userId = user?.uid ?? "";
   const courseUrl = `/curso/${courseId}`;
 
   // El alumno ya confirmó en la página del curso: se comienza sin volver a preguntar
@@ -89,6 +94,12 @@ export default function Evaluacion() {
   const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
   const [lastResultPublicacionManual, setLastResultPublicacionManual] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  /** Momento en que termina el tiempo; el reloj se calcula contra él para sobrevivir recargas */
+  const [deadline, setDeadline] = useState<number | null>(null);
+  const [activeExamId, setActiveExamId] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
   const [showVerExamenModal, setShowVerExamenModal] = useState(false);
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
   const [loadingVerExamen, setLoadingVerExamen] = useState(false);
@@ -132,6 +143,7 @@ export default function Evaluacion() {
     setLastResult(null);
     setLastResultPublicacionManual(false);
     setRemainingSeconds(null);
+    setDeadline(null);
     setConfirm(null);
 
     try {
@@ -141,13 +153,33 @@ export default function Evaluacion() {
         setPhase("intro");
         return;
       }
+      const questions = sortQuestionsByOrder(examData.preguntas);
       setExam(examData);
-      setDisplayQuestions(sortQuestionsByOrder(examData.preguntas));
+      setDisplayQuestions(questions);
       const minutos =
         examData.duracionMinutos && examData.duracionMinutos > 0
           ? examData.duracionMinutos
           : DEFAULT_EXAM_MINUTES;
-      setRemainingSeconds(minutos * 60);
+      const now = Date.now();
+      let examDeadline = now + minutos * 60_000;
+
+      // Si quedó una evaluación a medias en este dispositivo, se retoma con sus respuestas y su reloj
+      const draft = userId ? loadExamDraft(userId, idExamen) : null;
+      if (draft) {
+        const questionIds = new Set(questions.map((q) => q.id));
+        const keepKnown = <T,>(map: Record<string, T>) =>
+          Object.fromEntries(Object.entries(map).filter(([id]) => questionIds.has(id)));
+        setAnswers(keepKnown(draft.answers));
+        setTextAnswers(keepKnown(draft.textAnswers));
+        examDeadline = Math.min(draft.deadline, examDeadline);
+        toast.info("Retomamos tu evaluación", {
+          description: "Recuperamos las respuestas que habías marcado.",
+        });
+      }
+
+      setActiveExamId(idExamen);
+      setDeadline(examDeadline);
+      setRemainingSeconds(Math.max(0, Math.ceil((examDeadline - now) / 1000)));
       setPhase("taking");
     } catch (error) {
       console.error("Error loading exam questions:", error);
@@ -159,7 +191,7 @@ export default function Evaluacion() {
       });
       setPhase("intro");
     }
-  }, []);
+  }, [userId]);
 
   /** Consulta el estado actualizado y muestra la introducción, o comienza si ya se confirmó. */
   const loadEstado = useCallback(async (isCancelled?: () => boolean) => {
@@ -174,7 +206,8 @@ export default function Evaluacion() {
         setPhase("blocked");
         return;
       }
-      if (autoStartRef.current && fresh.idExamen) {
+      const hasDraft = !!fresh.idExamen && !!userId && !!loadExamDraft(userId, fresh.idExamen);
+      if ((autoStartRef.current || hasDraft) && fresh.idExamen) {
         autoStartRef.current = false;
         await startExam(fresh.idExamen);
         return;
@@ -189,7 +222,7 @@ export default function Evaluacion() {
       });
       setPhase("blocked");
     }
-  }, [formacionId, startExam]);
+  }, [formacionId, startExam, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,9 +344,20 @@ export default function Evaluacion() {
           motivoCierre: motivo,
         });
 
+        if (userId) clearExamDraft(userId, estado.idExamen);
         applySubmitResult(result, motivo);
       } catch (error: unknown) {
         console.error("Error submitting exam:", error);
+        // Sin conexión las respuestas siguen guardadas en el dispositivo y se reenvían al reconectar
+        if (!navigator.onLine) {
+          toast.error("Sin conexión", {
+            description:
+              motivo === "tiempo"
+                ? "Tus respuestas están guardadas. La evaluación se enviará cuando vuelva la conexión."
+                : "Tus respuestas están guardadas. Intentá enviar de nuevo cuando vuelva la conexión.",
+          });
+          return;
+        }
         const message =
           error instanceof Error
             ? error.message
@@ -324,26 +368,43 @@ export default function Evaluacion() {
         setSubmitting(false);
       }
     },
-    [applySubmitResult, exam, estado?.idExamen, formacionId]
+    [applySubmitResult, exam, estado?.idExamen, formacionId, userId]
   );
 
-  // Contador mientras se rinde
+  // Contador mientras se rinde, calculado contra la hora límite para no desfasarse
   useEffect(() => {
-    if (phase !== "taking") return;
+    if (phase !== "taking" || deadline == null) return;
 
-    const timerId = window.setInterval(() => {
-      setRemainingSeconds((prev) => (prev == null ? prev : Math.max(0, prev - 1)));
-    }, 1000);
+    const tick = () =>
+      setRemainingSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    const timerId = window.setInterval(tick, 1000);
 
     return () => window.clearInterval(timerId);
-  }, [phase]);
+  }, [phase, deadline]);
 
-  // Al llegar a 0, cerrar y registrar intento
+  // Al llegar a 0, cerrar y registrar intento (si no hay conexión, se reintenta al reconectar)
   useEffect(() => {
-    if (phase === "taking" && remainingSeconds === 0 && !submittingRef.current) {
+    if (phase === "taking" && remainingSeconds === 0 && isOnline && !submittingRef.current) {
       void submitExamAttempt("tiempo");
     }
-  }, [phase, remainingSeconds, submitExamAttempt]);
+  }, [phase, remainingSeconds, isOnline, submitExamAttempt]);
+
+  // Respaldo local de cada respuesta mientras se rinde
+  useEffect(() => {
+    if (phase !== "taking" || !userId || !activeExamId || deadline == null) return;
+    saveExamDraft(userId, { idExamen: activeExamId, deadline, answers, textAnswers });
+  }, [phase, userId, activeExamId, deadline, answers, textAnswers]);
+
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   // Mientras se rinde: avisar antes de recargar o cerrar la pestaña, y pedir confirmación al tocar "atrás"
   useEffect(() => {
@@ -521,6 +582,14 @@ export default function Evaluacion() {
             <X className="h-5 w-5" />
           </Button>
         </div>
+        {phase === "taking" && !isOnline && (
+          <div className="border-t border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+            <p className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-2 text-xs text-amber-900 dark:text-amber-100 sm:text-sm">
+              <WifiOff className="h-4 w-4 shrink-0" />
+              Sin conexión. Podés seguir respondiendo: tus respuestas se guardan en este dispositivo.
+            </p>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 pb-28">
