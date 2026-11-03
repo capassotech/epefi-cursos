@@ -49,7 +49,7 @@ import {
   isMultipleChoiceQuestion,
   PASSING_GRADE,
   sortQuestionsByOrder,
-  validateAllQuestionsAnswered,
+  countUnansweredQuestions,
 } from "@/lib/examUtils";
 import {
   getCourseContentProgress,
@@ -156,6 +156,7 @@ export default function CourseExamSection({
   const [loadingVerExamen, setLoadingVerExamen] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [unansweredCount, setUnansweredCount] = useState(0);
 
   const submittingRef = useRef(false);
   const answersRef = useRef<StudentAnswersMap>({});
@@ -452,22 +453,6 @@ export default function CourseExamSection({
       const currentAnswers = answersRef.current;
       const currentTextAnswers = textAnswersRef.current;
 
-      if (motivo === "envio") {
-        if (
-          !validateAllQuestionsAnswered(
-            questions,
-            currentAnswers,
-            currentTextAnswers
-          )
-        ) {
-          toast.error("Completá todas las preguntas", {
-            description:
-              "Debés responder cada pregunta antes de enviar la evaluación.",
-          });
-          return;
-        }
-      }
-
       submittingRef.current = true;
       setSubmitting(true);
       try {
@@ -573,6 +558,20 @@ export default function CourseExamSection({
   }, [estado?.ultimoIntento, lastResult]);
 
   const handleSubmit = () => {
+    const pendientes = countUnansweredQuestions(
+      displayQuestionsRef.current,
+      answersRef.current,
+      textAnswersRef.current
+    );
+    if (pendientes > 0) {
+      setUnansweredCount(pendientes);
+      return;
+    }
+    void submitExamAttempt("envio");
+  };
+
+  const confirmSubmitWithUnanswered = () => {
+    setUnansweredCount(0);
     void submitExamAttempt("envio");
   };
 
@@ -1237,6 +1236,38 @@ export default function CourseExamSection({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {submitting ? "Registrando..." : "Cerrar y registrar intento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={unansweredCount > 0}
+        onOpenChange={(open) => {
+          if (!open) setUnansweredCount(0);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tenés preguntas sin responder</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unansweredCount === 1
+                ? "Quedó 1 pregunta sin responder."
+                : `Quedaron ${unansweredCount} preguntas sin responder.`}{" "}
+              Si enviás ahora, se van a contar como incorrectas. ¿Querés
+              enviar la evaluación igual?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Seguir respondiendo</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              onClick={(e) => {
+                e.preventDefault();
+                confirmSubmitWithUnanswered();
+              }}
+            >
+              Enviar igual
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

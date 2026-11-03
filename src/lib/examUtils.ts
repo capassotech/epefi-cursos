@@ -40,18 +40,18 @@ export function sortQuestionsByOrder(questions: ExamQuestion[]): ExamQuestion[] 
   return [...questions].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 }
 
-export function validateAllQuestionsAnswered(
+export function countUnansweredQuestions(
   questions: ExamQuestion[],
   answers: StudentAnswersMap,
   textAnswers: StudentTextAnswersMap = {}
-): boolean {
-  return questions.every((q) => {
+): number {
+  return questions.filter((q) => {
     if (isDesarrolloQuestion(q)) {
-      return (textAnswers[q.id] ?? "").trim().length > 0;
+      return (textAnswers[q.id] ?? "").trim().length === 0;
     }
     const selected = answers[q.id] ?? [];
-    return selected.length > 0;
-  });
+    return selected.length === 0;
+  }).length;
 }
 
 function buildAnswerEntry(
