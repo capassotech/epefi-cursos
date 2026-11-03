@@ -854,7 +854,7 @@ export default function CourseExamSection({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
-                  {passed && puedeVerDetalle && (
+                  {puedeVerDetalle && (
                     <Button
                       variant="outline"
                       className="w-full sm:w-auto gap-2"
@@ -1156,6 +1156,22 @@ export default function CourseExamSection({
                     onClick={() => handleModalChange(false)}
                   >
                     Entendido
+                  </Button>
+                )}
+
+              {phase === "result" &&
+                lastResult &&
+                !lastResult.aprobado &&
+                lastResult.id &&
+                lastResult.estado !== "pendiente_correccion" &&
+                !lastResultPublicacionManual && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto gap-2"
+                    onClick={() => void handleVerExamenRealizado()}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Ver examen realizado
                   </Button>
                 )}
 
