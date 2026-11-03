@@ -155,8 +155,14 @@ export default function CourseExamSection({
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
   const [loadingVerExamen, setLoadingVerExamen] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-  const [unansweredCount, setUnansweredCount] = useState(0);
+  // Una sola confirmación visible a la vez: cerrar el examen o enviar con preguntas pendientes
+  const [confirm, setConfirm] = useState<
+    { kind: "close" } | { kind: "unanswered"; count: number } | null
+  >(null);
+  const openCloseConfirm = () => setConfirm((prev) => prev ?? { kind: "close" });
+  // Conserva el último contenido para que la animación de cierre no cambie de texto
+  const [shownConfirm, setShownConfirm] = useState(confirm);
+  if (confirm && confirm !== shownConfirm) setShownConfirm(confirm);
 
   const submittingRef = useRef(false);
   const answersRef = useRef<StudentAnswersMap>({});
@@ -192,7 +198,7 @@ export default function CourseExamSection({
     setAnswers({});
     setTextAnswers({});
     setRemainingSeconds(null);
-    setCloseConfirmOpen(false);
+    setConfirm(null);
     setLastResultPublicacionManual(false);
   }, []);
 
@@ -243,7 +249,7 @@ export default function CourseExamSection({
       setTextAnswers({});
       setLastResult(null);
       setRemainingSeconds(null);
-      setCloseConfirmOpen(false);
+      setConfirm(null);
 
       try {
         const examData = await ExamService.getExamForStudent(idExamen);
@@ -348,7 +354,7 @@ export default function CourseExamSection({
   const handleModalChange = (open: boolean) => {
     if (!open && submitting) return;
     if (!open && phaseRef.current === "taking") {
-      setCloseConfirmOpen(true);
+      openCloseConfirm();
       return;
     }
     if (!open) {
@@ -565,19 +571,19 @@ export default function CourseExamSection({
       textAnswersRef.current
     );
     if (pendientes > 0) {
-      setUnansweredCount(pendientes);
+      setConfirm({ kind: "unanswered", count: pendientes });
       return;
     }
     void submitExamAttempt("envio");
   };
 
   const confirmSubmitWithUnanswered = () => {
-    setUnansweredCount(0);
+    setConfirm(null);
     void submitExamAttempt("envio");
   };
 
   const confirmAbandonExam = () => {
-    setCloseConfirmOpen(false);
+    setConfirm(null);
     void submitExamAttempt("abandono");
   };
 
@@ -896,7 +902,7 @@ export default function CourseExamSection({
             if (submitting || phase === "taking") {
               e.preventDefault();
               if (phase === "taking" && !submitting) {
-                setCloseConfirmOpen(true);
+                openCloseConfirm();
               }
             }
           }}
@@ -904,7 +910,7 @@ export default function CourseExamSection({
             if (submitting || phase === "taking") {
               e.preventDefault();
               if (phase === "taking" && !submitting) {
-                setCloseConfirmOpen(true);
+                openCloseConfirm();
               }
             }
           }}
@@ -1145,7 +1151,7 @@ export default function CourseExamSection({
                   <Button
                     variant="outline"
                     disabled={submitting}
-                    onClick={() => setCloseConfirmOpen(true)}
+                    onClick={() => openCloseConfirm()}
                   >
                     Cancelar
                   </Button>
@@ -1235,61 +1241,63 @@ export default function CourseExamSection({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Cerrar la evaluación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Si cerrás ahora, se registrará como un intento perdido con las
-              respuestas que hayas marcado hasta el momento. Esta acción no se
-              puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Seguir rindiendo</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={submitting}
-              onClick={(e) => {
-                e.preventDefault();
-                confirmAbandonExam();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {submitting ? "Registrando..." : "Cerrar y registrar intento"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog
-        open={unansweredCount > 0}
+        open={confirm !== null}
         onOpenChange={(open) => {
-          if (!open) setUnansweredCount(0);
+          if (!open && !submitting) setConfirm(null);
         }}
       >
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Tenés preguntas sin responder</AlertDialogTitle>
-            <AlertDialogDescription>
-              {unansweredCount === 1
-                ? "Quedó 1 pregunta sin responder."
-                : `Quedaron ${unansweredCount} preguntas sin responder.`}{" "}
-              Si enviás ahora, se van a contar como incorrectas. ¿Querés
-              enviar la evaluación igual?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Seguir respondiendo</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={submitting}
-              onClick={(e) => {
-                e.preventDefault();
-                confirmSubmitWithUnanswered();
-              }}
-            >
-              Enviar igual
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {shownConfirm?.kind === "unanswered" ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tenés preguntas sin responder</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {shownConfirm.count === 1
+                    ? "Quedó 1 pregunta sin responder."
+                    : `Quedaron ${shownConfirm.count} preguntas sin responder.`}{" "}
+                  Si enviás ahora, se van a contar como incorrectas. ¿Querés
+                  enviar la evaluación igual?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={submitting}>Seguir respondiendo</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={submitting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    confirmSubmitWithUnanswered();
+                  }}
+                >
+                  Enviar igual
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Cerrar la evaluación?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Si cerrás ahora, se registrará como un intento perdido con las
+                  respuestas que hayas marcado hasta el momento. Esta acción no se
+                  puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={submitting}>Seguir rindiendo</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={submitting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    confirmAbandonExam();
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {submitting ? "Registrando..." : "Cerrar y registrar intento"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 
