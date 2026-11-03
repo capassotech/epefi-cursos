@@ -101,6 +101,8 @@ export interface ExamEstado {
   intentosUsados?: number;
   intentosMaximos?: number;
   intentosAgotados?: boolean;
+  /** Si el alumno puede ver la revisión de su último intento corregido. */
+  puedeRevisar?: boolean;
   mensajeBloqueo?: string;
   progresoFormacion?: {
     totalModulos: number;
@@ -137,6 +139,7 @@ export interface SubmitExamResult extends ExamResultSummary {
   examenRealizado?: ExamAttempt;
   mensaje?: string;
   puedeReintentar?: boolean;
+  puedeRevisar?: boolean;
   estado?: EstadoExamenRealizado;
   intentoNumero?: number;
   intentosUsados?: number;

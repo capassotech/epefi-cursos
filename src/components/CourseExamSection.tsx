@@ -418,7 +418,7 @@ export default function CourseExamSection({
         });
       }
 
-      const maxIntentos = result.intentosMaximos ?? 3;
+      const maxIntentos = result.intentosMaximos ?? 1;
       const usados = result.intentosUsados ?? result.intentoNumero;
       const agotoIntentos =
         !result.aprobado &&
@@ -435,6 +435,7 @@ export default function CourseExamSection({
               intentosUsados: usados ?? prev.intentosUsados,
               intentosMaximos: maxIntentos,
               intentosAgotados: agotoIntentos,
+              puedeRevisar: result.puedeRevisar === true,
               mensajeBloqueo: agotoIntentos ? result.mensaje : undefined,
               ultimoIntento: intentoResultado,
             }
@@ -625,8 +626,10 @@ export default function CourseExamSection({
   const intentosAgotados = estado?.intentosAgotados === true;
   const examenHabilitado = estado?.examenHabilitado !== false;
   const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
-  /** Disponible para cualquier intento ya corregido (aprobado o no). */
-  const puedeVerDetalle = Boolean(!esperandoCorreccion && tieneIntento && ultimoIntento?.id);
+  /** El backend decide: aprobó, agotó intentos o el admin se lo habilitó. */
+  const puedeVerDetalle = Boolean(
+    estado?.puedeRevisar && !esperandoCorreccion && tieneIntento && ultimoIntento?.id
+  );
   const canShowButton =
     examenHabilitado &&
     !passed &&
@@ -1163,6 +1166,7 @@ export default function CourseExamSection({
                 lastResult &&
                 !lastResult.aprobado &&
                 lastResult.id &&
+                estado?.puedeRevisar &&
                 lastResult.estado !== "pendiente_correccion" &&
                 !lastResultPublicacionManual && (
                   <Button
@@ -1208,7 +1212,7 @@ export default function CourseExamSection({
 
               {phase === "result" && lastResult?.aprobado && (
                 <>
-                  {lastResult.id && (
+                  {lastResult.id && estado?.puedeRevisar && (
                     <Button
                       variant="outline"
                       className="w-full sm:w-auto gap-2"
