@@ -4,7 +4,7 @@ import {
 } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight, CheckCircle2, X } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
@@ -120,6 +120,20 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
   useEffect(() => {
     if (!isMobile) setImmersiveEmbed(false);
   }, [isMobile]);
+
+  // Con modal={false} Radix no bloquea el scroll: se oculta el de la página mientras el visor está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, [isOpen]);
 
   // Prevenir menú contextual y descarga en móvil
   useEffect(() => {
@@ -303,10 +317,9 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         />
         <DialogPrimitive.Content
           className={cn(
-            "fixed left-[50%] top-[50%] z-[51] flex w-[calc(100vw-1.5rem)] max-w-4xl translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden border bg-background p-3 shadow-lg duration-200 sm:w-full sm:p-6",
-            "max-h-[min(90dvh,900px)] rounded-xl sm:rounded-lg",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-            "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+            // Pantalla completa: barra fina arriba y el video ocupando todo el resto
+            "fixed inset-0 z-[51] flex h-[100dvh] w-full flex-col overflow-hidden bg-background duration-200",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "outline-none focus:outline-none"
           )}
         >
@@ -316,100 +329,108 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
         <DialogDescription className="sr-only">
           Reproducción del video seleccionado
         </DialogDescription>
-        <div className="flex min-h-0 w-full flex-col" onClick={(e) => e.stopPropagation()}>
-          <div className="flex w-full min-h-0 flex-col gap-2 sm:gap-4">
-            {/* Encabezado compacto: título largo con scroll interno sin expandir el modal */}
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="flex min-w-0 items-start justify-between gap-2 sm:flex-1">
-                <div
-                  className="max-h-[4.5rem] min-w-0 flex-1 overflow-y-auto overscroll-contain pr-1 sm:max-h-[3.25rem]"
-                  title={videoTitle}
-                >
-                  <h3 className="text-left text-sm font-semibold leading-snug text-gray-900 break-words [overflow-wrap:anywhere] dark:text-gray-100 sm:text-base sm:leading-tight">
-                    {videoTitle}
-                  </h3>
-                </div>
-                {/* Pantalla completa en mobile: todos los tipos (YouTube/Drive antes no tenían botón) */}
+        <div className="flex min-h-0 w-full flex-1 flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="flex w-full min-h-0 flex-1 flex-col">
+            {/* Una sola barra compacta: título, visto, navegación y cerrar */}
+            <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 sm:px-4">
+              <h3
+                className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-900 dark:text-gray-100 sm:text-base"
+                title={videoTitle}
+              >
+                {videoTitle}
+              </h3>
+              {onMarkAsCompleted && (
                 <Button
                   type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 shrink-0 cursor-pointer touch-manipulation sm:hidden"
-                  onClick={() => void toggleFullscreen()}
-                  title={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-                  aria-label={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+                  size="sm"
+                  className={`h-9 shrink-0 cursor-pointer gap-1.5 px-3 text-sm font-semibold ${
+                    isCompleted
+                      ? "bg-green-600 text-white hover:bg-green-700"
+                      : "bg-red-500 text-white hover:bg-red-600"
+                  }`}
+                  onClick={onMarkAsCompleted}
                 >
-                  {immersiveEmbed || isFullscreen ? (
-                    <Minimize2 className="h-5 w-5" />
-                  ) : (
-                    <Maximize2 className="h-5 w-5" />
+                  <CheckCircle2 className="h-4 w-4" />
+                  {isCompleted ? "Visto" : (
+                    <>
+                      <span className="sm:hidden">Marcar visto</span>
+                      <span className="hidden sm:inline">Marcar como visto</span>
+                    </>
                   )}
                 </Button>
-              </div>
+              )}
               {/* Controles de navegación - Solo visible en desktop */}
-              <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                {/* Controles de navegación para múltiples videos */}
-                {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={onPreviousVideo}
-                      disabled={!onPreviousVideo || content.currentIndex === 0}
-                      className="cursor-pointer"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
-                      {content.currentIndex + 1} / {content.videos.length}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={onNextVideo}
-                      disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
-                      className="cursor-pointer"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-                {!isYouTube && !isGoogleDrive && (
+              {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
+                <div className="hidden sm:flex items-center gap-1">
                   <Button
                     type="button"
-                    variant="outline"
-                    className="cursor-pointer"
-                    onClick={() => void toggleFullscreen()}
-                    title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                    variant="ghost"
+                    size="icon"
+                    onClick={onPreviousVideo}
+                    disabled={!onPreviousVideo || content.currentIndex === 0}
+                    className="h-9 w-9 cursor-pointer"
                   >
-                    {isFullscreen ? (
-                      <>
-                        <Minimize2 className="h-4 w-4 mr-2" />
-                        Salir
-                      </>
-                    ) : (
-                      <>
-                        <Maximize2 className="h-4 w-4 mr-2" />
-                        Expandir
-                      </>
-                    )}
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 tabular-nums">
+                    {content.currentIndex + 1} / {content.videos.length}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={onNextVideo}
+                    disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
+                    className="h-9 w-9 cursor-pointer"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {/* Pantalla completa: en mobile para todos los tipos, en desktop solo para video propio */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-9 w-9 shrink-0 cursor-pointer touch-manipulation",
+                  (isYouTube || isGoogleDrive) && "sm:hidden"
                 )}
-              </div>
+                onClick={() => void toggleFullscreen()}
+                title={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                aria-label={immersiveEmbed || isFullscreen ? "Salir de pantalla completa" : "Ver en pantalla completa"}
+              >
+                {immersiveEmbed || isFullscreen ? (
+                  <Minimize2 className="h-5 w-5" />
+                ) : (
+                  <Maximize2 className="h-5 w-5" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 shrink-0 cursor-pointer touch-manipulation rounded-full"
+                onClick={() => {
+                  onClose();
+                  setIsFullscreen(false);
+                }}
+                aria-label="Cerrar video"
+                title="Cerrar"
+              >
+                <X className="!h-7 !w-7" />
+              </Button>
             </div>
-            
-            {/* Reproductor 16:9 */}
+
+            {/* Reproductor: ocupa todo el espacio libre y el video se ajusta sin recortarse */}
             <div
               ref={videoContainerRef}
               className={cn(
-                "relative w-full shrink-0 overflow-hidden rounded-lg video-no-download",
+                "relative w-full overflow-hidden bg-black video-no-download",
                 immersiveEmbed
-                  ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
-                  : undefined
+                  ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
+                  : "min-h-0 flex-1"
               )}
-              style={immersiveEmbed ? undefined : { paddingBottom: "56.25%" }}
             >
               {(isYouTube || isGoogleDrive) ? (
                 <>
@@ -437,7 +458,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                       src={videoUrl}
                       title={isYouTube ? "Video de YouTube" : "Video de Google Drive"}
                       className={cn(
-                        "absolute left-0 top-0 h-full w-full rounded-lg",
+                        "absolute left-0 top-0 h-full w-full",
                         immersiveEmbed && "rounded-md sm:rounded-lg"
                       )}
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
@@ -471,7 +492,7 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
                   controls
                   controlsList="nodownload nofullscreen noremoteplayback"
                   disablePictureInPicture
-                  className="absolute top-0 left-0 w-full h-full rounded-lg"
+                  className="absolute top-0 left-0 w-full h-full"
                   style={{
                     objectFit: 'contain',
                     userSelect: 'none',
@@ -498,66 +519,34 @@ const VideoModal = ({ isOpen, onClose, content, onNextVideo, onPreviousVideo, on
               )}
             </div>
             
-            {/* Acciones */}
-            <div className="flex shrink-0 flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center sm:gap-2">
-              {/* Controles de navegación para mobile - Solo visible en mobile */}
-              {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
-                <div className="flex sm:hidden items-center justify-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={onPreviousVideo}
-                    disabled={!onPreviousVideo || content.currentIndex === 0}
-                    className="cursor-pointer"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
-                    {content.currentIndex + 1} / {content.videos.length}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={onNextVideo}
-                    disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
-                    className="cursor-pointer"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              
-              <div className="flex items-center gap-2">
-                {onMarkAsCompleted && (
-                  <Button
-                    type="button"
-                    variant={isCompleted ? "default" : "default"}
-                    className={`cursor-pointer px-4 py-2 text-sm font-semibold shadow-md transition-all sm:px-6 sm:py-3 sm:text-base sm:shadow-lg ${
-                      isCompleted
-                        ? "bg-green-600 text-white hover:bg-green-700"
-                        : "bg-red-500 text-white hover:bg-red-600 hover:shadow-xl"
-                    }`}
-                    onClick={onMarkAsCompleted}
-                  >
-                    <CheckCircle2 className="h-4 w-4 sm:mr-2 sm:h-5 sm:w-5" />
-                    {isCompleted ? "Visto" : "Marcar como visto"}
-                  </Button>
-                )}
+            {/* Navegación entre videos en mobile */}
+            {content.videos && content.videos.length > 1 && content.currentIndex !== undefined && (
+              <div className="flex shrink-0 sm:hidden items-center justify-center gap-2 border-t py-1.5">
                 <Button
                   type="button"
                   variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => {
-                    onClose();
-                    setIsFullscreen(false);
-                  }}
+                  size="icon"
+                  onClick={onPreviousVideo}
+                  disabled={!onPreviousVideo || content.currentIndex === 0}
+                  className="h-9 w-9 cursor-pointer"
                 >
-                  Cerrar
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-gray-600 dark:text-gray-400 px-2 tabular-nums">
+                  {content.currentIndex + 1} / {content.videos.length}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={onNextVideo}
+                  disabled={!onNextVideo || content.currentIndex === content.videos.length - 1}
+                  className="h-9 w-9 cursor-pointer"
+                >
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
+            )}
           </div>
         </div>
         </DialogPrimitive.Content>

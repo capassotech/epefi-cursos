@@ -13,6 +13,7 @@ import {
   Clock,
   Loader2,
   ChevronLeft,
+  X,
   ChevronRight,
   AlertTriangle,
   CheckCircle2,
@@ -31,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
@@ -41,7 +43,6 @@ import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
 import { getMissingModuleIds } from "@/lib/courseModules";
 import { getModulesForMateria } from "@/lib/courseModules";
-import { isModuleFullyCompleted } from "@/lib/courseProgress";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CourseDetailPage = () => {
@@ -733,8 +734,8 @@ const CourseDetailPage = () => {
   const CourseSkeleton = () => (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       {/* Header Skeleton */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
+      <header className="relative border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 lg:px-6">
           <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></div>
           <div className="flex-1 space-y-2">
             <div className="h-3 w-16 bg-slate-200 dark:bg-slate-800 rounded animate-pulse"></div>
@@ -801,8 +802,8 @@ const CourseDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-6">
+      <header className="relative border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 lg:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -812,23 +813,23 @@ const CourseDetailPage = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
-            <p className="text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100" data-testid="course-title">
+            <p className="text-[11px] sm:text-[13px] uppercase tracking-wider text-orange-500">Curso</p>
+            <h1 className="text-base sm:text-lg font-semibold leading-tight text-slate-900 dark:text-slate-100" data-testid="course-title">
               {courseDetail.titulo}
             </h1>
             {/* Fechas de dictado */}
             {(courseDetail.fechaInicioDictado || courseDetail.fechaFinDictado) && (
-              <div className="mt-1.5 space-y-0.5">
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 sm:mt-1.5 sm:block sm:space-y-0.5">
                 {courseDetail.fechaInicioDictado && (
-                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                     <Clock className="w-3 h-3 flex-shrink-0" />
                     <span className="font-medium">Inicio:</span>
                     <span>{formatDate(courseDetail.fechaInicioDictado)}</span>
                   </div>
                 )}
                 {courseDetail.fechaFinDictado && (
-                  <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
-                    <Clock className="w-3 h-3 flex-shrink-0 opacity-0 sm:opacity-100" />
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
                     <span className="font-medium">Fin:</span>
                     <span>{formatDate(courseDetail.fechaFinDictado)}</span>
                   </div>
@@ -869,43 +870,29 @@ const CourseDetailPage = () => {
             };
 
             return (
-              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-2 sm:py-3 px-3 sm:px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
-                {/* Texto solo visible en desktop */}
-                <div className="hidden sm:flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">Progreso del curso</span>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    {courseProgress.completed} de {courseProgress.total} completados
+              <section className="sticky top-[72px] z-30 bg-white dark:bg-slate-900 py-3 px-4 lg:px-6 shadow-sm border-b border-slate-200 dark:border-slate-700 space-y-1 sm:space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">Progreso</span>
+                  <span className="text-slate-600 dark:text-slate-400 tabular-nums">
+                    {courseProgress.percentage}% completado
                   </span>
                 </div>
                 {/* Barra de progreso - más delgada en mobile */}
-                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1 sm:h-3 overflow-hidden">
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 sm:h-3 overflow-hidden">
                   <div
                     className={`h-full ${getProgressColor(courseProgress.percentage)} transition-all duration-500 ease-out rounded-full`}
                     style={{ width: `${courseProgress.percentage}%` }}
                   />
                 </div>
-                {/* Porcentaje - solo visible en desktop */}
-                <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400 text-center">
-                  {courseProgress.percentage}% completado
-                </p>
-                {/* En mobile, mostrar solo el porcentaje de forma compacta */}
-                <div className="flex sm:hidden items-center justify-between text-xs">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">
-                    {courseProgress.percentage}%
-                  </span>
-                  <span className="text-slate-500 dark:text-slate-400">
-                    {courseProgress.completed}/{courseProgress.total}
-                  </span>
-                </div>
               </section>
             );
           })()}
 
-          <div className="flex flex-col gap-4 sm:gap-6 px-3 sm:px-4 lg:px-6">
+          <div className="flex flex-col gap-6 px-4 lg:px-6">
           <section className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 px-1">
               <School className="h-4 w-4 text-orange-500" />
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Contenido del curso</h2>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Contenido</h2>
             </div>
 
             {materias.length > 0 ? (
@@ -920,10 +907,6 @@ const CourseDetailPage = () => {
                   .map((materia) => {
                     const materiasModulos = getModulesForMateria(materia, modulos);
                     const missingModuleIds = getMissingModuleIds(materia, modulos);
-                    const totalEnMateria = materia.modulos?.length ?? materiasModulos.length;
-                    const modulosCompletados = materiasModulos.filter((modulo) =>
-                      isModuleFullyCompleted(modulo, progress)
-                    ).length;
 
                   return (
                     <AccordionItem
@@ -931,31 +914,27 @@ const CourseDetailPage = () => {
                       value={materia.id}
                       className="border border-slate-200 dark:border-slate-700 rounded-lg px-4 sm:px-5 bg-white dark:bg-slate-900/70"
                     >
-                          <AccordionTrigger className="hover:no-underline py-3.5 sm:py-4">
+                          <AccordionTrigger className="hover:no-underline py-5 sm:py-4 min-h-[64px] sm:min-h-0 [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-4 sm:[&>svg]:w-4">
                             <div className="flex items-center gap-3 text-left w-full">
-                              <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                              <div className="h-2.5 w-2.5 sm:h-2 sm:w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
                               <div className="flex-1 min-w-0">
                                 <span
-                                  className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block truncate"
+                                  className="text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block line-clamp-2 sm:truncate"
                                   title={materia.nombre}
                                 >
                                   {materia.nombre}
                                 </span>
-                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                  {modulosCompletados} de {totalEnMateria} módulo
-                                  {totalEnMateria !== 1 ? "s" : ""}
-                                </p>
                               </div>
                             </div>
                           </AccordionTrigger>
 
                           <AccordionContent className="pb-4 sm:pb-5 pt-0">
                             {loadingEnabledModules ? (
-                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                              <div className="space-y-3 sm:space-y-3.5 sm:px-5">
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Cargando módulos...</p>
                               </div>
                             ) : materiasModulos.length > 0 || missingModuleIds.length > 0 ? (
-                              <div className="space-y-3 sm:space-y-3.5 px-4 sm:px-5">
+                              <div className="space-y-3 sm:space-y-3.5 sm:px-5">
                                 {materiasModulos.map((modulo) => (
                                   <div
                                     key={modulo.id}
@@ -1013,7 +992,7 @@ const CourseDetailPage = () => {
             <section className="space-y-4">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-orange-500" />
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Documentos del curso</h2>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Documentos</h2>
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
@@ -1022,22 +1001,14 @@ const CourseDetailPage = () => {
                   {courseDetail.planDeEstudiosUrl && (
                     <div className="flex items-center justify-between gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
+                        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100">
                           Plan de Estudios
                         </h4>
-                        {courseDetail.planDeEstudiosFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
-                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                            <span>
-                              Última actualización: {formatDate(courseDetail.planDeEstudiosFechaActualizacion)}
-                            </span>
-                          </p>
-                        )}
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm flex-shrink-0"
+                        className="h-12 sm:h-9 min-w-[96px] sm:min-w-0 px-5 sm:px-4 text-base sm:text-sm flex-shrink-0"
                         asChild
                       >
                         <a
@@ -1046,7 +1017,7 @@ const CourseDetailPage = () => {
                           rel="noopener noreferrer"
                           className="flex items-center gap-2"
                         >
-                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <ExternalLink className="h-5 w-5 sm:h-4 sm:w-4" />
                           Ver
                         </a>
                       </Button>
@@ -1057,22 +1028,14 @@ const CourseDetailPage = () => {
                   {courseDetail.fechasDeExamenesUrl && (
                     <div className="flex items-center justify-between gap-3 sm:gap-4">
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
+                        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100">
                           Fechas de Exámenes
                         </h4>
-                        {courseDetail.fechasDeExamenesFechaActualizacion && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 mt-1">
-                            <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                            <span>
-                              Última actualización: {formatDate(courseDetail.fechasDeExamenesFechaActualizacion)}
-                            </span>
-                          </p>
-                        )}
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm flex-shrink-0"
+                        className="h-12 sm:h-9 min-w-[96px] sm:min-w-0 px-5 sm:px-4 text-base sm:text-sm flex-shrink-0"
                         asChild
                       >
                         <a
@@ -1081,7 +1044,7 @@ const CourseDetailPage = () => {
                           rel="noopener noreferrer"
                           className="flex items-center gap-2"
                         >
-                          <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <ExternalLink className="h-5 w-5 sm:h-4 sm:w-4" />
                           Ver
                         </a>
                       </Button>
@@ -1165,20 +1128,48 @@ const CourseDetailPage = () => {
 
       {/* Modal de documento para desktop */}
       <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
-        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-screen !m-0 !p-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
-          <DialogHeader className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-[100dvh] !m-0 !p-0 !gap-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
+          {/* Una sola barra compacta para dejar el máximo espacio al documento */}
+          <DialogHeader className="px-3 py-1.5 sm:px-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 space-y-0">
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
               <div className="flex-1 min-w-0">
-                <DialogTitle className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <DialogTitle className="truncate text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 text-left">
                   {selectedDocument?.title || 'Documento'}
                 </DialogTitle>
                 {selectedDocument?.documents && selectedDocument.documents.length > 1 && selectedDocument.currentIndex !== undefined && (
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Documento {selectedDocument.currentIndex + 1} de {selectedDocument.documents.length}
                   </p>
                 )}
               </div>
-              <div className="hidden sm:flex items-center gap-2">
+              {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
+                const modulo = modulos.find(m => m.titulo === selectedDocument.title);
+                const isDocCompleted = isContentCompleted(modulo?.id || '', selectedDocument.currentIndex, 'document');
+                return (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (modulo && selectedDocument.currentIndex !== undefined) {
+                        handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
+                      }
+                    }}
+                    className={`h-9 shrink-0 gap-1.5 px-3 text-sm font-semibold ${
+                      isDocCompleted
+                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        : 'bg-red-500 hover:bg-red-600 text-white'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {isDocCompleted ? 'Visto' : (
+                      <>
+                        <span className="sm:hidden">Marcar visto</span>
+                        <span className="hidden sm:inline">Marcar como visto</span>
+                      </>
+                    )}
+                  </Button>
+                );
+              })()}
+              <div className="hidden sm:flex items-center gap-1">
                 {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
                   <>
                     <Button
@@ -1202,6 +1193,16 @@ const CourseDetailPage = () => {
                   </>
                 )}
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCloseDocument}
+                className="h-10 w-10 shrink-0 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                aria-label="Cerrar documento"
+                title="Cerrar"
+              >
+                <X className="!h-7 !w-7" />
+              </Button>
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
@@ -1220,9 +1221,8 @@ const CourseDetailPage = () => {
                 src={selectedDocument.url}
                 title={selectedDocument.title}
                 className="w-full h-full"
-                style={{ 
-                  border: 'none', 
-                  minHeight: 'calc(100vh - 180px)',
+                style={{
+                  border: 'none',
                   width: '100%',
                   height: '100%',
                 }}
@@ -1249,42 +1249,6 @@ const CourseDetailPage = () => {
                 </div>
               </div>
             )}
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2 p-4 sm:p-6 border-t border-slate-200 dark:border-slate-700 flex-shrink-0">
-            <div className="flex items-center gap-2 justify-between w-full">
-              {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
-                const modulo = modulos.find(m => m.titulo === selectedDocument.title);
-                const moduleId = modulo?.id || '';
-                const isDocCompleted = isContentCompleted(moduleId, selectedDocument.currentIndex, 'document');
-                return (
-                  <Button
-                    variant="default"
-                    size="lg"
-                    onClick={() => {
-                      if (modulo && selectedDocument.currentIndex !== undefined) {
-                        handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
-                      }
-                    }}
-                    className={`h-12 px-6 sm:h-12 sm:px-8 text-base font-semibold shadow-lg transition-all ${
-                      isDocCompleted 
-                        ? 'bg-green-600 hover:bg-green-700 text-white' 
-                        : 'bg-red-500 hover:bg-red-600 text-white hover:shadow-xl'
-                    }`}
-                  >
-                    <CheckCircle2 className="h-5 w-5 sm:mr-2" />
-                    {isDocCompleted ? 'Visto' : 'Marcar como visto'}
-                  </Button>
-                );
-              })()}
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleCloseDocument}
-                className="h-10 px-4 sm:h-10 sm:px-6 font-medium ml-auto"
-              >
-                Cerrar
-              </Button>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1316,13 +1280,8 @@ const CourseDetailPage = () => {
 // Componente para cada módulo con descripción desplegable
 const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted = false, isEnabled = true, isContentCompleted, handleMarkAsCompleted, onDisabledClick }: { modulo: Modulo; handleOpenDocument: (modulo: Modulo, index?: number) => void; handleOpenVideo: (modulo: Modulo, index?: number) => void; isHighlighted?: boolean; isEnabled?: boolean; isContentCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => boolean; handleMarkAsCompleted: (moduleId: string, contentIndex: number, contentType: 'video' | 'document') => Promise<void>; onDisabledClick?: () => void }) => {
   const [isModuleExpanded, setIsModuleExpanded] = useState(true);
-  const [isDescExpanded, setIsDescExpanded] = useState(false);
-  const descripcion = modulo.descripcion || '';
-  const maxLength = 150; // Caracteres para mostrar antes del "Ver más"
-  const shouldTruncate = descripcion.length > maxLength;
-  const displayDesc = shouldTruncate && !isDescExpanded 
-    ? descripcion.substring(0, maxLength) + '...'
-    : descripcion;
+  const [isDescOpen, setIsDescOpen] = useState(false);
+  const descripcion = modulo.descripcion?.trim() || '';
 
   // Obtener array de documentos
   const getDocuments = (): string[] => {
@@ -1385,9 +1344,24 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
 
   const moduleCompleted = isModuleCompleted();
 
+  // Con un solo material no hace falta desplegar: se abre directo desde la fila del módulo
+  const isSingleItem = documents.length + videos.length === 1;
+  const singleIsVideo = isSingleItem && documents.length === 0;
+  const singleCompleted =
+    isSingleItem && isContentCompleted(modulo.id, 0, singleIsVideo ? 'video' : 'document');
+  const openSingleItem = () => {
+    if (!isEnabled) {
+      onDisabledClick?.();
+    } else if (singleIsVideo) {
+      handleOpenVideo(modulo, 0);
+    } else {
+      handleOpenDocument(modulo, 0);
+    }
+  };
+
   return (
     <div className={cn(
-      "flex min-w-0 items-start gap-2 sm:gap-4 p-2 sm:p-4 rounded-md border transition-colors duration-200",
+      "flex min-w-0 items-start gap-3 sm:gap-4 p-3.5 sm:p-4 rounded-lg sm:rounded-md border transition-colors duration-200",
       !isEnabled 
         ? "bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 opacity-60"
         : isHighlighted 
@@ -1396,18 +1370,21 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
     )}>
       <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 sm:mt-2 flex-shrink-0 hidden sm:block"></div>
       <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-3">
         <button
           onClick={() => {
-            if (!isEnabled && onDisabledClick) {
+            if (isSingleItem) {
+              openSingleItem();
+            } else if (!isEnabled && onDisabledClick) {
               onDisabledClick();
             } else {
               setIsModuleExpanded(!isModuleExpanded);
             }
           }}
-          className="w-full flex items-center justify-between gap-2 text-left"
+          className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left min-h-[44px] sm:min-h-0"
         >
           <h4 className={cn(
-            "text-xs sm:text-base font-medium leading-relaxed flex items-center gap-2 min-w-0 flex-1",
+            "text-[15px] sm:text-base font-medium leading-snug flex items-center gap-2 min-w-0 flex-1",
             !isEnabled
               ? "text-slate-500 dark:text-slate-400"
               : moduleCompleted 
@@ -1420,49 +1397,74 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
             {!isEnabled && (
               <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
             )}
-            <span className="min-w-0 truncate" title={modulo.titulo}>
+            <span className="min-w-0 line-clamp-2 sm:truncate" title={modulo.titulo}>
               {modulo.titulo}
             </span>
+            {descripcion && (
+              <Tooltip open={isDescOpen} onOpenChange={setIsDescOpen}>
+                <TooltipTrigger asChild>
+                  {/* span y no button: queda dentro del botón que expande el módulo */}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Ver descripción del módulo"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDescOpen((open) => !open);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDescOpen((open) => !open);
+                      }
+                    }}
+                    className="inline-flex flex-shrink-0 rounded-full p-1 sm:p-0.5 text-slate-400/70 transition-colors hover:text-slate-500 dark:text-slate-500/70 dark:hover:text-slate-400"
+                  >
+                    <Info className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-[min(24rem,calc(100vw-2rem))] text-xs font-normal leading-relaxed">
+                  {descripcion}
+                </TooltipContent>
+              </Tooltip>
+            )}
             {!isEnabled && (
               <span className="flex-shrink-0 text-xs text-slate-400 dark:text-slate-500 ml-1">(No disponible)</span>
             )}
           </h4>
-          <ChevronDown className={cn(
-            "h-4 w-4 sm:h-5 sm:w-5 text-slate-500 dark:text-slate-400 transition-transform flex-shrink-0",
-            isModuleExpanded && "rotate-180"
-          )} />
+          {!isSingleItem && (
+            <ChevronDown className={cn(
+              "h-4 w-4 sm:h-5 sm:w-5 text-slate-500 dark:text-slate-400 transition-transform flex-shrink-0",
+              isModuleExpanded && "rotate-180"
+            )} />
+          )}
         </button>
-        {isModuleExpanded && (
-          <>
-            {descripcion && (
-              <div className="hidden sm:block mt-1.5 sm:mt-2">
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {displayDesc}
-                </p>
-                {shouldTruncate && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsDescExpanded(!isDescExpanded);
-                    }}
-                    className="text-xs sm:text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 mt-1.5 transition-colors flex items-center gap-1"
-                  >
-                    {isDescExpanded ? (
-                      <>
-                        Ver menos
-                        <ChevronDown className="h-3 w-3 rotate-180" />
-                      </>
-                    ) : (
-                      <>
-                        Ver más
-                        <ChevronDown className="h-3 w-3" />
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
+        {/* Material único en desktop: el botón va en la misma fila del título */}
+        {isSingleItem && (
+          <Button
+            className={`hidden sm:flex h-8 px-3 text-sm font-medium items-center justify-center gap-1.5 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+              singleCompleted
+                ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
+                : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
+            }`}
+            onClick={openSingleItem}
+            disabled={!isEnabled}
+          >
+            {singleCompleted ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+            ) : singleIsVideo ? (
+              <Play className="h-3.5 w-3.5" />
+            ) : (
+              <FileText className="h-3.5 w-3.5" />
             )}
-            <div className="flex flex-col gap-2 sm:gap-3 mt-2 sm:mt-4">
+            Ver
+          </Button>
+        )}
+        </div>
+        {(isModuleExpanded || isSingleItem) && (
+          <>
+            <div className={cn("flex flex-col gap-2.5 sm:gap-3 mt-3 sm:mt-4", isSingleItem && "sm:hidden")}>
           {documents.map((doc, index) => {
             const fileName = getDocName(index);
             const isDocCompleted = isContentCompleted(modulo.id, index, 'document');
@@ -1472,7 +1474,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-14 px-4 py-3 text-base font-medium flex items-center justify-center gap-2 transition-colors ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isDocCompleted
@@ -1489,7 +1491,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     disabled={!isEnabled}
                     title={fileName}
                   >
-                    <FileText className="h-4 w-4 flex-shrink-0" />
+                    <FileText className="h-5 w-5 flex-shrink-0" />
                     <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{fileName}</span>
                   </Button>
                   <button
@@ -1498,7 +1500,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                       e.stopPropagation();
                       handleMarkAsCompleted(modulo.id, index, 'document');
                     }}
-                    className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
+                    className={`h-14 w-14 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
                       isDocCompleted
                         ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
@@ -1510,11 +1512,20 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 </div>
                 {/* Card para desktop */}
                 <div 
-                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  className={`hidden ${isSingleItem ? '' : 'sm:flex'} cursor-pointer items-center gap-3 p-3 rounded-lg border transition-colors ${
                     isDocCompleted
                       ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}
+                  role="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    if (!isEnabled && onDisabledClick) {
+                      onDisabledClick();
+                    } else {
+                      handleOpenDocument(modulo, index);
+                    }
+                  }}
                 >
                   {isDocCompleted ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
@@ -1537,7 +1548,8 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                         ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
                         : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
                     }`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (!isEnabled && onDisabledClick) {
                         onDisabledClick();
                       } else {
@@ -1566,7 +1578,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 {/* Botón para móvil - con opción de marcar como visto */}
                 <div className="w-full min-w-0 max-w-full sm:hidden flex items-center gap-2">
                   <Button
-                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-10 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    className={`min-w-0 max-w-full flex-1 overflow-hidden h-auto min-h-14 px-4 py-3 text-base font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       !isEnabled
                         ? 'border border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/50 cursor-not-allowed opacity-60'
                         : isVideoCompleted
@@ -1583,7 +1595,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                     disabled={!isEnabled}
                     title={videoName}
                   >
-                    <Play className="h-4 w-4 flex-shrink-0" />
+                    <Play className="h-5 w-5 flex-shrink-0" />
                     <span className="min-w-0 flex-1 text-left line-clamp-2 break-words leading-snug">{videoName}</span>
                   </Button>
                   <button
@@ -1592,7 +1604,7 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                       e.stopPropagation();
                       handleMarkAsCompleted(modulo.id, index, 'video');
                     }}
-                    className={`h-10 w-10 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
+                    className={`h-14 w-14 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
                       isVideoCompleted
                         ? 'bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700'
                         : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
@@ -1604,11 +1616,20 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                 </div>
                 {/* Card para desktop */}
                 <div 
-                  className={`hidden sm:flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                  className={`hidden ${isSingleItem ? '' : 'sm:flex'} cursor-pointer items-center gap-3 p-3 rounded-lg border transition-colors ${
                     isVideoCompleted
                       ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}
+                  role="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    if (!isEnabled && onDisabledClick) {
+                      onDisabledClick();
+                    } else {
+                      handleOpenVideo(modulo, index);
+                    }
+                  }}
                 >
                   {isVideoCompleted ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
@@ -1631,7 +1652,8 @@ const ModuleItem = ({ modulo, handleOpenDocument, handleOpenVideo, isHighlighted
                         ? 'border border-green-500 dark:border-green-400 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/30'
                         : 'border border-orange-400 dark:border-orange-500 text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30'
                     }`}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (!isEnabled && onDisabledClick) {
                         onDisabledClick();
                       } else {

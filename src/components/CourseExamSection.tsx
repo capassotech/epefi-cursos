@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
+  Award,
   ClipboardCheck,
+  Clock,
   Loader2,
   Lock,
   RotateCcw,
@@ -236,6 +239,23 @@ export default function CourseExamSection({
 
   const sectionTitle = estado?.titulo?.trim() || "Evaluación de la formación";
 
+  /** Mensaje breve y cercano según dónde está parado el alumno */
+  const statusMessage = passed
+    ? "¡Aprobaste esta evaluación!"
+    : esperandoCorreccion
+      ? "Tu evaluación está en corrección."
+      : !examenHabilitado
+        ? "Todavía no está disponible."
+        : intentosAgotados
+          ? "Ya usaste todos los intentos disponibles."
+          : canShowButton && !tieneIntento
+            ? locallyReady
+              ? "¡Completaste el curso! Ya podés rendir la evaluación final."
+              : "La evaluación ya está disponible. Podés rendirla cuando quieras."
+            : tieneIntento
+              ? `Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`
+              : "";
+
   const sectionHeader = (
     <div className="flex items-center gap-2">
       <ClipboardCheck className="h-4 w-4 text-orange-500" />
@@ -336,17 +356,81 @@ export default function CourseExamSection({
       <section className="space-y-4">
         {sectionHeader}
 
-        <Card className="border-slate-200 dark:border-slate-800">
+        <Card className="overflow-hidden border-slate-200 dark:border-slate-800">
+          {/* Franja de acento según el estado */}
+          <div
+            className={cn(
+              "h-1",
+              passed
+                ? "bg-green-500"
+                : intentosAgotados || !examenHabilitado
+                  ? "bg-slate-300 dark:bg-slate-700"
+                  : "bg-gradient-to-r from-orange-400 to-orange-600"
+            )}
+          />
           <CardContent className="p-4 sm:p-6 space-y-4">
-            <div>
-              <h3 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
-                {sectionTitle}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Nota mínima para aprobar: {notaMinima}
-                {" · "}
-                Intentos usados: {intentosUsados} de {intentosMaximos}
-              </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                <span
+                  className={cn(
+                    "grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-sm sm:h-12 sm:w-12",
+                    passed
+                      ? "bg-green-500 text-white"
+                      : intentosAgotados || !examenHabilitado
+                        ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        : "bg-gradient-to-br from-orange-400 to-orange-600 text-white"
+                  )}
+                >
+                  {passed ? (
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : intentosAgotados || !examenHabilitado ? (
+                    <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : (
+                    <ClipboardCheck className="h-5 w-5 sm:h-6 sm:w-6" />
+                  )}
+                </span>
+                <div className="min-w-0 space-y-2">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {sectionTitle}
+                    </h3>
+                    {statusMessage && (
+                      <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{statusMessage}</p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { icon: Clock, label: `${rules.duracionMinutos} min` },
+                      { icon: RotateCcw, label: `Intentos ${intentosUsados} de ${intentosMaximos}` },
+                      { icon: Award, label: `Nota mínima ${notaMinima}` },
+                    ].map(({ icon: Icon, label }) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      >
+                        <Icon className="h-3.5 w-3.5 text-orange-500" />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {canShowButton && !tieneIntento && (
+                <Button
+                  size="lg"
+                  className="h-14 sm:h-11 w-full shrink-0 gap-2 text-base sm:text-sm sm:w-auto"
+                  onClick={() => void requestStart()}
+                  disabled={checkingStart}
+                >
+                  {checkingStart ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  Realizar evaluación
+                </Button>
+              )}
             </div>
 
             {!examenHabilitado && (
@@ -358,18 +442,6 @@ export default function CourseExamSection({
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
                   {estado?.mensajeBloqueo ||
                     "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios. Si tenés alguna consulta, comunicate con tu profesor."}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {examenHabilitado &&
-              locallyReady &&
-              !passed &&
-              !esperandoCorreccion &&
-              !intentosAgotados && (
-              <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
-                <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
-                  Completaste todo el contenido del curso. Podés realizar la evaluación final.
                 </AlertDescription>
               </Alert>
             )}
@@ -483,16 +555,6 @@ export default function CourseExamSection({
               </div>
             )}
 
-            {canShowButton && !tieneIntento && (
-              <Button
-                className="w-full sm:w-auto gap-2"
-                onClick={() => void requestStart()}
-                disabled={checkingStart}
-              >
-                {checkingStart && <Loader2 className="h-4 w-4 animate-spin" />}
-                Realizar evaluación
-              </Button>
-            )}
           </CardContent>
         </Card>
       </section>
