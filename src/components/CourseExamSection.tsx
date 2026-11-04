@@ -9,7 +9,6 @@ import {
   Lock,
   RotateCcw,
   CheckCircle2,
-  XCircle,
   FileText,
   Hourglass,
 } from "lucide-react";
@@ -30,7 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { resolveFormacionId } from "@/lib/formacionId";
-import { getExamBlockReason, getExamRules } from "@/lib/examUtils";
+import { formatNota, formatPorcentaje, getExamBlockReason, getExamRules } from "@/lib/examUtils";
 import {
   getCourseContentProgress,
   getVisibleModulesProgress,
@@ -39,7 +38,7 @@ import {
 } from "@/lib/courseProgress";
 import ExamService, { getApiErrorMessage } from "@/services/examService";
 import VerExamenRealizadoModal from "@/components/VerExamenRealizadoModal";
-import { ExamResultDisplay, ExamStartSummary } from "@/components/exam/ExamParts";
+import { ExamStartSummary } from "@/components/exam/ExamParts";
 import type { Modulo } from "@/types/types";
 import type { ExamEstado, ExamRealizadoDetalle } from "@/types/exam";
 import { toast } from "sonner";
@@ -253,7 +252,7 @@ export default function CourseExamSection({
               ? "¡Completaste el curso! Ya podés rendir la evaluación final."
               : "La evaluación ya está disponible. Podés rendirla cuando quieras."
             : tieneIntento
-              ? `Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`
+              ? `No llegaste a la nota mínima. Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`
               : "";
 
   const sectionHeader = (
@@ -398,6 +397,7 @@ export default function CourseExamSection({
                       <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{statusMessage}</p>
                     )}
                   </div>
+                  {!passed && (
                   <div className="flex flex-wrap gap-1.5">
                     {[
                       { icon: Clock, label: `${rules.duracionMinutos} min` },
@@ -413,6 +413,7 @@ export default function CourseExamSection({
                       </span>
                     ))}
                   </div>
+                  )}
                 </div>
               </div>
 
@@ -490,68 +491,70 @@ export default function CourseExamSection({
             )}
 
             {tieneIntento && !esperandoCorreccion && (
-              <div
-                className={cn(
-                  "rounded-lg border p-4 space-y-3",
-                  passed
-                    ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
-                    : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  {passed ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 space-y-2">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">
-                      {passed ? "¡Aprobaste la evaluación!" : "Último intento"}
-                    </p>
-                    <ExamResultDisplay result={ultimoIntento} showStatus />
-                    {!passed && !intentosAgotados && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        No alcanzaste la nota mínima. Te{" "}
-                        {intentosRestantes === 1 ? "queda" : "quedan"}{" "}
-                        {intentosRestantes}{" "}
-                        {intentosRestantes === 1 ? "intento" : "intentos"}.
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                {/* Resultado del último intento en casillas simples; el encabezado ya dice si aprobó */}
+                <div className="flex flex-1 gap-2">
+                  {[
+                    { label: "Nota", value: formatNota(ultimoIntento.nota), main: true },
+                    { label: "Aciertos", value: formatPorcentaje(ultimoIntento.porcentajeAciertos) },
+                    ...(ultimoIntento.respuestasCorrectas != null && ultimoIntento.totalPreguntas != null
+                      ? [{ label: "Correctas", value: `${ultimoIntento.respuestasCorrectas}/${ultimoIntento.totalPreguntas}` }]
+                      : []),
+                  ].map(({ label, value, main }) => (
+                    <div
+                      key={label}
+                      className={cn(
+                        "flex-1 rounded-xl border px-3 py-2.5 text-center sm:max-w-[9rem]",
+                        passed
+                          ? "border-green-200 bg-green-50 dark:border-green-900/60 dark:bg-green-950/30"
+                          : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
+                      )}
+                    >
+                      <p
+                        className={cn(
+                          "text-2xl font-bold tabular-nums leading-tight",
+                          main
+                            ? passed
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-orange-600 dark:text-orange-400"
+                            : "text-slate-900 dark:text-slate-100"
+                        )}
+                      >
+                        {value}
                       </p>
-                    )}
-                    {!passed && intentosAgotados && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        No alcanzaste la nota mínima y usaste los {intentosMaximos}{" "}
-                        intentos disponibles.
-                      </p>
-                    )}
-                  </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  {puedeVerDetalle && (
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-auto gap-2"
-                      onClick={() => void handleVerExamenRealizado()}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Ver examen realizado
-                    </Button>
-                  )}
-                  {!passed && canShowButton && (
-                    <Button
-                      className="w-full sm:w-auto gap-2"
-                      onClick={() => void requestStart()}
-                      disabled={checkingStart}
-                    >
-                      {checkingStart ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RotateCcw className="h-4 w-4" />
-                      )}
-                      Reintentar evaluación
-                    </Button>
-                  )}
-                </div>
+                {(puedeVerDetalle || (!passed && canShowButton)) && (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    {puedeVerDetalle && (
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full gap-2 sm:w-auto"
+                        onClick={() => void handleVerExamenRealizado()}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Ver examen
+                      </Button>
+                    )}
+                    {!passed && canShowButton && (
+                      <Button
+                        className="h-11 w-full gap-2 sm:w-auto"
+                        onClick={() => void requestStart()}
+                        disabled={checkingStart}
+                      >
+                        {checkingStart ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        Reintentar
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -563,7 +566,8 @@ export default function CourseExamSection({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Comenzar la evaluación?</AlertDialogTitle>
-            <AlertDialogDescription>
+            {/* Solo para lectores de pantalla: el resumen de abajo ya muestra las condiciones */}
+            <AlertDialogDescription className="sr-only">
               {sectionTitle}. Revisá las condiciones antes de empezar.
             </AlertDialogDescription>
           </AlertDialogHeader>

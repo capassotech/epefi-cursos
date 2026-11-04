@@ -699,74 +699,6 @@ const CourseDetailPage = () => {
             )}
           </section>
 
-          {/* Sección de documentos del curso */}
-          {(courseDetail?.planDeEstudiosUrl || courseDetail?.fechasDeExamenesUrl) && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-orange-500" />
-                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Documentos</h2>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 sm:p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                <div className="space-y-3">
-                  {/* Plan de Estudios */}
-                  {courseDetail.planDeEstudiosUrl && (
-                    <div className="flex items-center justify-between gap-3 sm:gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100">
-                          Plan de Estudios
-                        </h4>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-12 sm:h-9 min-w-[96px] sm:min-w-0 px-5 sm:px-4 text-base sm:text-sm flex-shrink-0"
-                        asChild
-                      >
-                        <a
-                          href={courseDetail.planDeEstudiosUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2"
-                        >
-                          <ExternalLink className="h-5 w-5 sm:h-4 sm:w-4" />
-                          Ver
-                        </a>
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Fechas de Exámenes */}
-                  {courseDetail.fechasDeExamenesUrl && (
-                    <div className="flex items-center justify-between gap-3 sm:gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-base font-medium text-slate-900 dark:text-slate-100">
-                          Fechas de Exámenes
-                        </h4>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-12 sm:h-9 min-w-[96px] sm:min-w-0 px-5 sm:px-4 text-base sm:text-sm flex-shrink-0"
-                        asChild
-                      >
-                        <a
-                          href={courseDetail.fechasDeExamenesUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2"
-                        >
-                          <ExternalLink className="h-5 w-5 sm:h-4 sm:w-4" />
-                          Ver
-                        </a>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
-
           {user?.uid && courseId && (
             <CourseExamSection
               key={courseId}
@@ -778,6 +710,34 @@ const CourseDetailPage = () => {
               enabledModules={enabledModules}
               progress={progress}
             />
+          )}
+
+          {/* Documentos del curso: discretos, al final de la página */}
+          {(courseDetail?.planDeEstudiosUrl || courseDetail?.fechasDeExamenesUrl) && (
+            <section className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-4 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-2 sm:text-slate-500">
+              {[
+                { label: "Plan de estudios", url: courseDetail.planDeEstudiosUrl },
+                { label: "Fechas de exámenes", url: courseDetail.fechasDeExamenesUrl },
+              ]
+                .filter((doc) => doc.url)
+                .map((doc) => (
+                  <a
+                    key={doc.label}
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn(
+                      // Mobile: botón suave y cómodo de tocar. Desktop: enlace discreto
+                      "flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center font-medium transition-colors active:bg-slate-100 dark:border-slate-800 dark:bg-slate-900/60 dark:active:bg-slate-800",
+                      "sm:inline-flex sm:h-auto sm:gap-1.5 sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-1 sm:font-normal sm:underline-offset-4 sm:hover:text-orange-500 sm:hover:underline sm:dark:bg-transparent sm:dark:hover:text-orange-400"
+                    )}
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-orange-500 sm:hidden" />
+                    <span className="leading-tight">{doc.label}</span>
+                    <ExternalLink className="hidden h-3.5 w-3.5 sm:block" />
+                  </a>
+                ))}
+            </section>
           )}
           </div>
         </div>

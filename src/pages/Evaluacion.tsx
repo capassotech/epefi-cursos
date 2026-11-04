@@ -371,16 +371,17 @@ export default function Evaluacion() {
     [applySubmitResult, exam, estado?.idExamen, formacionId, userId]
   );
 
-  // Contador mientras se rinde, calculado contra la hora límite para no desfasarse
+  // Contador mientras se rinde, calculado contra la hora límite para no desfasarse.
+  // Se congela mientras se envía: el alumno ya finalizó y no debe ver correr el tiempo
   useEffect(() => {
-    if (phase !== "taking" || deadline == null) return;
+    if (phase !== "taking" || deadline == null || submitting) return;
 
     const tick = () =>
       setRemainingSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
     const timerId = window.setInterval(tick, 1000);
 
     return () => window.clearInterval(timerId);
-  }, [phase, deadline]);
+  }, [phase, deadline, submitting]);
 
   // Al llegar a 0, cerrar y registrar intento (si no hay conexión, se reintenta al reconectar)
   useEffect(() => {
