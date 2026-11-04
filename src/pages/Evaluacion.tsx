@@ -514,7 +514,7 @@ export default function Evaluacion() {
   };
 
   const rules = getExamRules(estado);
-  const title = estado?.titulo?.trim() || exam?.titulo?.trim() || "Evaluación de la formación";
+  const title = estado?.titulo?.trim() || exam?.titulo?.trim() || "Evaluación del curso";
   const examRequiereCorreccion = useMemo(
     () => hasDesarrolloQuestions(displayQuestions),
     [displayQuestions]

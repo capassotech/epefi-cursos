@@ -297,7 +297,7 @@ const Index = () => {
         <div className="space-y-4">
           {user?.activo !== false && (
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 ml-1">
-              Mis formaciones
+              Mis cursos
             </h2>
           )}
           <div className="grid grid-cols-1 gap-4">
@@ -320,7 +320,7 @@ const Index = () => {
                       </p>
                       <p className="text-sm sm:text-base text-red-600 dark:text-red-400 max-w-2xl">
                         Por favor, contacta con el administrador para revertir
-                        esta acción y recuperar el acceso a tus formaciones.
+                        esta acción y recuperar el acceso a tus cursos.
                       </p>
                     </div>
                     <div className="space-y-3 mt-6">
@@ -391,10 +391,10 @@ const Index = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500"></div>
 
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-300">
-                  Adquirir más formaciones
+                  Adquirir más cursos
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 mt-2 text-sm sm:text-base">
-                  Explorá toda nuestra oferta de formaciones
+                  Explorá toda nuestra oferta de cursos
                 </p>
 
                 {/* Ícono con detalle naranja */}

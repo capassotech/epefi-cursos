@@ -157,7 +157,7 @@ export function getExamBlockReason(
   if (!estado.idExamen) {
     return {
       title: "Evaluación no disponible",
-      description: "No hay evaluación configurada para esta formación.",
+      description: "No hay evaluación configurada para este curso.",
     };
   }
   if (estado.examenHabilitado === false) {

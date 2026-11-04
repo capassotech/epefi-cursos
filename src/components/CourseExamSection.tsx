@@ -236,7 +236,7 @@ export default function CourseExamSection({
     !!estado?.idExamen &&
     (estado.puedeRealizar === true || locallyReady);
 
-  const sectionTitle = estado?.titulo?.trim() || "Evaluación de la formación";
+  const sectionTitle = estado?.titulo?.trim() || "Evaluación del curso";
 
   /** Mensaje breve y cercano según dónde está parado el alumno */
   const statusMessage = passed
@@ -339,7 +339,7 @@ export default function CourseExamSection({
                 </AlertTitle>
                 <AlertDescription className="text-slate-600 dark:text-slate-400">
                   {sinExamenConfigurado
-                    ? "Completaste el curso, pero esta formación aún no tiene evaluación configurada."
+                    ? "Completaste el curso, pero este curso aún no tiene evaluación configurada."
                     : "La evaluación no está disponible en este momento."}
                 </AlertDescription>
               </Alert>
