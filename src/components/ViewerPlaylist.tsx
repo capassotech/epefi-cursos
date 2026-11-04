@@ -49,7 +49,7 @@ export default function ViewerPlaylist({
         {groups.map((group) => (
           <section key={group.moduloId} className="py-1">
             <p
-              className="truncate px-4 pb-1 pt-2 text-xs font-semibold text-slate-700 dark:text-slate-300"
+              className="truncate px-4 pb-1.5 pt-3 text-[13px] font-semibold text-slate-700 dark:text-slate-300 md:pb-1 md:pt-2 md:text-xs"
               title={group.titulo}
             >
               {group.titulo}
@@ -76,7 +76,8 @@ export default function ViewerPlaylist({
                       onClick={() => !current && onSelect(item)}
                       aria-current={current ? "true" : undefined}
                       className={cn(
-                        "flex w-full items-start gap-2.5 border-l-2 px-4 py-2 text-left text-sm transition-colors",
+                        // Mobile: filas más altas y letra más grande para tocar cómodo; desktop compacto
+                        "flex min-h-[52px] w-full items-center gap-3 border-l-[3px] px-4 py-3 text-left text-[15px] transition-colors md:min-h-0 md:items-start md:gap-2.5 md:border-l-2 md:py-2 md:text-sm",
                         current
                           ? "border-orange-500 bg-orange-50 font-medium text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
                           : "border-transparent text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/70",
@@ -85,7 +86,7 @@ export default function ViewerPlaylist({
                     >
                       <Icon
                         className={cn(
-                          "mt-0.5 h-4 w-4 shrink-0",
+                          "h-5 w-5 shrink-0 md:mt-0.5 md:h-4 md:w-4",
                           done && item.enabled
                             ? "text-green-600 dark:text-green-400"
                             : current
