@@ -112,6 +112,9 @@ export function formatPorcentaje(porcentaje: number): string {
 
 export const DEFAULT_EXAM_MINUTES = 90;
 
+/** Igual que el backend (MAX_INTENTOS_EXAMEN): 1 intento si el examen no tiene límite configurado */
+export const DEFAULT_EXAM_ATTEMPTS = 1;
+
 export interface ExamRules {
   duracionMinutos: number;
   notaMinima: number;
@@ -133,7 +136,7 @@ export function getExamRules(estado: ExamEstado | null | undefined): ExamRules {
   const intentosMaximos =
     typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
       ? estado.intentosMaximos
-      : 3;
+      : DEFAULT_EXAM_ATTEMPTS;
   const intentosUsados =
     typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
       ? estado.intentosUsados
