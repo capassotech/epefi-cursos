@@ -16,6 +16,7 @@ import ViewerPlaylist from "@/components/ViewerPlaylist";
 import VideoPlayer from "@/components/material/VideoPlayer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStudentCourseContent, type StudentCourseContent } from "@/hooks/useStudentCourseContent";
+import { useCellularDataWarning } from "@/hooks/useCellularDataWarning";
 import { queryClient, queryKeys } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
@@ -175,6 +176,9 @@ export default function Material() {
       className={className}
     />
   );
+
+  // Con datos móviles (Android) se recomienda WiFi al mirar videos
+  useCellularDataWarning(current?.type === "video" && current.enabled);
 
   const completed = current ? isCompleted(current) : false;
   const showMobileList = isMobile && !isPending && !!current && playlist.length > 0;
