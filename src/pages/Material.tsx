@@ -7,13 +7,11 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
-  ListVideo,
   Loader2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import ViewerPlaylist from "@/components/ViewerPlaylist";
 import VideoPlayer from "@/components/material/VideoPlayer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,9 +20,13 @@ import { queryClient, queryKeys } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import {
   buildPlaylist,
+  getDocumentUrl,
+  isMobileViewport,
   materialPath,
+  openDocumentInNewTab,
   parseTypeSegment,
   playlistKey,
+  saveLastViewed,
   type PlaylistItem,
 } from "@/lib/viewerPlaylist";
 import CoursesService from "@/services/coursesService";
@@ -50,9 +52,8 @@ const isGoogleDriveDocument = (url: string) => {
 /** PDF ajustado al ancho, con barra de herramientas para zoom y sin panel lateral */
 const formatPDFUrl = (url: string) => `${url.split("#")[0]}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
 
-const openInNewTab = (url: string) => window.open(url.split("#")[0], "_blank", "noopener,noreferrer");
 
-/** Página donde el alumno ve un documento o un video, con el resto del material al costado. */
+/** PÃ¡gina donde el alumno ve un documento o un video, con el resto del material al costado. */
 export default function Material() {
   const { courseId = "", moduloId = "", tipo, index: indexParam } = useParams();
   const navigate = useNavigate();
@@ -64,12 +65,12 @@ export default function Material() {
   const index = Number(indexParam ?? 0);
   const courseUrl = `/curso/${courseId}`;
 
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
-  const [listOpen, setListOpen] = useState(false);
+  // Mismo corte que la lista lateral (md): por debajo, la lista va debajo del material
+  const [isMobile, setIsMobile] = useState(isMobileViewport);
   const [docLoading, setDocLoading] = useState(true);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640);
+    const check = () => setIsMobile(isMobileViewport());
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
@@ -87,7 +88,7 @@ export default function Material() {
 
   const isCompleted = (item: PlaylistItem) => progress[item.moduloId]?.[item.key] === true;
 
-  // Anterior y siguiente disponibles, saltando los módulos bloqueados
+  // Anterior y siguiente disponibles, saltando los mÃ³dulos bloqueados
   const prevItem = currentPos > 0 ? [...flatItems.slice(0, currentPos)].reverse().find((i) => i.enabled) : undefined;
   const nextItem = currentPos >= 0 ? flatItems.slice(currentPos + 1).find((i) => i.enabled) : undefined;
 
@@ -101,7 +102,7 @@ export default function Material() {
     setDocLoading(true);
   }, [url]);
 
-  /** Guarda el visto en el progreso compartido con la página del curso */
+  /** Guarda el visto en el progreso compartido con la pÃ¡gina del curso */
   const setCompleted = async (item: PlaylistItem, value: boolean) => {
     if (!user?.uid) return;
     const key = queryKeys.courseContent(courseId, user.uid);
@@ -125,22 +126,32 @@ export default function Material() {
     } catch (error) {
       console.error("Error marking content as completed:", error);
       apply(!value);
-      toast.error("No se pudo guardar el progreso", { description: "Intentá nuevamente." });
+      toast.error("No se pudo guardar el progreso", { description: "IntentÃ¡ nuevamente." });
     }
   };
 
   // Abrir un material lo marca como visto (igual que antes en los visores)
   const autoMarkedRef = useRef(new Set<string>());
   useEffect(() => {
-    if (!current || !current.enabled || autoMarkedRef.current.has(current.key)) return;
+    if (!current || !current.enabled) return;
+    // Recordar el Ãºltimo material abierto para el botÃ³n "Continuar" del curso
+    if (user?.uid) {
+      saveLastViewed(user.uid, courseId, { moduloId: current.moduloId, type: current.type, index: current.index });
+    }
+    if (autoMarkedRef.current.has(current.key)) return;
     autoMarkedRef.current.add(current.key);
     if (!isCompleted(current)) void setCompleted(current, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de material
   }, [current?.key]);
 
-  /** Cambiar de material reemplaza la entrada del historial: "atrás" siempre vuelve al curso */
+  /** Cambiar de material reemplaza la entrada del historial: "atrÃ¡s" siempre vuelve al curso */
   const goTo = (item: PlaylistItem) => {
-    setListOpen(false);
+    // En celular el documento se abre tambiÃ©n en otra pestaÃ±a, dentro del mismo toque
+    if (item.type === "document" && isMobileViewport()) {
+      const target = data?.modulos?.find((m) => m.id === item.moduloId);
+      const docUrl = target ? getDocumentUrl(target, item.index) : "";
+      if (docUrl) openDocumentInNewTab(docUrl);
+    }
     navigate(materialPath(courseId, item.moduloId, item.type, item.index), {
       replace: true,
       state: location.state,
@@ -166,6 +177,7 @@ export default function Material() {
   );
 
   const completed = current ? isCompleted(current) : false;
+  const showMobileList = isMobile && !isPending && !!current && playlist.length > 0;
   const markButton = current && current.enabled && (
     <Button
       size="sm"
@@ -198,7 +210,7 @@ export default function Material() {
       return (
         <Notice
           title="No encontramos este material"
-          description="Puede que se haya movido o ya no esté disponible."
+          description="Puede que se haya movido o ya no estÃ© disponible."
           action={<Button onClick={close}>Volver al curso</Button>}
         />
       );
@@ -206,8 +218,8 @@ export default function Material() {
     if (!current.enabled) {
       return (
         <Notice
-          title="Módulo no disponible"
-          description="Este módulo aún no está disponible. Los módulos se habilitarán progresivamente según el plan de estudios."
+          title="MÃ³dulo no disponible"
+          description="Este mÃ³dulo aÃºn no estÃ¡ disponible. Los mÃ³dulos se habilitarÃ¡n progresivamente segÃºn el plan de estudios."
           action={<Button onClick={close}>Volver al curso</Button>}
         />
       );
@@ -215,19 +227,32 @@ export default function Material() {
     if (current.type === "video") {
       return <VideoPlayer url={url} slotKey={modulo.id} />;
     }
-    // Drive no se puede embeber y los celulares no muestran PDFs dentro de la página
-    if (isGoogleDriveDocument(url) || isMobile) {
+    // Los celulares no muestran PDFs dentro de la pÃ¡gina: fila compacta para dejar lugar a la lista
+    if (isMobile) {
+      return (
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-orange-50 dark:bg-orange-950/40">
+            <FileText className="h-5 w-5 text-orange-500" />
+          </span>
+          <p className="min-w-0 flex-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
+            El documento se abre en una pestaÃ±a nueva para leerlo cÃ³modo.
+          </p>
+          <Button className="h-10 shrink-0 gap-1.5" onClick={() => openDocumentInNewTab(url)}>
+            <ExternalLink className="h-4 w-4" />
+            Abrir
+          </Button>
+        </div>
+      );
+    }
+    // Drive no se puede embeber
+    if (isGoogleDriveDocument(url)) {
       return (
         <Notice
           icon={<FileText className="h-8 w-8 text-orange-500" />}
           title={current.name}
-          description={
-            isMobile
-              ? "En el celular el documento se abre en una pestaña nueva para que puedas leerlo cómodo."
-              : "Este documento se abre en una pestaña nueva."
-          }
+          description="Este documento se abre en una pestaÃ±a nueva."
           action={
-            <Button className="gap-2" onClick={() => openInNewTab(url)}>
+            <Button className="gap-2" onClick={() => openDocumentInNewTab(url)}>
               <ExternalLink className="h-4 w-4" />
               Abrir documento
             </Button>
@@ -259,18 +284,9 @@ export default function Material() {
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
-      {/* Una sola barra compacta para dejar el máximo espacio al material */}
+      {/* Una sola barra compacta para dejar el mÃ¡ximo espacio al material */}
       <header className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-2 py-1.5 sm:px-4 dark:border-slate-800">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 shrink-0 md:hidden"
-          onClick={() => setListOpen(true)}
-          aria-label="Ver material del curso"
-        >
-          <ListVideo className="h-5 w-5" />
-        </Button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pl-1 sm:pl-0">
           {modulo && (
             <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">{modulo.titulo}</p>
           )}
@@ -294,12 +310,23 @@ export default function Material() {
         </Button>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      {/* Desktop: lista a la izquierda y material al lado. Mobile: video 16:9 arriba y la lista debajo */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {playlistPanel("hidden md:flex")}
-        <main className="min-h-0 min-w-0 flex-1">{renderContent()}</main>
+        <main
+          className={cn(
+            "min-w-0 md:min-h-0 md:flex-1",
+            showMobileList ? "shrink-0" : "min-h-0 flex-1",
+            showMobileList && current?.type === "video" && "aspect-video md:aspect-auto"
+          )}
+        >
+          {renderContent()}
+        </main>
+        {showMobileList &&
+          playlistPanel("md:hidden w-full xl:w-full min-h-0 flex-1 border-r-0 border-t")}
       </div>
 
-      {/* En celular: visto y anterior/siguiente abajo, con botones cómodos de tocar */}
+      {/* En celular: visto y anterior/siguiente abajo, con botones cÃ³modos de tocar */}
       {current && (
         <footer className="flex shrink-0 items-center gap-2 border-t border-slate-200 px-2 py-1.5 sm:hidden dark:border-slate-800">
           <NavButtons prev={prevItem} next={nextItem} onGo={goTo} wide>
@@ -307,15 +334,6 @@ export default function Material() {
           </NavButtons>
         </footer>
       )}
-
-      <Sheet open={listOpen} onOpenChange={setListOpen}>
-        {/* Sin la X del panel: tapaba el contador; se cierra tocando afuera o eligiendo un material */}
-        <SheetContent side="left" className="flex w-[85vw] max-w-sm flex-col gap-0 p-0 [&>button]:hidden">
-          <SheetTitle className="sr-only">Material del curso</SheetTitle>
-          <SheetDescription className="sr-only">Elegí otro documento o video del curso</SheetDescription>
-          {playlistPanel("w-full xl:w-full flex-1 border-r-0")}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

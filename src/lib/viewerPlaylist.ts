@@ -23,6 +23,16 @@ export interface PlaylistGroup {
 export const playlistKey = (moduloId: string, type: PlaylistItemType, index: number) =>
   `${moduloId}_${type}_${index}`;
 
+/** Por debajo de este ancho la lista va debajo del material y los PDF se abren en otra pestaña */
+export const isMobileViewport = () => typeof window !== "undefined" && window.innerWidth < 768;
+
+export const getDocumentUrl = (modulo: Modulo, index: number) =>
+  getDocuments(modulo)[index]?.trim() ?? "";
+
+/** Debe llamarse dentro del clic del usuario para que el navegador no bloquee la pestaña */
+export const openDocumentInNewTab = (url: string) =>
+  window.open(url.split("#")[0], "_blank", "noopener,noreferrer");
+
 /** Segmento de la URL de la página de material para cada tipo */
 const TYPE_SEGMENT: Record<PlaylistItemType, string> = { document: "documento", video: "video" };
 
@@ -35,6 +45,56 @@ export const materialPath = (
   type: PlaylistItemType,
   index: number
 ) => `/curso/${courseId}/material/${moduloId}/${TYPE_SEGMENT[type]}/${index}`;
+
+/** Último material abierto por el alumno en un curso (se guarda en el dispositivo) */
+export interface LastViewed {
+  moduloId: string;
+  type: PlaylistItemType;
+  index: number;
+}
+
+const lastViewedKey = (userId: string, courseId: string) => `epefi-last-viewed:${userId}:${courseId}`;
+
+export function saveLastViewed(userId: string, courseId: string, item: LastViewed): void {
+  try {
+    window.localStorage.setItem(lastViewedKey(userId, courseId), JSON.stringify(item));
+  } catch {
+    // Sin almacenamiento disponible: se propondrá el primer material pendiente
+  }
+}
+
+export function readLastViewed(userId: string, courseId: string): LastViewed | null {
+  try {
+    const raw = window.localStorage.getItem(lastViewedKey(userId, courseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LastViewed;
+    return parsed?.moduloId && (parsed.type === "document" || parsed.type === "video")
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Material para el botón "Continuar": el último abierto si sigue disponible;
+ * si no, el primer pendiente (o el primero del curso).
+ */
+export function pickResumeItem(
+  groups: PlaylistGroup[],
+  last: LastViewed | null,
+  isCompleted: (item: PlaylistItem) => boolean
+): { item: PlaylistItem; group: PlaylistGroup; isLast: boolean } | null {
+  const entries = groups.flatMap((group) => group.items.map((item) => ({ item, group })));
+  const enabled = entries.filter(({ item }) => item.enabled);
+  if (last) {
+    const key = playlistKey(last.moduloId, last.type, last.index);
+    const found = enabled.find(({ item }) => item.key === key);
+    if (found) return { ...found, isLast: true };
+  }
+  const pending = enabled.find(({ item }) => !isCompleted(item)) ?? enabled[0];
+  return pending ? { ...pending, isLast: false } : null;
+}
 
 /** Estado de la página del curso que se recupera al volver de un material */
 export interface CourseViewState {

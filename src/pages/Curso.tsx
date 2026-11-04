@@ -30,9 +30,15 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  buildPlaylist,
   clearCourseViewState,
+  getDocumentUrl,
+  isMobileViewport,
+  openDocumentInNewTab,
   materialPath,
+  pickResumeItem,
   readCourseViewState,
+  readLastViewed,
   saveCourseViewState,
   type PlaylistItemType,
 } from "@/lib/viewerPlaylist";
@@ -171,6 +177,14 @@ const CourseDetailPage = () => {
       return;
     }
     if (!courseId) return;
+
+    // En celular los PDF no se ven dentro de la página: además de ir al visor, se abre el documento
+    // en una pestaña nueva en el mismo toque (si no, el navegador lo bloquea). Al volver, queda el visor con la lista.
+    if (type === 'document' && isMobileViewport()) {
+      const url = getDocumentUrl(modulo, index);
+      if (url) openDocumentInNewTab(url);
+    }
+
     saveCourseViewState(courseId, { scrollY: window.scrollY, expanded: expandedMaterias });
     navigate(materialPath(courseId, modulo.id, type, index), { state: { fromCourse: true } });
   };
@@ -239,6 +253,14 @@ const CourseDetailPage = () => {
     const moduleProgress = progress[moduleId] || {};
     return moduleProgress[contentKey] === true;
   };
+
+  // "Continuar donde dejaste": último material abierto, o el primero pendiente
+  const coursePlaylist = buildPlaylist(materias, modulos, enabledModules);
+  const resume = pickResumeItem(
+    coursePlaylist,
+    user?.uid && courseId ? readLastViewed(user.uid, courseId) : null,
+    (item) => isContentCompleted(item.moduloId, item.index, item.type)
+  );
 
   // Calcular progreso del curso
   const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
@@ -547,6 +569,38 @@ const CourseDetailPage = () => {
           })()}
 
           <div className="flex flex-col gap-6 px-4 lg:px-6">
+          {resume && (() => {
+            const modulo = modulos.find((m) => m.id === resume.item.moduloId);
+            if (!modulo) return null;
+            const allDone = !resume.isLast && isContentCompleted(resume.item.moduloId, resume.item.index, resume.item.type);
+            const label = resume.isLast
+              ? 'Continuá donde dejaste'
+              : allDone
+                ? 'Repasar el curso'
+                : resume.item.key === coursePlaylist[0]?.items[0]?.key
+                  ? 'Empezá el curso'
+                  : 'Seguí con lo pendiente';
+            const ResumeIcon = resume.item.type === 'video' ? Play : FileText;
+            return (
+              <button
+                type="button"
+                onClick={() => openMaterial(modulo, resume.item.type, resume.item.index)}
+                className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-4 text-left text-white shadow-lg shadow-orange-500/20 transition hover:shadow-xl hover:shadow-orange-500/30 sm:gap-5 sm:p-6"
+              >
+                {/* Brillo decorativo */}
+                <span className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" aria-hidden="true" />
+                <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white text-orange-600 shadow-md transition group-hover:scale-105 sm:h-16 sm:w-16">
+                  <ResumeIcon className={cn("h-7 w-7 sm:h-8 sm:w-8", resume.item.type === 'video' && "ml-1")} fill={resume.item.type === 'video' ? 'currentColor' : 'none'} />
+                </span>
+                <span className="relative min-w-0 flex-1">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-white/80">{label}</span>
+                  <span className="mt-0.5 block text-base font-semibold leading-snug line-clamp-2 sm:text-lg">{resume.item.name}</span>
+                  <span className="mt-0.5 block truncate text-xs text-white/80 sm:text-sm">{modulo.titulo}</span>
+                </span>
+                <ChevronDown className="relative hidden h-6 w-6 shrink-0 -rotate-90 transition group-hover:translate-x-1 sm:block" />
+              </button>
+            );
+          })()}
           <section className="space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2 px-1">
               <School className="h-4 w-4 text-orange-500" />
