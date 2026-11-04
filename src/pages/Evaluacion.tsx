@@ -235,7 +235,8 @@ export default function Evaluacion() {
   // El aviso de inicio se consume una sola vez: al recargar o volver se muestra la introducción
   useEffect(() => {
     if ((location.state as { autoStart?: boolean } | null)?.autoStart) {
-      navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+      // Se conserva que se llegó desde el curso, para que "Volver al curso" no duplique el historial
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: { fromCourse: true } });
     }
   }, [location.pathname, location.search, location.state, navigate]);
 
@@ -407,7 +408,9 @@ export default function Evaluacion() {
     };
   }, []);
 
-  // Mientras se rinde: avisar antes de recargar o cerrar la pestaña, y pedir confirmación al tocar "atrás"
+  // Mientras se rinde: avisar antes de recargar o cerrar la pestaña.
+  // El "atrás" del navegador no se intercepta (agregar entradas falsas al historial desordenaba la
+  // navegación): si el alumno sale, sus respuestas y el reloj quedan guardados y al volver se retoma
   useEffect(() => {
     if (phase !== "taking") return;
 
@@ -415,20 +418,10 @@ export default function Evaluacion() {
       e.preventDefault();
       e.returnValue = "";
     };
-    // Entrada duplicada en el historial para interceptar el botón "atrás" del navegador
-    window.history.pushState(window.history.state, "", window.location.href);
-    const onPopState = () => {
-      window.history.pushState(window.history.state, "", window.location.href);
-      openCloseConfirm();
-    };
 
     window.addEventListener("beforeunload", onBeforeUnload);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [phase, openCloseConfirm]);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [phase]);
 
   const handleSingleSelect = (questionId: string, optionId: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: [optionId] }));
@@ -495,7 +488,15 @@ export default function Evaluacion() {
     }
   };
 
-  const goToCourse = () => navigate(courseUrl, { replace: true });
+  /** Si se llegó desde el curso se vuelve a esa misma entrada; si no (ej. recarga directa), se reemplaza */
+  const goToCourse = () => {
+    const state = location.state as { autoStart?: boolean; fromCourse?: boolean } | null;
+    if (state?.fromCourse || state?.autoStart) {
+      navigate(-1);
+    } else {
+      navigate(courseUrl, { replace: true });
+    }
+  };
 
   const handleExit = () => {
     if (submitting) return;

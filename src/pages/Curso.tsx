@@ -488,7 +488,10 @@ const CourseDetailPage = () => {
             variant="ghost"
             size="icon"
             className="h-9 w-9 rounded-full text-slate-600 dark:text-slate-300"
-            onClick={() => navigate(-1)}
+            // Destino fijo: "atrás" en el historial podía caer en otra copia del curso
+            // (por ejemplo, al volver de una evaluación) y la pantalla no cambiaba
+            onClick={() => navigate("/")}
+            aria-label="Volver a mis cursos"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
