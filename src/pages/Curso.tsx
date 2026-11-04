@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -11,10 +11,6 @@ import {
   FileText,
   ExternalLink,
   Clock,
-  Loader2,
-  ChevronLeft,
-  X,
-  ChevronRight,
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
@@ -33,13 +29,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  clearCourseViewState,
+  materialPath,
+  readCourseViewState,
+  saveCourseViewState,
+  type PlaylistItemType,
+} from "@/lib/viewerPlaylist";
 import { cn } from "@/lib/utils";
-import { ensureYouTubeEmbedParams } from "@/lib/youtubeEmbed";
 import { Curso, Materia, Modulo } from "@/types/types";
 import CoursesService from "@/services/coursesService";
 import { useStudentCourseContent } from "@/hooks/useStudentCourseContent";
 import { queryClient, queryKeys } from "@/lib/queryClient";
-import VideoModal from "@/components/video-modal";
 import CourseExamSection from "@/components/CourseExamSection";
 import { getMissingModuleIds } from "@/lib/courseModules";
 import { getModulesForMateria } from "@/lib/courseModules";
@@ -60,53 +61,16 @@ const CourseDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMaterias, setLoadingMaterias] = useState(true);
   const [loadingModulos, setLoadingModulos] = useState(true);
-  const [expandedMaterias, setExpandedMaterias] = useState<string[]>([]);
+  // Si se vuelve de un material, se recupera cómo estaba el curso (materias abiertas y posición)
+  const [restoreView] = useState(() => (courseId ? readCourseViewState(courseId) : null));
+  const [expandedMaterias, setExpandedMaterias] = useState<string[]>(() => restoreView?.expanded ?? []);
   const [progress, setProgress] = useState<Record<string, Record<string, boolean>>>({});
   const [examProgressRevision, setExamProgressRevision] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(true);
   const moduloRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [highlightedModuloId, setHighlightedModuloId] = useState<string | null>(null);
-  const [selectedVideo, setSelectedVideo] = useState<{
-    id: string;
-    title: string;
-    description?: string;
-    url: string;
-    thumbnail?: string;
-    videos?: string[]; // Array de todos los videos del módulo
-    videoTitles?: string[]; // Nombres personalizados por índice de video
-    currentIndex?: number; // Índice del video actual
-  } | null>(null);
-  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  const [isDocumentModalOpen, setIsDocumentModalOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<{
-    url: string;
-    title: string;
-    documents?: string[]; // Array de todos los documentos del módulo
-    currentIndex?: number; // Índice del documento actual
-  } | null>(null);
-  const [isDocumentLoading, setIsDocumentLoading] = useState(true);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [isDisabledModuleDialogOpen, setIsDisabledModuleDialogOpen] = useState(false);
-  const videoModalStatePushedRef = useRef(false);
-  const documentModalStatePushedRef = useRef(false);
-
-  // Detectar iOS
-  useEffect(() => {
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(iOS);
-  }, []);
-
-  // Detectar mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Redirigir si el usuario está deshabilitado
   useEffect(() => {
@@ -134,11 +98,18 @@ const CourseDetailPage = () => {
     setLoadingEnabledModules(isInitialLoad);
   }, [isCourseContentPending, courseContent]);
 
-  // Efecto para posicionar la página al principio cuando se carga el curso
+  // Al volver de un material se recupera la posición; si no, el curso arranca desde arriba
   useEffect(() => {
-    // Hacer scroll al principio cuando se carga el curso
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [courseId]);
+    if (!restoreView) window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [courseId, restoreView]);
+
+  useEffect(() => {
+    if (!restoreView || !courseId || loading) return;
+    clearCourseViewState(courseId);
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: restoreView.scrollY, behavior: 'instant' });
+    });
+  }, [restoreView, courseId, loading]);
 
   // Efecto para manejar el filtro de módulo desde la URL
   useEffect(() => {
@@ -193,335 +164,22 @@ const CourseDetailPage = () => {
   }, [searchParams, modulos, materias]);
 
 
-  // Función para convertir URL de YouTube o Google Drive al formato embed
-  const convertYouTubeToEmbed = (url: string): string => {
-    if (!url) return url;
-    
-    try {
-      // Google Drive
-      if (url.includes('drive.google.com')) {
-        // Extraer el ID del archivo de diferentes formatos de Google Drive
-        let fileId = '';
-        
-        // Formato: drive.google.com/file/d/FILE_ID/view
-        const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (fileMatch && fileMatch[1]) {
-          fileId = fileMatch[1];
-        }
-        // Formato: drive.google.com/open?id=FILE_ID
-        else if (url.includes('id=')) {
-          const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-          if (idMatch && idMatch[1]) {
-            fileId = idMatch[1];
-          }
-        }
-        // Formato: drive.google.com/drive/folders/FOLDER_ID (carpetas, no archivos)
-        else if (url.includes('/folders/')) {
-          // Para carpetas, no podemos hacer embed, retornar URL original
-          return url;
-        }
-        
-        if (fileId) {
-          // Usar el formato preview de Google Drive para videos
-          return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-        
-        return url;
-      }
-      
-      // YouTube
-      if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        // Si ya es una URL embed, retornarla tal cual
-        if (url.includes('youtube.com/embed/')) {
-          return url;
-        }
-        
-        const urlObj = new URL(url);
-        let videoId = '';
-        
-        // Formato: youtube.com/watch?v=VIDEO_ID
-        if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
-          videoId = urlObj.searchParams.get('v') || '';
-        }
-        // Formato: youtu.be/VIDEO_ID
-        else if (urlObj.hostname.includes('youtu.be')) {
-          videoId = urlObj.pathname.replace('/', '').split('?')[0];
-        }
-        // Formato: youtube.com/embed/VIDEO_ID (ya es embed)
-        else if (urlObj.pathname.includes('/embed/')) {
-          return url;
-        }
-        
-        if (videoId) {
-          return `https://www.youtube.com/embed/${videoId}`;
-        }
-      }
-      
-      // Si no es YouTube ni Google Drive, retornar la URL original
-      return url;
-    } catch {
-      // Si no es una URL válida, retornar tal cual
-      return url;
-    }
-  };
-
-  const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) => {
-    // Verificar si el módulo está habilitado
+  /** Abre un documento o video en su propia página y guarda cómo estaba el curso para volver igual */
+  const openMaterial = (modulo: Modulo, type: PlaylistItemType, index: number) => {
     if (enabledModules[modulo.id] === false) {
       setIsDisabledModuleDialogOpen(true);
-      return; // No permitir abrir si está deshabilitado
-    }
-    
-    // Obtener array de videos (puede ser string, array, o undefined)
-    let videos: string[] = [];
-    if (modulo.url_video) {
-      if (Array.isArray(modulo.url_video)) {
-        videos = modulo.url_video;
-      } else {
-        videos = [modulo.url_video];
-      }
-    }
-    
-    if (videos.length === 0) {
-      console.error('No hay videos disponibles');
       return;
     }
-    
-    // Asegurar que el índice esté dentro del rango
-    const validIndex = Math.max(0, Math.min(videoIndex, videos.length - 1));
-    const videoUrl = videos[validIndex];
-
-    // Obtener títulos (nombres) de videos para mostrar el correcto en el modal
-    const videoTitles: string[] = modulo.nombres_videos
-      ? modulo.nombres_videos.includes('|||')
-        ? modulo.nombres_videos.split('|||').map(s => s.trim()).filter(Boolean)
-        : [modulo.nombres_videos.trim()].filter(Boolean)
-      : [];
-    
-    // Marcar como visto automáticamente al abrir
-    const isVideoCompleted = isContentCompleted(modulo.id, validIndex, 'video');
-    if (!isVideoCompleted && user?.uid) {
-      handleMarkAsCompleted(modulo.id, validIndex, 'video');
-    }
-    
-    // Convertir URL de YouTube o Google Drive al formato embed si es necesario
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(videoUrl));
-    
-    setSelectedVideo({
-      id: modulo.id,
-      title: modulo.titulo,
-      url: embedUrl,
-      thumbnail: modulo.url_miniatura,
-      videos: videos.map(v => ensureYouTubeEmbedParams(convertYouTubeToEmbed(v))), // Convertir todos los videos
-      videoTitles,
-      currentIndex: validIndex,
-    });
-    history.pushState({ videoModalOpen: true }, "", window.location.href);
-    videoModalStatePushedRef.current = true;
-    setIsVideoModalOpen(true);
+    if (!courseId) return;
+    saveCourseViewState(courseId, { scrollY: window.scrollY, expanded: expandedMaterias });
+    navigate(materialPath(courseId, modulo.id, type, index), { state: { fromCourse: true } });
   };
 
-  const handleCloseVideo = () => {
-    if (videoModalStatePushedRef.current) {
-      videoModalStatePushedRef.current = false;
-      history.back();
-    } else {
-      setIsVideoModalOpen(false);
-      setSelectedVideo(null);
-    }
-  };
+  const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) =>
+    openMaterial(modulo, 'document', documentIndex);
 
-  // Cerrar modal de documento o video al pulsar atrás del navegador (mismo patrón que el reproductor)
-  useEffect(() => {
-    const handlePopState = () => {
-      if (isDocumentModalOpen) {
-        documentModalStatePushedRef.current = false;
-        setIsDocumentModalOpen(false);
-        setSelectedDocument(null);
-        setIsDocumentLoading(true);
-        return;
-      }
-      if (isVideoModalOpen) {
-        videoModalStatePushedRef.current = false;
-        setIsVideoModalOpen(false);
-        setSelectedVideo(null);
-      }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [isVideoModalOpen, isDocumentModalOpen]);
-
-  // Función para cambiar al siguiente video
-  const handleNextVideo = () => {
-    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
-    const nextIndex = (selectedVideo.currentIndex + 1) % selectedVideo.videos.length;
-    const nextUrl = selectedVideo.videos[nextIndex];
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(nextUrl));
-    setSelectedVideo({
-      ...selectedVideo,
-      url: embedUrl,
-      currentIndex: nextIndex,
-    });
-  };
-
-  // Función para cambiar al video anterior
-  const handlePreviousVideo = () => {
-    if (!selectedVideo || !selectedVideo.videos || selectedVideo.currentIndex === undefined) return;
-    const prevIndex = (selectedVideo.currentIndex - 1 + selectedVideo.videos.length) % selectedVideo.videos.length;
-    const prevUrl = selectedVideo.videos[prevIndex];
-    const embedUrl = ensureYouTubeEmbedParams(convertYouTubeToEmbed(prevUrl));
-    setSelectedVideo({
-      ...selectedVideo,
-      url: embedUrl,
-      currentIndex: prevIndex,
-    });
-  };
-
-  // Función para detectar si es una URL de Google Drive
-  const isGoogleDriveUrl = (url: string): boolean => {
-    if (!url) return false;
-    const urlLower = url.toLowerCase();
-    return urlLower.includes('drive.google.com') || 
-           urlLower.includes('docs.google.com') ||
-           urlLower.includes('googleusercontent.com') ||
-           urlLower.startsWith('https://drive.google.com') ||
-           urlLower.startsWith('http://drive.google.com');
-  };
-
-  // Función para formatear la URL del PDF con parámetros de zoom
-  const formatPDFUrl = (url: string): string => {
-    if (!url) return url;
-    
-    // Remover cualquier fragmento existente para evitar conflictos
-    const baseUrl = url.split('#')[0];
-    
-    // Agregar parámetros para que el PDF se muestre completo y permita zoom manual
-    // #view=FitH ajusta horizontalmente (muestra toda la página)
-    // #toolbar=1 muestra la barra de herramientas para zoom manual
-    // #navpanes=0 oculta el panel de navegación para más espacio
-    // #scrollbar=1 muestra la barra de desplazamiento
-    return `${baseUrl}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
-  };
-
-  const handleOpenDocument = (modulo: Modulo, documentIndex: number = 0) => {
-    // Verificar si el módulo está habilitado
-    if (enabledModules[modulo.id] === false) {
-      setIsDisabledModuleDialogOpen(true);
-      return; // No permitir abrir si está deshabilitado
-    }
-    if (!modulo.url_archivo) {
-      console.error('No hay URL de archivo disponible');
-      return;
-    }
-
-    // Parsear documentos (puede ser string simple o string con delimitador |||)
-    let documents: string[] = [];
-    if (modulo.url_archivo) {
-      if (modulo.url_archivo.includes('|||')) {
-        documents = modulo.url_archivo.split('|||').filter(url => url.trim());
-      } else {
-        documents = [modulo.url_archivo];
-      }
-    }
-    
-    if (documents.length === 0) {
-      console.error('No hay documentos disponibles');
-      return;
-    }
-    
-    // Asegurar que el índice esté dentro del rango
-    const validIndex = Math.max(0, Math.min(documentIndex, documents.length - 1));
-    const selectedUrl = documents[validIndex];
-
-    // Marcar como viso automáticamente al abrir
-    const isDocCompleted = isContentCompleted(modulo.id, validIndex, 'document');
-    if (!isDocCompleted && user?.uid) {
-      handleMarkAsCompleted(modulo.id, validIndex, 'document');
-    }
-
-    // En mobile: abrir directamente en nueva pestaña (sin modal)
-    // En desktop: abrir modal como antes
-    if (isMobile) {
-      const link = document.createElement('a');
-      link.href = selectedUrl.split('#')[0];
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return;
-    }
-
-    // Desktop: abrir modal
-    setIsDocumentLoading(true);
-    const formattedUrl = formatPDFUrl(selectedUrl);
-    setSelectedDocument({
-      url: formattedUrl,
-      title: modulo.titulo,
-      documents: documents,
-      currentIndex: validIndex,
-    });
-    history.pushState({ documentModalOpen: true }, "", window.location.href);
-    documentModalStatePushedRef.current = true;
-    setIsDocumentModalOpen(true);
-  };
-
-  const handleCloseDocument = () => {
-    if (documentModalStatePushedRef.current) {
-      documentModalStatePushedRef.current = false;
-      history.back();
-    } else {
-      setIsDocumentModalOpen(false);
-      setSelectedDocument(null);
-      setIsDocumentLoading(true);
-    }
-  };
-
-  // Función para cambiar al siguiente documento
-  const handleNextDocument = () => {
-    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
-    const nextIndex = (selectedDocument.currentIndex + 1) % selectedDocument.documents.length;
-    const nextUrl = selectedDocument.documents[nextIndex];
-    
-    // Detectar si es una URL de Google Drive
-    if (isGoogleDriveUrl(nextUrl)) {
-      window.open(nextUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    
-    setIsDocumentLoading(true);
-    const formattedUrl = formatPDFUrl(nextUrl);
-    setSelectedDocument({
-      ...selectedDocument,
-      url: formattedUrl,
-      currentIndex: nextIndex,
-    });
-  };
-
-  // Función para cambiar al documento anterior
-  const handlePreviousDocument = () => {
-    if (!selectedDocument || !selectedDocument.documents || selectedDocument.currentIndex === undefined) return;
-    const prevIndex = (selectedDocument.currentIndex - 1 + selectedDocument.documents.length) % selectedDocument.documents.length;
-    const prevUrl = selectedDocument.documents[prevIndex];
-    
-    // Detectar si es una URL de Google Drive
-    if (isGoogleDriveUrl(prevUrl)) {
-      window.open(prevUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    
-    setIsDocumentLoading(true);
-    const formattedUrl = formatPDFUrl(prevUrl);
-    setSelectedDocument({
-      ...selectedDocument,
-      url: formattedUrl,
-      currentIndex: prevIndex,
-    });
-  };
-
-  const handleDocumentLoad = () => {
-    setIsDocumentLoading(false);
-  };
+  const handleOpenVideo = (modulo: Modulo, videoIndex: number = 0) =>
+    openMaterial(modulo, 'video', videoIndex);
 
 
   // Función para marcar contenido como completado
@@ -1105,147 +763,6 @@ const CourseDetailPage = () => {
                       <span>{formatDate(courseDetail.fechaFinDictado)}</span>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <VideoModal
-        isOpen={isVideoModalOpen}
-        onClose={handleCloseVideo}
-        content={selectedVideo}
-        onNextVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handleNextVideo : undefined}
-        onPreviousVideo={selectedVideo?.videos && selectedVideo.videos.length > 1 ? handlePreviousVideo : undefined}
-        onMarkAsCompleted={selectedVideo ? () => {
-          if (selectedVideo.currentIndex !== undefined) {
-            handleMarkAsCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video');
-          }
-        } : undefined}
-        isCompleted={selectedVideo && selectedVideo.currentIndex !== undefined ? isContentCompleted(selectedVideo.id, selectedVideo.currentIndex, 'video') : false}
-      />
-
-      {/* Modal de documento para desktop */}
-      <Dialog open={isDocumentModalOpen} onOpenChange={handleCloseDocument}>
-        <DialogContent className="!max-w-[100vw] !max-h-[100vh] !w-screen !h-[100dvh] !m-0 !p-0 !gap-0 !rounded-none !left-0 !top-0 !translate-x-0 !translate-y-0 !transform-none flex flex-col [&>button]:hidden">
-          {/* Una sola barra compacta para dejar el máximo espacio al documento */}
-          <DialogHeader className="px-3 py-1.5 sm:px-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 space-y-0">
-            <div className="flex items-center justify-between gap-2 sm:gap-3">
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="truncate text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 text-left">
-                  {selectedDocument?.title || 'Documento'}
-                </DialogTitle>
-                {selectedDocument?.documents && selectedDocument.documents.length > 1 && selectedDocument.currentIndex !== undefined && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Documento {selectedDocument.currentIndex + 1} de {selectedDocument.documents.length}
-                  </p>
-                )}
-              </div>
-              {selectedDocument && selectedDocument.currentIndex !== undefined && (() => {
-                const modulo = modulos.find(m => m.titulo === selectedDocument.title);
-                const isDocCompleted = isContentCompleted(modulo?.id || '', selectedDocument.currentIndex, 'document');
-                return (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (modulo && selectedDocument.currentIndex !== undefined) {
-                        handleMarkAsCompleted(modulo.id, selectedDocument.currentIndex, 'document');
-                      }
-                    }}
-                    className={`h-9 shrink-0 gap-1.5 px-3 text-sm font-semibold ${
-                      isDocCompleted
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                        : 'bg-red-500 hover:bg-red-600 text-white'
-                    }`}
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    {isDocCompleted ? 'Visto' : (
-                      <>
-                        <span className="sm:hidden">Marcar visto</span>
-                        <span className="hidden sm:inline">Marcar como visto</span>
-                      </>
-                    )}
-                  </Button>
-                );
-              })()}
-              <div className="hidden sm:flex items-center gap-1">
-                {selectedDocument?.documents && selectedDocument.documents.length > 1 && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handlePreviousDocument}
-                      className="h-8 w-8"
-                      disabled={selectedDocument.currentIndex === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleNextDocument}
-                      className="h-8 w-8"
-                      disabled={selectedDocument.currentIndex === selectedDocument.documents.length - 1}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCloseDocument}
-                className="h-10 w-10 shrink-0 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                aria-label="Cerrar documento"
-                title="Cerrar"
-              >
-                <X className="!h-7 !w-7" />
-              </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden p-0 min-h-0 relative">
-            {isDocumentLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-950 z-10">
-                <div className="flex flex-col items-center gap-4">
-                  <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
-                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
-                    Cargando documento...
-                  </p>
-                </div>
-              </div>
-            )}
-            {selectedDocument && !isGoogleDriveUrl(selectedDocument.url) && (
-              <iframe
-                src={selectedDocument.url}
-                title={selectedDocument.title}
-                className="w-full h-full"
-                style={{
-                  border: 'none',
-                  width: '100%',
-                  height: '100%',
-                }}
-                allow="fullscreen"
-                onLoad={handleDocumentLoad}
-                key={selectedDocument.url}
-              />
-            )}
-            {selectedDocument && isGoogleDriveUrl(selectedDocument.url) && (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center p-6">
-                  <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-4">
-                    Este documento se abrirá en una nueva pestaña
-                  </p>
-                  <Button
-                    onClick={() => {
-                      window.open(selectedDocument.url, '_blank', 'noopener,noreferrer');
-                      handleCloseDocument();
-                    }}
-                    className="bg-orange-500 hover:bg-orange-600 text-white"
-                  >
-                    Abrir documento
-                  </Button>
                 </div>
               </div>
             )}
