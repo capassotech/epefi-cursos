@@ -40,6 +40,7 @@ import {
   readCourseViewState,
   readLastViewed,
   saveCourseViewState,
+  type PlaylistItem,
   type PlaylistItemType,
 } from "@/lib/viewerPlaylist";
 import { cn } from "@/lib/utils";
@@ -254,18 +255,21 @@ const CourseDetailPage = () => {
     return moduleProgress[contentKey] === true;
   };
 
+  const isItemCompleted = (item: PlaylistItem) =>
+    isContentCompleted(item.moduloId, item.index, item.type);
+
   // "Continuar donde dejaste": último material abierto, o el primero pendiente
   const coursePlaylist = buildPlaylist(materias, modulos, enabledModules);
   const resume = pickResumeItem(
     coursePlaylist,
     user?.uid && courseId ? readLastViewed(user.uid, courseId) : null,
-    (item) => isContentCompleted(item.moduloId, item.index, item.type)
+    isItemCompleted
   );
   // Con todo el material visto no hay nada que continuar
   const courseFinished = coursePlaylist
     .flatMap((group) => group.items)
     .filter((item) => item.enabled)
-    .every((item) => isContentCompleted(item.moduloId, item.index, item.type));
+    .every(isItemCompleted);
 
   // Calcular progreso del curso
   const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
@@ -624,6 +628,11 @@ const CourseDetailPage = () => {
                   .map((materia) => {
                     const materiasModulos = getModulesForMateria(materia, modulos);
                     const missingModuleIds = getMissingModuleIds(materia, modulos);
+                    const materiaItems = coursePlaylist
+                      .filter((group) => materiasModulos.some((modulo) => modulo.id === group.moduloId))
+                      .flatMap((group) => group.items)
+                      .filter((item) => item.enabled);
+                    const materiaCompleted = materiaItems.length > 0 && materiaItems.every(isItemCompleted);
 
                   return (
                     <AccordionItem
@@ -633,10 +642,19 @@ const CourseDetailPage = () => {
                     >
                           <AccordionTrigger className="hover:no-underline py-5 sm:py-4 min-h-[64px] sm:min-h-0 [&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-4 sm:[&>svg]:w-4">
                             <div className="flex items-center gap-3 text-left w-full">
-                              <div className="h-2.5 w-2.5 sm:h-2 sm:w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                              {materiaCompleted ? (
+                                <CheckCircle2 aria-label="Completado" className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                              ) : (
+                                <div className="h-2.5 w-2.5 sm:h-2 sm:w-2 rounded-full bg-orange-500 flex-shrink-0"></div>
+                              )}
                               <div className="flex-1 min-w-0">
                                 <span
-                                  className="text-base font-medium text-slate-900 dark:text-slate-100 leading-snug block line-clamp-2 sm:truncate"
+                                  className={cn(
+                                    "text-base font-medium leading-snug block line-clamp-2 sm:truncate",
+                                    materiaCompleted
+                                      ? "text-green-600 dark:text-green-400"
+                                      : "text-slate-900 dark:text-slate-100"
+                                  )}
                                   title={materia.nombre}
                                 >
                                   {materia.nombre}
