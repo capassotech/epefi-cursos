@@ -39,6 +39,31 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+const LECTURA_TIMEOUT_MS = 20_000;
+const ENVIO_TIMEOUT_MS = 90_000;
+const LECTURA_INTENTOS = 3;
+const ENVIO_INTENTOS = 5;
+
+/** Fallas pasajeras (sin respuesta, servidor saturado o reiniciándose): vale la pena reintentar. */
+export function isRetryableExamError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  if (!error.response) return true;
+  return [429, 500, 502, 503, 504].includes(error.response.status);
+}
+
+/** Reintenta con espera creciente y al azar, para que los alumnos no vuelvan todos juntos. */
+async function withRetry<T>(request: () => Promise<T>, maxAttempts: number): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await request();
+    } catch (error) {
+      if (attempt >= maxAttempts || !isRetryableExamError(error) || !navigator.onLine) throw error;
+      const base = Math.min(2000 * 2 ** (attempt - 1), 20_000);
+      await new Promise((resolve) => setTimeout(resolve, base / 2 + Math.random() * base));
+    }
+  }
+}
+
 function toBool(value: unknown): boolean {
   return value === true || value === "true" || value === 1;
 }
@@ -378,21 +403,34 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
 class ExamService {
   /** Paso 1: estado al entrar a la formación. */
   async getExamEstado(idFormacion: string): Promise<ExamEstado> {
-    const response = await api.get(
-      `/examenes/alumno/formacion/${encodeURIComponent(idFormacion)}/estado`
+    const response = await withRetry(
+      () =>
+        api.get(`/examenes/alumno/formacion/${encodeURIComponent(idFormacion)}/estado`, {
+          timeout: LECTURA_TIMEOUT_MS,
+        }),
+      LECTURA_INTENTOS
     );
     return normalizeExamEstado(response.data);
   }
 
   /** Paso 3: preguntas para el alumno (aleatorio automático en reintentos). */
   async getExamForStudent(idExamen: string): Promise<CourseExam | null> {
-    const response = await api.get(`/examenes/alumno/${encodeURIComponent(idExamen)}`);
+    const response = await withRetry(
+      () =>
+        api.get(`/examenes/alumno/${encodeURIComponent(idExamen)}`, {
+          timeout: LECTURA_TIMEOUT_MS,
+        }),
+      LECTURA_INTENTOS
+    );
     return normalizeStudentExam(response.data, idExamen);
   }
 
   /** Paso 4: enviar respuestas. */
   async submitExam(payload: SubmitExamPayload): Promise<SubmitExamResult> {
-    const response = await api.post("/examenes-realizados", payload);
+    const response = await withRetry(
+      () => api.post("/examenes-realizados", payload, { timeout: ENVIO_TIMEOUT_MS }),
+      ENVIO_INTENTOS
+    );
     return normalizeSubmitResult(response.data);
   }
 
@@ -413,8 +451,19 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
     }
     if (typeof data === "string") return data;
   }
+  // Los errores de red de axios vienen en inglés y no le dicen nada al alumno
+  if (axios.isAxiosError(error)) return fallback;
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+export function getApiErrorCode(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) return undefined;
+  const data = error.response?.data;
+  if (data && typeof data === "object" && "codigo" in data) {
+    return String((data as Record<string, unknown>).codigo);
+  }
+  return undefined;
 }
 
 export default new ExamService();

@@ -50,7 +50,11 @@ import {
   isMultipleChoiceQuestion,
   sortQuestionsByOrder,
 } from "@/lib/examUtils";
-import ExamService, { getApiErrorMessage } from "@/services/examService";
+import ExamService, {
+  getApiErrorCode,
+  getApiErrorMessage,
+  isRetryableExamError,
+} from "@/services/examService";
 import type {
   CourseExam,
   ExamEstado,
@@ -61,6 +65,9 @@ import type {
   StudentTextAnswersMap,
   SubmitExamResult,
 } from "@/types/exam";
+
+/** Máximo que espera cada dispositivo antes de enviar cuando se termina el tiempo. */
+const ENVIO_POR_TIEMPO_ESPERA_MAX_MS = 30_000;
 
 type ExamPhase = "loading" | "intro" | "blocked" | "starting" | "taking" | "result";
 
@@ -117,6 +124,13 @@ export default function Evaluacion() {
   if (timeUp && confirm) setConfirm(null);
 
   const submittingRef = useRef(false);
+  const [idEnvio, setIdEnvio] = useState<string | null>(null);
+  /** Cambia para volver a intentar solo el envío por tiempo agotado cuando falló. */
+  const [autoRetryNonce, setAutoRetryNonce] = useState(0);
+  /** El envío automático por tiempo agotado falló: el alumno ya puede reintentar a mano. */
+  const [envioPorTiempoFallo, setEnvioPorTiempoFallo] = useState(false);
+  /** Se terminó el tiempo y el envío está en camino: para el alumno ya se está enviando. */
+  const enviandoPorTiempo = timeUp && isOnline && !envioPorTiempoFallo;
   const answersRef = useRef<StudentAnswersMap>({});
   const textAnswersRef = useRef<StudentTextAnswersMap>({});
   const displayQuestionsRef = useRef<ExamQuestion[]>([]);
@@ -148,6 +162,7 @@ export default function Evaluacion() {
     setRemainingSeconds(null);
     setDeadline(null);
     setConfirm(null);
+    setEnvioPorTiempoFallo(false);
 
     try {
       const examData = await ExamService.getExamForStudent(idExamen);
@@ -168,6 +183,7 @@ export default function Evaluacion() {
 
       // Si quedó una evaluación a medias en este dispositivo, se retoma con sus respuestas y su reloj
       const draft = userId ? loadExamDraft(userId, idExamen) : null;
+      setIdEnvio(draft?.idEnvio ?? crypto.randomUUID());
       if (draft) {
         const questionIds = new Set(questions.map((q) => q.id));
         const keepKnown = <T,>(map: Record<string, T>) =>
@@ -189,7 +205,7 @@ export default function Evaluacion() {
       toast.error("No se pudo iniciar la evaluación", {
         description: getApiErrorMessage(
           error,
-          "Completá todos los módulos antes de realizar la evaluación."
+          "Revisá tu conexión e intentá de nuevo."
         ),
       });
       setPhase("intro");
@@ -346,12 +362,14 @@ export default function Evaluacion() {
           idFormacion: formacionId,
           respuestas,
           motivoCierre: motivo,
+          ...(idEnvio ? { idEnvio } : {}),
         });
 
         if (userId) clearExamDraft(userId, estado.idExamen);
         applySubmitResult(result, motivo);
       } catch (error: unknown) {
         console.error("Error submitting exam:", error);
+        if (motivo === "tiempo") setEnvioPorTiempoFallo(true);
         // Sin conexión las respuestas siguen guardadas en el dispositivo y se reenvían al reconectar
         if (!navigator.onLine) {
           toast.error("Sin conexión", {
@@ -362,17 +380,38 @@ export default function Evaluacion() {
           });
           return;
         }
-        const message =
-          error instanceof Error
-            ? error.message
-            : "No se pudo enviar la evaluación. Intentá nuevamente.";
+        const message = getApiErrorMessage(
+          error,
+          "No pudimos conectar con el servidor. Tus respuestas están guardadas, intentá nuevamente."
+        );
         toast.error("Error al enviar", { description: message });
+
+        // Ya no se puede registrar este intento (se envió desde otro dispositivo, por ejemplo):
+        // se descarta el borrador y se muestra el estado real, para que el alumno no quede trabado
+        const codigo = getApiErrorCode(error);
+        if (
+          codigo === "EVALUACION_YA_APROBADA" ||
+          codigo === "EVALUACION_PENDIENTE_CORRECCION" ||
+          codigo === "INTENTOS_AGOTADOS"
+        ) {
+          if (userId) clearExamDraft(userId, estado.idExamen);
+          void loadEstado();
+          return;
+        }
+
+        // Con el tiempo terminado el alumno no puede hacer otra cosa: se sigue intentando solo
+        if (motivo === "tiempo" && isRetryableExamError(error)) {
+          window.setTimeout(
+            () => setAutoRetryNonce((n) => n + 1),
+            20_000 + Math.random() * 20_000
+          );
+        }
       } finally {
         submittingRef.current = false;
         setSubmitting(false);
       }
     },
-    [applySubmitResult, exam, estado?.idExamen, formacionId, userId]
+    [applySubmitResult, exam, estado?.idExamen, formacionId, idEnvio, loadEstado, userId]
   );
 
   // Contador mientras se rinde, calculado contra la hora límite para no desfasarse.
@@ -390,15 +429,25 @@ export default function Evaluacion() {
   // Al llegar a 0, cerrar y registrar intento (si no hay conexión, se reintenta al reconectar)
   useEffect(() => {
     if (phase === "taking" && remainingSeconds === 0 && isOnline && !submittingRef.current) {
-      void submitExamAttempt("tiempo");
+      // Si todos empezaron juntos, el tiempo se les termina juntos: se reparten los envíos.
+      // Un reintento no espera de nuevo, porque ya viene con su propia pausa
+      const espera = autoRetryNonce > 0 ? 0 : Math.random() * ENVIO_POR_TIEMPO_ESPERA_MAX_MS;
+      const timerId = window.setTimeout(() => void submitExamAttempt("tiempo"), espera);
+      return () => window.clearTimeout(timerId);
     }
-  }, [phase, remainingSeconds, isOnline, submitExamAttempt]);
+  }, [phase, remainingSeconds, isOnline, submitExamAttempt, autoRetryNonce]);
 
   // Respaldo local de cada respuesta mientras se rinde
   useEffect(() => {
     if (phase !== "taking" || !userId || !activeExamId || deadline == null) return;
-    saveExamDraft(userId, { idExamen: activeExamId, deadline, answers, textAnswers });
-  }, [phase, userId, activeExamId, deadline, answers, textAnswers]);
+    saveExamDraft(userId, {
+      idExamen: activeExamId,
+      deadline,
+      answers,
+      textAnswers,
+      ...(idEnvio ? { idEnvio } : {}),
+    });
+  }, [phase, userId, activeExamId, deadline, answers, textAnswers, idEnvio]);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -839,10 +888,10 @@ export default function Evaluacion() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || (timeUp && !isOnline)}
+              disabled={submitting || enviandoPorTiempo || (timeUp && !isOnline)}
               className="flex-1 sm:ml-auto sm:flex-none"
             >
-              {submitting ? (
+              {submitting || enviandoPorTiempo ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Enviando...

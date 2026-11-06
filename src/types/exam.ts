@@ -124,6 +124,8 @@ export interface SubmitExamPayload {
   idFormacion: string;
   respuestas: ExamAnswerSubmission[];
   motivoCierre?: "tiempo" | "abandono" | "envio";
+  /** Identifica este envío: si se reintenta, el servidor no crea otro intento. */
+  idEnvio?: string;
 }
 
 export interface ExamAttempt extends ExamResultSummary {

@@ -59,6 +59,11 @@ Las reglas generales de UI están en `../CLAUDE.md`.
 - Resultado: tiles de Nota / Aciertos / Correctas (`src/components/exam/ExamParts.tsx`).
 - La revisión del examen está en `VerExamenRealizadoModal.tsx`, a pantalla completa.
 
+### Envío de la evaluación
+- `idEnvio` se genera al empezar y se guarda en el borrador: reenviar nunca crea otro intento.
+- `examService` tiene timeout y reintentos con espera al azar (`withRetry`). Al agotarse el tiempo, cada dispositivo espera hasta 30 s al azar antes de enviar, para repartir el pico, y el botón ya muestra "Enviando...". Si el envío falla, se sigue intentando solo cada 20-40 s.
+- Si el servidor responde que el intento ya no se puede registrar (`EVALUACION_YA_APROBADA`, `EVALUACION_PENDIENTE_CORRECCION`, `INTENTOS_AGOTADOS`), se borra el borrador y se muestra el estado real.
+
 ## Ideas ofrecidas, no implementadas
 - Guardado parcial de exámenes del lado del servidor. La tarea ya está redactada.
 - Visor pdf.js para PDFs en mobile.
