@@ -33,7 +33,7 @@ Las reglas generales de UI están en `../CLAUDE.md`.
   - Los documentos muestran una fila compacta con "Abrir".
   - Footer con Anterior / Marcar visto / Siguiente.
   - Al abrir un documento se navega al visor y además se abre en una pestaña nueva. Es a propósito: se mantiene aunque QA lo haya marcado como sugerencia.
-- Desktop: el visor de PDF tiene un ancho máximo y va centrado, para que la hoja no ocupe toda la pantalla.
+- Desktop: el visor de PDF ocupa todo el espacio disponible y el archivo abre con zoom inicial del 75% (`#zoom=75`). No recortar el contenedor.
 - Marca el material como visto automáticamente (actualiza la cache de TanStack Query y llama a `CoursesService.markContentAsCompleted`).
 - Navegación del historial:
   - Entre ítems usa `replace`.
