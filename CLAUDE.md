@@ -32,12 +32,13 @@ Las reglas generales de UI están en `../CLAUDE.md`.
   - El video va arriba (`aspect-video`) y la lista debajo, con ítems grandes para tocar.
   - Los documentos muestran una fila compacta con "Abrir".
   - Footer con Anterior / Marcar visto / Siguiente.
-  - Al abrir un documento se navega al visor y además se abre en una pestaña nueva.
+  - Al abrir un documento se navega al visor y además se abre en una pestaña nueva. Es a propósito: se mantiene aunque QA lo haya marcado como sugerencia.
+- Desktop: el visor de PDF tiene un ancho máximo y va centrado, para que la hoja no ocupe toda la pantalla.
 - Marca el material como visto automáticamente (actualiza la cache de TanStack Query y llama a `CoursesService.markContentAsCompleted`).
 - Navegación del historial:
   - Entre ítems usa `replace`.
   - Cerrar usa `navigate(-1)` si se llegó desde el curso (`state.fromCourse`); si no, `replace` al curso.
-- Player: `src/components/material/VideoPlayer.tsx`. Tiene fullscreen, modo inmersivo en iOS y protección contra descarga.
+- Player: `src/components/material/VideoPlayer.tsx`. Reproduce inline (`playsInline`). Tiene fullscreen (en iPhone: `webkitEnterFullscreen` para `<video>` y modo inmersivo por CSS para iframes) y protección contra descarga.
 - Helpers de URLs: `src/lib/videoEmbed.ts`.
 - `src/hooks/useCellularDataWarning.ts`:
   - Si un video se reproduce con datos móviles, muestra un toast que recomienda WiFi, una vez por sesión.

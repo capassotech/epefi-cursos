@@ -54,7 +54,7 @@ const isGoogleDriveDocument = (url: string) => {
 const formatPDFUrl = (url: string) => `${url.split("#")[0]}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
 
 
-/** PÃ¡gina donde el alumno ve un documento o un video, con el resto del material al costado. */
+/** Página donde el alumno ve un documento o un video, con el resto del material al costado. */
 export default function Material() {
   const { courseId = "", moduloId = "", tipo, index: indexParam } = useParams();
   const navigate = useNavigate();
@@ -89,7 +89,7 @@ export default function Material() {
 
   const isCompleted = (item: PlaylistItem) => progress[item.moduloId]?.[item.key] === true;
 
-  // Anterior y siguiente disponibles, saltando los mÃ³dulos bloqueados
+  // Anterior y siguiente disponibles, saltando los módulos bloqueados
   const prevItem = currentPos > 0 ? [...flatItems.slice(0, currentPos)].reverse().find((i) => i.enabled) : undefined;
   const nextItem = currentPos >= 0 ? flatItems.slice(currentPos + 1).find((i) => i.enabled) : undefined;
 
@@ -103,7 +103,7 @@ export default function Material() {
     setDocLoading(true);
   }, [url]);
 
-  /** Guarda el visto en el progreso compartido con la pÃ¡gina del curso */
+  /** Guarda el visto en el progreso compartido con la página del curso */
   const setCompleted = async (item: PlaylistItem, value: boolean) => {
     if (!user?.uid) return;
     const key = queryKeys.courseContent(courseId, user.uid);
@@ -127,7 +127,7 @@ export default function Material() {
     } catch (error) {
       console.error("Error marking content as completed:", error);
       apply(!value);
-      toast.error("No se pudo guardar el progreso", { description: "IntentÃ¡ nuevamente." });
+      toast.error("No se pudo guardar el progreso", { description: "Intentá nuevamente." });
     }
   };
 
@@ -135,7 +135,7 @@ export default function Material() {
   const autoMarkedRef = useRef(new Set<string>());
   useEffect(() => {
     if (!current || !current.enabled) return;
-    // Recordar el Ãºltimo material abierto para el botÃ³n "Continuar" del curso
+    // Recordar el último material abierto para el botón "Continuar" del curso
     if (user?.uid) {
       saveLastViewed(user.uid, courseId, { moduloId: current.moduloId, type: current.type, index: current.index });
     }
@@ -145,9 +145,9 @@ export default function Material() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de material
   }, [current?.key]);
 
-  /** Cambiar de material reemplaza la entrada del historial: "atrÃ¡s" siempre vuelve al curso */
+  /** Cambiar de material reemplaza la entrada del historial: "atrás" siempre vuelve al curso */
   const goTo = (item: PlaylistItem) => {
-    // En celular el documento se abre tambiÃ©n en otra pestaÃ±a, dentro del mismo toque
+    // En celular el documento se abre también en otra pestaña, dentro del mismo toque
     if (item.type === "document" && isMobileViewport()) {
       const target = data?.modulos?.find((m) => m.id === item.moduloId);
       const docUrl = target ? getDocumentUrl(target, item.index) : "";
@@ -214,7 +214,7 @@ export default function Material() {
       return (
         <Notice
           title="No encontramos este material"
-          description="Puede que se haya movido o ya no estÃ© disponible."
+          description="Puede que se haya movido o ya no esté disponible."
           action={<Button onClick={close}>Volver al curso</Button>}
         />
       );
@@ -222,8 +222,8 @@ export default function Material() {
     if (!current.enabled) {
       return (
         <Notice
-          title="MÃ³dulo no disponible"
-          description="Este mÃ³dulo aÃºn no estÃ¡ disponible. Los mÃ³dulos se habilitarÃ¡n progresivamente segÃºn el plan de estudios."
+          title="Módulo no disponible"
+          description="Este módulo aún no está disponible. Los módulos se habilitarán progresivamente según el plan de estudios."
           action={<Button onClick={close}>Volver al curso</Button>}
         />
       );
@@ -231,7 +231,7 @@ export default function Material() {
     if (current.type === "video") {
       return <VideoPlayer url={url} slotKey={modulo.id} />;
     }
-    // Los celulares no muestran PDFs dentro de la pÃ¡gina: fila compacta para dejar lugar a la lista
+    // Los celulares no muestran PDFs dentro de la página: fila compacta para dejar lugar a la lista
     if (isMobile) {
       return (
         <div className="flex items-center gap-3 px-4 py-3">
@@ -239,7 +239,7 @@ export default function Material() {
             <FileText className="h-5 w-5 text-orange-500" />
           </span>
           <p className="min-w-0 flex-1 text-xs leading-snug text-slate-500 dark:text-slate-400">
-            El documento se abre en una pestaÃ±a nueva para leerlo cÃ³modo.
+            El documento se abre en una pestaña nueva para leerlo cómodo.
           </p>
           <Button className="h-10 shrink-0 gap-1.5" onClick={() => openDocumentInNewTab(url)}>
             <ExternalLink className="h-4 w-4" />
@@ -254,7 +254,7 @@ export default function Material() {
         <Notice
           icon={<FileText className="h-8 w-8 text-orange-500" />}
           title={current.name}
-          description="Este documento se abre en una pestaÃ±a nueva."
+          description="Este documento se abre en una pestaña nueva."
           action={
             <Button className="gap-2" onClick={() => openDocumentInNewTab(url)}>
               <ExternalLink className="h-4 w-4" />
@@ -264,8 +264,9 @@ export default function Material() {
         />
       );
     }
+    // Ancho máximo para que la hoja se vea a un tamaño natural y no ocupe toda la pantalla
     return (
-      <div className="relative h-full">
+      <div className="relative mx-auto h-full max-w-4xl">
         {docLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-slate-950">
             <div className="flex flex-col items-center gap-3">
@@ -288,7 +289,7 @@ export default function Material() {
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
-      {/* Una sola barra compacta para dejar el mÃ¡ximo espacio al material */}
+      {/* Una sola barra compacta para dejar el máximo espacio al material */}
       <header className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-2 py-1.5 sm:px-4 dark:border-slate-800">
         <div className="min-w-0 flex-1 pl-1 sm:pl-0">
           {modulo && (
@@ -330,7 +331,7 @@ export default function Material() {
           playlistPanel("md:hidden w-full xl:w-full min-h-0 flex-1 border-r-0 border-t")}
       </div>
 
-      {/* En celular: visto y anterior/siguiente abajo, con botones cÃ³modos de tocar */}
+      {/* En celular: visto y anterior/siguiente abajo, con botones cómodos de tocar */}
       {current && (
         <footer className="flex shrink-0 items-center gap-2 border-t border-slate-200 px-2 py-1.5 sm:hidden dark:border-slate-800">
           <NavButtons prev={prevItem} next={nextItem} onGo={goTo} wide>

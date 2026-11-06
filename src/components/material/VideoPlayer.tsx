@@ -24,6 +24,12 @@ type FullscreenElement = HTMLElement & {
   msRequestFullscreen?: () => Promise<void>;
 };
 
+/** En iPhone el único fullscreen real es el del propio `<video>`; solo funciona con los metadatos cargados. */
+type AppleVideoElement = HTMLVideoElement & {
+  webkitSupportsFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+};
+
 const getFullscreenNode = () => {
   const doc = document as FullscreenDocument;
   return (
@@ -48,8 +54,8 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  /** WebKit iOS no aplica requestFullscreen al iframe de YouTube/Drive; simulamos “pantalla completa” con CSS. */
-  const [immersiveEmbed, setImmersiveEmbed] = useState(false);
+  /** WebKit iOS no aplica requestFullscreen a los iframes; simulamos “pantalla completa” con CSS. */
+  const [immersive, setImmersive] = useState(false);
 
   const isYouTube = isYouTubeUrl(url);
   const isGoogleDrive = isGoogleDriveVideoUrl(url);
@@ -87,16 +93,21 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
 
   // Al cambiar de video se sale del modo inmersivo
   useEffect(() => {
-    setImmersiveEmbed(false);
+    setImmersive(false);
   }, [url]);
 
   const toggleFullscreen = useCallback(async () => {
-    if (immersiveEmbed) {
-      setImmersiveEmbed(false);
+    if (immersive) {
+      setImmersive(false);
       return;
     }
-    if (isEmbed && isAppleTouchDevice()) {
-      setImmersiveEmbed(true);
+    if (isAppleTouchDevice()) {
+      const video = videoRef.current as AppleVideoElement | null;
+      if (video?.webkitSupportsFullscreen && video.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+      } else {
+        setImmersive(true);
+      }
       return;
     }
 
@@ -117,15 +128,15 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
     } catch (error) {
       console.error("Error al cambiar pantalla completa:", error);
     }
-  }, [immersiveEmbed, isEmbed]);
+  }, [immersive, isEmbed]);
 
-  const expanded = immersiveEmbed || isFullscreen;
+  const expanded = immersive || isFullscreen;
 
   return (
     <div
       className={cn(
         "relative w-full overflow-hidden bg-black video-no-download",
-        immersiveEmbed
+        immersive
           ? "fixed inset-0 z-[9999] flex flex-col items-center justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]"
           : "h-full",
         className
@@ -138,7 +149,7 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
         size="icon"
         className={cn(
           "absolute right-3 top-3 z-20 h-9 w-9 touch-manipulation bg-black/50 text-white shadow-md hover:bg-black/70",
-          isEmbed && !immersiveEmbed && "sm:hidden"
+          isEmbed && !immersive && "sm:hidden"
         )}
         onClick={() => void toggleFullscreen()}
         title={expanded ? "Salir de pantalla completa" : "Pantalla completa"}
@@ -150,7 +161,7 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
       {isEmbed ? (
         <div
           className={cn(
-            immersiveEmbed ? "relative aspect-video w-full max-h-[min(100dvh,100svh)]" : "absolute inset-0"
+            immersive ? "relative aspect-video w-full max-h-[min(100dvh,100svh)]" : "absolute inset-0"
           )}
         >
           <iframe
@@ -185,6 +196,7 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
           key={videoUrl}
           src={videoUrl}
           controls
+          playsInline
           controlsList="nodownload nofullscreen noremoteplayback"
           disablePictureInPicture
           className="absolute left-0 top-0 h-full w-full"
