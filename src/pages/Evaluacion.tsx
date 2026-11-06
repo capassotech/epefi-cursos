@@ -112,6 +112,9 @@ export default function Evaluacion() {
   // Conserva el último contenido para que la animación de cierre no cambie de texto
   const [shownConfirm, setShownConfirm] = useState<ConfirmState>(confirm);
   if (confirm && confirm !== shownConfirm) setShownConfirm(confirm);
+  /** Con el tiempo terminado no se puede responder ni salir: solo queda enviar lo que había */
+  const timeUp = phase === "taking" && remainingSeconds === 0;
+  if (timeUp && confirm) setConfirm(null);
 
   const submittingRef = useRef(false);
   const answersRef = useRef<StudentAnswersMap>({});
@@ -442,6 +445,11 @@ export default function Evaluacion() {
   };
 
   const handleSubmit = () => {
+    // Reintento de un envío por tiempo agotado que falló: sigue siendo un cierre por tiempo
+    if (timeUp) {
+      void submitExamAttempt("tiempo");
+      return;
+    }
     const pendientes = countUnansweredQuestions(
       displayQuestionsRef.current,
       answersRef.current,
@@ -577,7 +585,7 @@ export default function Evaluacion() {
             size="icon"
             className="shrink-0 text-slate-500"
             onClick={handleExit}
-            disabled={submitting}
+            disabled={submitting || timeUp}
             aria-label={phase === "taking" ? "Salir de la evaluación" : "Volver al curso"}
             title={phase === "taking" ? "Salir de la evaluación" : "Volver al curso"}
           >
@@ -588,7 +596,9 @@ export default function Evaluacion() {
           <div className="border-t border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
             <p className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-2 text-xs text-amber-900 dark:text-amber-100 sm:text-sm">
               <WifiOff className="h-4 w-4 shrink-0" />
-              Sin conexión. Podés seguir respondiendo: tus respuestas se guardan en este dispositivo.
+              {timeUp
+                ? "Se terminó el tiempo. Tus respuestas están guardadas y se van a enviar solas cuando vuelva la conexión."
+                : "Sin conexión. Podés seguir respondiendo: tus respuestas se guardan en este dispositivo."}
             </p>
           </div>
         )}
@@ -693,7 +703,7 @@ export default function Evaluacion() {
                       id={`exam-${question.id}-desarrollo`}
                       value={textoRespuesta}
                       onChange={(e) => handleTextAnswerChange(question.id, e.target.value)}
-                      disabled={submitting}
+                      disabled={submitting || timeUp}
                       rows={5}
                       placeholder="Escribí tu respuesta acá..."
                       className="min-h-[120px] resize-y"
@@ -711,7 +721,7 @@ export default function Evaluacion() {
                             onCheckedChange={(checked) =>
                               handleMultipleToggle(question.id, option.id, checked === true)
                             }
-                            disabled={submitting}
+                            disabled={submitting || timeUp}
                           />
                           <Label
                             htmlFor={`exam-${question.id}-${option.id}`}
@@ -727,7 +737,7 @@ export default function Evaluacion() {
                       value={selected[0] ?? ""}
                       onValueChange={(value) => handleSingleSelect(question.id, value)}
                       className="space-y-2"
-                      disabled={submitting}
+                      disabled={submitting || timeUp}
                     >
                       {question.opciones.map((option) => (
                         <div
@@ -824,15 +834,21 @@ export default function Evaluacion() {
       {phase === "taking" && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
           <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3">
-            <Button variant="outline" disabled={submitting} onClick={openCloseConfirm}>
+            <Button variant="outline" disabled={submitting || timeUp} onClick={openCloseConfirm}>
               Salir
             </Button>
-            <Button onClick={handleSubmit} disabled={submitting} className="flex-1 sm:ml-auto sm:flex-none">
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || (timeUp && !isOnline)}
+              className="flex-1 sm:ml-auto sm:flex-none"
+            >
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Enviando...
                 </>
+              ) : timeUp ? (
+                isOnline ? "Enviar evaluación" : "Esperando conexión..."
               ) : (
                 "Finalizar evaluación"
               )}

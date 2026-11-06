@@ -51,6 +51,7 @@ Las reglas generales de UI están en `../CLAUDE.md`.
 - Las respuestas se guardan parcialmente en localStorage (`src/lib/examDraft.ts`).
 - El timer se calcula contra el deadline y se congela mientras se envía.
 - Si se pierde la conexión aparece un banner y se reenvía al volver la conexión.
+- Con el reloj en 0 se bloquean las respuestas y Salir; el envío va como `tiempo` y sigue a corrección si corresponde.
 - Solo hay un estado de confirmación, para que no se superpongan los diálogos.
 - Solo se usa `beforeunload`; nada de pushState como guard, porque rompía el botón atrás.
 - Volver al curso: `navigate(-1)` si vino del curso (`fromCourse`/`autoStart`).
