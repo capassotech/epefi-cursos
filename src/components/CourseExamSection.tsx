@@ -1,30 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
+  ArrowRight,
+  Award,
   ClipboardCheck,
+  Clock,
   Loader2,
   Lock,
   RotateCcw,
   CheckCircle2,
-  XCircle,
   FileText,
-  Timer,
   Hourglass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,19 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import axios from "axios";
 import { resolveFormacionId } from "@/lib/formacionId";
-import {
-  buildForcedClosePayload,
-  buildSubmissionPayload,
-  formatExamCountdown,
-  formatNota,
-  formatPorcentaje,
-  hasDesarrolloQuestions,
-  isDesarrolloQuestion,
-  isMultipleChoiceQuestion,
-  PASSING_GRADE,
-  sortQuestionsByOrder,
-  validateAllQuestionsAnswered,
-} from "@/lib/examUtils";
+import { formatNota, formatPorcentaje, getExamBlockReason, getExamRules } from "@/lib/examUtils";
 import {
   getCourseContentProgress,
   getVisibleModulesProgress,
@@ -59,65 +38,10 @@ import {
 } from "@/lib/courseProgress";
 import ExamService, { getApiErrorMessage } from "@/services/examService";
 import VerExamenRealizadoModal from "@/components/VerExamenRealizadoModal";
+import { ExamStartSummary } from "@/components/exam/ExamParts";
 import type { Modulo } from "@/types/types";
-import type {
-  CourseExam,
-  ExamEstado,
-  ExamQuestion,
-  ExamRealizadoDetalle,
-  ExamResultSummary,
-  ExamUltimoIntento,
-  StudentAnswersMap,
-  StudentTextAnswersMap,
-  SubmitExamResult,
-} from "@/types/exam";
+import type { ExamEstado, ExamRealizadoDetalle } from "@/types/exam";
 import { toast } from "sonner";
-
-type ExamPhase = "idle" | "loading_exam" | "taking" | "result";
-
-function ExamResultDisplay({
-  result,
-  prominent = false,
-  showStatus = false,
-}: {
-  result: ExamResultSummary;
-  prominent?: boolean;
-  showStatus?: boolean;
-}) {
-  return (
-    <div className={cn("space-y-1", prominent ? "text-center" : "text-left")}>
-      {showStatus && (
-        <Badge
-          variant={result.aprobado ? "default" : "destructive"}
-          className={cn(prominent ? "mx-auto" : "")}
-        >
-          {result.aprobado ? "Aprobado" : "No aprobado"}
-        </Badge>
-      )}
-      <p
-        className={cn(
-          "font-bold text-slate-900 dark:text-slate-100",
-          prominent ? "text-3xl" : "text-base"
-        )}
-      >
-        Aciertos: {formatPorcentaje(result.porcentajeAciertos)}
-      </p>
-      <p
-        className={cn(
-          "text-slate-700 dark:text-slate-300",
-          prominent ? "text-xl" : "text-sm"
-        )}
-      >
-        Nota: {formatNota(result.nota)}
-      </p>
-      {result.respuestasCorrectas != null && result.totalPreguntas != null && (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Respuestas correctas: {result.respuestasCorrectas} de {result.totalPreguntas}
-        </p>
-      )}
-    </div>
-  );
-}
 
 interface CourseExamSectionProps {
   courseId: string;
@@ -139,61 +63,22 @@ export default function CourseExamSection({
   enabledModules = {},
   progress = {},
 }: CourseExamSectionProps) {
+  const navigate = useNavigate();
   const [loadingEstado, setLoadingEstado] = useState(true);
   const [estado, setEstado] = useState<ExamEstado | null>(null);
-  const [exam, setExam] = useState<CourseExam | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [phase, setPhase] = useState<ExamPhase>("idle");
-  const [displayQuestions, setDisplayQuestions] = useState<ExamQuestion[]>([]);
-  const [answers, setAnswers] = useState<StudentAnswersMap>({});
-  const [textAnswers, setTextAnswers] = useState<StudentTextAnswersMap>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [lastResult, setLastResult] = useState<ExamUltimoIntento | null>(null);
-  const [lastResultPublicacionManual, setLastResultPublicacionManual] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showVerExamenModal, setShowVerExamenModal] = useState(false);
   const [examenDetalle, setExamenDetalle] = useState<ExamRealizadoDetalle | null>(null);
   const [loadingVerExamen, setLoadingVerExamen] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-
-  const submittingRef = useRef(false);
-  const answersRef = useRef<StudentAnswersMap>({});
-  const textAnswersRef = useRef<StudentTextAnswersMap>({});
-  const displayQuestionsRef = useRef<ExamQuestion[]>([]);
-  const phaseRef = useRef<ExamPhase>("idle");
-
-  useEffect(() => {
-    answersRef.current = answers;
-  }, [answers]);
-
-  useEffect(() => {
-    textAnswersRef.current = textAnswers;
-  }, [textAnswers]);
-
-  useEffect(() => {
-    displayQuestionsRef.current = displayQuestions;
-  }, [displayQuestions]);
-
-  useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
+  /** Verificando con el backend que se pueda comenzar */
+  const [checkingStart, setCheckingStart] = useState(false);
+  /** Aviso previo con tiempo e intentos antes de ir a la página de la evaluación */
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false);
 
   const formacionId = useMemo(
     () => resolveFormacionId(coursePayload, courseId),
     [coursePayload, courseId]
   );
-
-  const resetExamSession = useCallback(() => {
-    setPhase("idle");
-    setExam(null);
-    setDisplayQuestions([]);
-    setAnswers({});
-    setTextAnswers({});
-    setRemainingSeconds(null);
-    setCloseConfirmOpen(false);
-    setLastResultPublicacionManual(false);
-  }, []);
 
   const loadEstado = useCallback(async (options?: { silent?: boolean }) => {
     if (!formacionId) {
@@ -208,9 +93,6 @@ export default function CourseExamSection({
     try {
       const data = await ExamService.getExamEstado(formacionId);
       setEstado(data);
-      if (data.ultimoIntento) {
-        setLastResult(data.ultimoIntento);
-      }
     } catch (error) {
       console.error("Error loading exam estado:", error);
       const message =
@@ -235,57 +117,20 @@ export default function CourseExamSection({
     void loadEstado({ silent });
   }, [loadEstado, progressRevision]);
 
-  const startExam = useCallback(
-    async (idExamen: string) => {
-      setPhase("loading_exam");
-      setAnswers({});
-      setTextAnswers({});
-      setLastResult(null);
-      setRemainingSeconds(null);
-      setCloseConfirmOpen(false);
-
-      try {
-        const examData = await ExamService.getExamForStudent(idExamen);
-        if (!examData || examData.preguntas.length === 0) {
-          toast.error("No hay preguntas disponibles para esta evaluación.");
-          setPhase("idle");
-          setModalOpen(false);
-          return;
-        }
-        setExam(examData);
-        setDisplayQuestions(sortQuestionsByOrder(examData.preguntas));
-        const minutos =
-          examData.duracionMinutos && examData.duracionMinutos > 0
-            ? examData.duracionMinutos
-            : 90;
-        setRemainingSeconds(minutos * 60);
-        setPhase("taking");
-      } catch (error) {
-        console.error("Error loading exam questions:", error);
-        toast.error("No se pudo iniciar la evaluación", {
-          description: getApiErrorMessage(
-            error,
-            "Completá todos los módulos antes de realizar la evaluación."
-          ),
-        });
-        setPhase("idle");
-        setModalOpen(false);
-        setRemainingSeconds(null);
-        void loadEstado({ silent: true });
-      }
-    },
-    [loadEstado]
-  );
-
-  const openExamModal = useCallback(async () => {
+  /** Verifica con datos frescos que se pueda rendir y muestra el aviso previo */
+  const requestStart = useCallback(async () => {
     if (!formacionId) return;
 
-    setModalOpen(true);
-    setPhase("loading_exam");
-
+    setCheckingStart(true);
     try {
       const fresh = await ExamService.getExamEstado(formacionId);
       setEstado(fresh);
+
+      const reason = getExamBlockReason(fresh);
+      if (reason) {
+        toast.error(reason.title, { description: reason.description });
+        return;
+      }
 
       const readyNow = isVisibleCourseProgressComplete(
         modulos,
@@ -293,262 +138,35 @@ export default function CourseExamSection({
         enabledModules,
         progress
       );
-
-      if (!fresh.idExamen) {
-        toast.error("No hay evaluación configurada para esta formación.");
-        setModalOpen(false);
-        setPhase("idle");
-        return;
-      }
-
-      if (fresh.examenHabilitado === false) {
-        toast.error("Evaluación no disponible", {
-          description:
-            fresh.mensajeBloqueo ||
-            "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios.",
-        });
-        setModalOpen(false);
-        setPhase("idle");
-        return;
-      }
-
-      if (fresh.intentosAgotados) {
-        toast.error("Evaluación bloqueada", {
-          description:
-            fresh.mensajeBloqueo ||
-            "Alcanzaste el máximo de intentos. Ya no podés volver a realizarla.",
-        });
-        setModalOpen(false);
-        setPhase("idle");
-        return;
-      }
-
       if (!fresh.puedeRealizar && !readyNow) {
         toast.error("Evaluación no disponible", {
           description:
             "Debés completar todos los contenidos de cada módulo. Revisá el progreso del curso.",
         });
-        setModalOpen(false);
-        setPhase("idle");
         return;
       }
 
-      await startExam(fresh.idExamen);
+      setStartConfirmOpen(true);
     } catch (error) {
       console.error("Error refreshing exam estado:", error);
       toast.error("No se pudo verificar la evaluación", {
         description: getApiErrorMessage(error, "Intentá nuevamente."),
       });
-      setModalOpen(false);
-      setPhase("idle");
+    } finally {
+      setCheckingStart(false);
     }
-  }, [formacionId, startExam, modulos, materiaIds, enabledModules, progress]);
+  }, [formacionId, modulos, materiaIds, enabledModules, progress]);
 
-  const handleModalChange = (open: boolean) => {
-    if (!open && submitting) return;
-    if (!open && phaseRef.current === "taking") {
-      setCloseConfirmOpen(true);
-      return;
-    }
-    if (!open) {
-      resetExamSession();
-    }
-    setModalOpen(open);
+  const goToExam = () => {
+    setStartConfirmOpen(false);
+    navigate(
+      `/curso/${courseId}/evaluacion?formacion=${encodeURIComponent(formacionId)}`,
+      { state: { autoStart: true } }
+    );
   };
-
-  const applySubmitResult = useCallback(
-    (
-      result: SubmitExamResult,
-      motivo: "tiempo" | "abandono" | "envio"
-    ) => {
-      const pendienteCorreccion = result.estado === "pendiente_correccion";
-      const publicacionManual = result.publicacionManualDeNota === true;
-      setLastResultPublicacionManual(publicacionManual);
-      const intentoResultado: ExamUltimoIntento = {
-        nota: result.nota,
-        aprobado: result.aprobado,
-        porcentajeAciertos: result.porcentajeAciertos,
-        respuestasCorrectas: result.respuestasCorrectas,
-        totalPreguntas: result.totalPreguntas,
-        ...(result.intentoNumero != null ? { intentoNumero: result.intentoNumero } : {}),
-        ...(result.examenRealizado?.id ? { id: result.examenRealizado.id } : {}),
-        ...(result.estado ? { estado: result.estado } : {}),
-      };
-
-      setLastResult(intentoResultado);
-      setPhase("result");
-      setRemainingSeconds(null);
-
-      if (publicacionManual || pendienteCorreccion) {
-        toast.success("Evaluación enviada", {
-          description:
-            result.mensaje ||
-            (publicacionManual && !pendienteCorreccion
-              ? "La nota será publicada por el administrador en las próximas horas."
-              : "Contiene preguntas de desarrollo: será corregida en las próximas horas."),
-        });
-      } else if (motivo === "tiempo") {
-        toast.warning("Tiempo agotado", {
-          description:
-            result.mensaje ||
-            "Se agotó el tiempo. El intento quedó registrado.",
-        });
-      } else if (motivo === "abandono") {
-        toast.info("Evaluación cerrada", {
-          description:
-            result.mensaje ||
-            "Cerraste la evaluación. El intento quedó registrado.",
-        });
-      } else if (result.aprobado) {
-        toast.success("¡Felicitaciones!", {
-          description: `Aprobaste con ${formatPorcentaje(result.porcentajeAciertos)} de aciertos.`,
-        });
-      } else if (!result.puedeReintentar) {
-        toast.error("Evaluación bloqueada", {
-          description:
-            result.mensaje ||
-            "Alcanzaste el máximo de intentos. Ya no podés volver a realizarla.",
-        });
-      } else {
-        toast.info("Evaluación no aprobada", {
-          description:
-            result.mensaje ||
-            `Obtuviste ${formatPorcentaje(result.porcentajeAciertos)} de aciertos. Podés reintentar cuando quieras.`,
-        });
-      }
-
-      const maxIntentos = result.intentosMaximos ?? 3;
-      const usados = result.intentosUsados ?? result.intentoNumero;
-      const agotoIntentos =
-        !result.aprobado &&
-        !pendienteCorreccion &&
-        result.puedeReintentar !== true &&
-        typeof usados === "number" &&
-        usados >= maxIntentos;
-
-      setEstado((prev) =>
-        prev
-          ? {
-              ...prev,
-              puedeRealizar: result.puedeReintentar === true,
-              intentosUsados: usados ?? prev.intentosUsados,
-              intentosMaximos: maxIntentos,
-              intentosAgotados: agotoIntentos,
-              mensajeBloqueo: agotoIntentos ? result.mensaje : undefined,
-              ultimoIntento: intentoResultado,
-            }
-          : prev
-      );
-    },
-    []
-  );
-
-  const submitExamAttempt = useCallback(
-    async (motivo: "tiempo" | "abandono" | "envio") => {
-      if (!exam || !estado?.idExamen || !formacionId) return;
-      if (submittingRef.current) return;
-
-      const questions = displayQuestionsRef.current;
-      const currentAnswers = answersRef.current;
-      const currentTextAnswers = textAnswersRef.current;
-
-      if (motivo === "envio") {
-        if (
-          !validateAllQuestionsAnswered(
-            questions,
-            currentAnswers,
-            currentTextAnswers
-          )
-        ) {
-          toast.error("Completá todas las preguntas", {
-            description:
-              "Debés responder cada pregunta antes de enviar la evaluación.",
-          });
-          return;
-        }
-      }
-
-      submittingRef.current = true;
-      setSubmitting(true);
-      try {
-        const respuestas =
-          motivo === "envio"
-            ? buildSubmissionPayload(questions, currentAnswers, currentTextAnswers)
-            : buildForcedClosePayload(
-                questions,
-                currentAnswers,
-                currentTextAnswers
-              );
-
-        const result = await ExamService.submitExam({
-          idExamen: estado.idExamen,
-          idFormacion: formacionId,
-          respuestas,
-          motivoCierre: motivo,
-        });
-
-        applySubmitResult(result, motivo);
-      } catch (error: unknown) {
-        console.error("Error submitting exam:", error);
-        const message =
-          error instanceof Error
-            ? error.message
-            : "No se pudo enviar la evaluación. Intentá nuevamente.";
-        toast.error("Error al enviar", { description: message });
-      } finally {
-        submittingRef.current = false;
-        setSubmitting(false);
-      }
-    },
-    [applySubmitResult, exam, estado?.idExamen, formacionId]
-  );
-
-  const handleSingleSelect = (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: [optionId] }));
-  };
-
-  const handleMultipleToggle = (questionId: string, optionId: string, checked: boolean) => {
-    setAnswers((prev) => {
-      const current = prev[questionId] ?? [];
-      if (checked) {
-        return { ...prev, [questionId]: [...current, optionId] };
-      }
-      return {
-        ...prev,
-        [questionId]: current.filter((id) => id !== optionId),
-      };
-    });
-  };
-
-  const handleTextAnswerChange = (questionId: string, value: string) => {
-    setTextAnswers((prev) => ({ ...prev, [questionId]: value }));
-  };
-
-  // Contador mientras se rinde
-  useEffect(() => {
-    if (phase !== "taking") return;
-
-    const timerId = window.setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev == null) return prev;
-        return Math.max(0, prev - 1);
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timerId);
-  }, [phase]);
-
-  // Al llegar a 0, cerrar y registrar intento
-  useEffect(() => {
-    if (phase === "taking" && remainingSeconds === 0 && !submittingRef.current) {
-      void submitExamAttempt("tiempo");
-    }
-  }, [phase, remainingSeconds, submitExamAttempt]);
 
   const handleVerExamenRealizado = useCallback(async () => {
-    const intento = lastResult ?? estado?.ultimoIntento;
-
-    const intentoId = intento?.id;
+    const intentoId = estado?.ultimoIntento?.id;
     if (!intentoId) {
       toast.error("No se encontró el registro del examen realizado.");
       return;
@@ -570,16 +188,7 @@ export default function CourseExamSection({
     } finally {
       setLoadingVerExamen(false);
     }
-  }, [estado?.ultimoIntento, lastResult]);
-
-  const handleSubmit = () => {
-    void submitExamAttempt("envio");
-  };
-
-  const confirmAbandonExam = () => {
-    setCloseConfirmOpen(false);
-    void submitExamAttempt("abandono");
-  };
+  }, [estado?.ultimoIntento?.id]);
 
   const contentProgress = useMemo(() => {
     if (modulos.length === 0 || materiaIds.length === 0) {
@@ -606,28 +215,19 @@ export default function CourseExamSection({
     [modulos, materiaIds, enabledModules, progress, estado?.idExamen]
   );
 
-  const notaMinima =
-    typeof estado?.notaMinima === "number" && estado.notaMinima > 0
-      ? estado.notaMinima / 10
-      : PASSING_GRADE;
-  const ultimoIntento = lastResult ?? estado?.ultimoIntento ?? null;
+  const rules = getExamRules(estado);
+  const { notaMinima, intentosMaximos, intentosUsados, intentosRestantes } = rules;
+  const ultimoIntento = estado?.ultimoIntento ?? null;
   const passed = ultimoIntento?.aprobado === true;
   const tieneIntento = ultimoIntento != null;
   /** Con preguntas de desarrollo el intento espera corrección manual. */
   const esperandoCorreccion = ultimoIntento?.estado === "pendiente_correccion";
-  const intentosMaximos =
-    typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
-      ? estado.intentosMaximos
-      : 3;
-  const intentosUsados =
-    typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
-      ? estado.intentosUsados
-      : 0;
   const intentosAgotados = estado?.intentosAgotados === true;
   const examenHabilitado = estado?.examenHabilitado !== false;
-  const intentosRestantes = Math.max(0, intentosMaximos - intentosUsados);
-  /** Disponible para cualquier intento ya corregido (aprobado o no). */
-  const puedeVerDetalle = Boolean(!esperandoCorreccion && tieneIntento && ultimoIntento?.id);
+  /** El backend decide: aprobó, agotó intentos o el admin se lo habilitó. */
+  const puedeVerDetalle = Boolean(
+    estado?.puedeRevisar && !esperandoCorreccion && tieneIntento && ultimoIntento?.id
+  );
   const canShowButton =
     examenHabilitado &&
     !passed &&
@@ -636,16 +236,24 @@ export default function CourseExamSection({
     !!estado?.idExamen &&
     (estado.puedeRealizar === true || locallyReady);
 
-  /** El examen en curso requiere corrección manual al enviarse. */
-  const examRequiereCorreccion = useMemo(
-    () => hasDesarrolloQuestions(displayQuestions),
-    [displayQuestions]
-  );
+  const sectionTitle = estado?.titulo?.trim() || "Evaluación del curso";
 
-  const sectionTitle = useMemo(
-    () => estado?.titulo?.trim() || exam?.titulo?.trim() || "Evaluación de la formación",
-    [estado?.titulo, exam?.titulo]
-  );
+  /** Mensaje breve y cercano según dónde está parado el alumno */
+  const statusMessage = passed
+    ? "¡Aprobaste esta evaluación!"
+    : esperandoCorreccion
+      ? "Tu evaluación está en corrección."
+      : !examenHabilitado
+        ? "Todavía no está disponible."
+        : intentosAgotados
+          ? "Ya usaste todos los intentos disponibles."
+          : canShowButton && !tieneIntento
+            ? locallyReady
+              ? "¡Completaste el curso! Ya podés rendir la evaluación final."
+              : "La evaluación ya está disponible. Podés rendirla cuando quieras."
+            : tieneIntento
+              ? `No llegaste a la nota mínima. Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`
+              : "";
 
   const sectionHeader = (
     <div className="flex items-center gap-2">
@@ -660,9 +268,21 @@ export default function CourseExamSection({
     return (
       <section className="space-y-4">
         {sectionHeader}
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-        </div>
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="flex items-center gap-3 p-4 sm:p-6">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-50 dark:bg-orange-950/40">
+              <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+            </span>
+            <div>
+              <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
+                Cargando evaluación
+              </p>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Estamos consultando tu estado y tus intentos…
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </section>
     );
   }
@@ -719,7 +339,7 @@ export default function CourseExamSection({
                 </AlertTitle>
                 <AlertDescription className="text-slate-600 dark:text-slate-400">
                   {sinExamenConfigurado
-                    ? "Completaste el curso, pero esta formación aún no tiene evaluación configurada."
+                    ? "Completaste el curso, pero este curso aún no tiene evaluación configurada."
                     : "La evaluación no está disponible en este momento."}
                 </AlertDescription>
               </Alert>
@@ -735,17 +355,83 @@ export default function CourseExamSection({
       <section className="space-y-4">
         {sectionHeader}
 
-        <Card className="border-slate-200 dark:border-slate-800">
+        <Card className="overflow-hidden border-slate-200 dark:border-slate-800">
+          {/* Franja de acento según el estado */}
+          <div
+            className={cn(
+              "h-1",
+              passed
+                ? "bg-green-500"
+                : intentosAgotados || !examenHabilitado
+                  ? "bg-slate-300 dark:bg-slate-700"
+                  : "bg-gradient-to-r from-orange-400 to-orange-600"
+            )}
+          />
           <CardContent className="p-4 sm:p-6 space-y-4">
-            <div>
-              <h3 className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100">
-                {sectionTitle}
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Nota mínima para aprobar: {notaMinima}
-                {" · "}
-                Intentos usados: {intentosUsados} de {intentosMaximos}
-              </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                <span
+                  className={cn(
+                    "grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-sm sm:h-12 sm:w-12",
+                    passed
+                      ? "bg-green-500 text-white"
+                      : intentosAgotados || !examenHabilitado
+                        ? "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        : "bg-gradient-to-br from-orange-400 to-orange-600 text-white"
+                  )}
+                >
+                  {passed ? (
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : intentosAgotados || !examenHabilitado ? (
+                    <Lock className="h-5 w-5 sm:h-6 sm:w-6" />
+                  ) : (
+                    <ClipboardCheck className="h-5 w-5 sm:h-6 sm:w-6" />
+                  )}
+                </span>
+                <div className="min-w-0 space-y-2">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {sectionTitle}
+                    </h3>
+                    {statusMessage && (
+                      <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{statusMessage}</p>
+                    )}
+                  </div>
+                  {!passed && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { icon: Clock, label: `${rules.duracionMinutos} min` },
+                      { icon: RotateCcw, label: `Intentos ${intentosUsados} de ${intentosMaximos}` },
+                      { icon: Award, label: `Nota mínima ${notaMinima}` },
+                    ].map(({ icon: Icon, label }) => (
+                      <span
+                        key={label}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300"
+                      >
+                        <Icon className="h-3.5 w-3.5 text-orange-500" />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                  )}
+                </div>
+              </div>
+
+              {canShowButton && !tieneIntento && (
+                <Button
+                  size="lg"
+                  className="h-14 sm:h-11 w-full shrink-0 gap-2 text-base sm:text-sm sm:w-auto"
+                  onClick={() => void requestStart()}
+                  disabled={checkingStart}
+                >
+                  {checkingStart ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
+                  Realizar evaluación
+                </Button>
+              )}
             </div>
 
             {!examenHabilitado && (
@@ -757,18 +443,6 @@ export default function CourseExamSection({
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
                   {estado?.mensajeBloqueo ||
                     "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios. Si tenés alguna consulta, comunicate con tu profesor."}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {examenHabilitado &&
-              locallyReady &&
-              !passed &&
-              !esperandoCorreccion &&
-              !intentosAgotados && (
-              <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30">
-                <AlertDescription className="text-blue-900 dark:text-blue-100 text-sm">
-                  Completaste todo el contenido del curso. Podés realizar la evaluación final.
                 </AlertDescription>
               </Alert>
             )}
@@ -803,9 +477,8 @@ export default function CourseExamSection({
                       </Badge>
                     </div>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {examRequiereCorreccion
-                        ? "Tu evaluación incluye preguntas de desarrollo, así que la corrige un docente. Vas a ver la nota y el resultado en las próximas horas."
-                        : "Tu evaluación fue enviada correctamente. La nota será publicada por el docente lo antes posible."}
+                      Tu evaluación fue enviada correctamente y la corrige un docente. Vas a
+                      ver la nota y el resultado en las próximas horas.
                     </p>
                     {ultimoIntento?.intentoNumero != null && (
                       <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -818,426 +491,90 @@ export default function CourseExamSection({
             )}
 
             {tieneIntento && !esperandoCorreccion && (
-              <div
-                className={cn(
-                  "rounded-lg border p-4 space-y-3",
-                  passed
-                    ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
-                    : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
-                )}
-              >
-                <div className="flex items-start gap-3">
-                  {passed ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 space-y-2">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">
-                      {passed ? "¡Aprobaste la evaluación!" : "Último intento"}
-                    </p>
-                    <ExamResultDisplay result={ultimoIntento} showStatus />
-                    {!passed && !intentosAgotados && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        No alcanzaste la nota mínima. Te{" "}
-                        {intentosRestantes === 1 ? "queda" : "quedan"}{" "}
-                        {intentosRestantes}{" "}
-                        {intentosRestantes === 1 ? "intento" : "intentos"}.
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                {/* Resultado del último intento en casillas simples; el encabezado ya dice si aprobó */}
+                <div className="flex flex-1 gap-2">
+                  {[
+                    { label: "Nota", value: formatNota(ultimoIntento.nota), main: true },
+                    { label: "Aciertos", value: formatPorcentaje(ultimoIntento.porcentajeAciertos) },
+                    ...(ultimoIntento.respuestasCorrectas != null && ultimoIntento.totalPreguntas != null
+                      ? [{ label: "Correctas", value: `${ultimoIntento.respuestasCorrectas}/${ultimoIntento.totalPreguntas}` }]
+                      : []),
+                  ].map(({ label, value, main }) => (
+                    <div
+                      key={label}
+                      className={cn(
+                        "flex-1 rounded-xl border px-3 py-2.5 text-center sm:max-w-[9rem]",
+                        passed
+                          ? "border-green-200 bg-green-50 dark:border-green-900/60 dark:bg-green-950/30"
+                          : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50"
+                      )}
+                    >
+                      <p
+                        className={cn(
+                          "text-2xl font-bold tabular-nums leading-tight",
+                          main
+                            ? passed
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-orange-600 dark:text-orange-400"
+                            : "text-slate-900 dark:text-slate-100"
+                        )}
+                      >
+                        {value}
                       </p>
-                    )}
-                    {!passed && intentosAgotados && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        No alcanzaste la nota mínima y usaste los {intentosMaximos}{" "}
-                        intentos disponibles.
-                      </p>
-                    )}
-                  </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  {passed && puedeVerDetalle && (
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-auto gap-2"
-                      onClick={() => void handleVerExamenRealizado()}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Ver examen realizado
-                    </Button>
-                  )}
-                  {!passed && canShowButton && (
-                    <Button className="w-full sm:w-auto gap-2" onClick={() => void openExamModal()}>
-                      <RotateCcw className="h-4 w-4" />
-                      Reintentar evaluación
-                    </Button>
-                  )}
-                </div>
+                {(puedeVerDetalle || (!passed && canShowButton)) && (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    {puedeVerDetalle && (
+                      <Button
+                        variant="outline"
+                        className="h-11 w-full gap-2 sm:w-auto"
+                        onClick={() => void handleVerExamenRealizado()}
+                      >
+                        <FileText className="h-4 w-4" />
+                        Ver examen
+                      </Button>
+                    )}
+                    {!passed && canShowButton && (
+                      <Button
+                        className="h-11 w-full gap-2 sm:w-auto"
+                        onClick={() => void requestStart()}
+                        disabled={checkingStart}
+                      >
+                        {checkingStart ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        Reintentar
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {canShowButton && !tieneIntento && (
-              <Button className="w-full sm:w-auto" onClick={() => void openExamModal()}>
-                Realizar evaluación
-              </Button>
-            )}
           </CardContent>
         </Card>
       </section>
 
-      <Dialog open={modalOpen} onOpenChange={handleModalChange}>
-        <DialogContent
-          className={cn(
-            "max-w-2xl w-[calc(100%-2rem)] p-0 gap-0 overflow-hidden",
-            "max-h-[min(90dvh,900px)] flex flex-col"
-          )}
-          onInteractOutside={(e) => {
-            if (submitting || phase === "taking") {
-              e.preventDefault();
-              if (phase === "taking" && !submitting) {
-                setCloseConfirmOpen(true);
-              }
-            }
-          }}
-          onEscapeKeyDown={(e) => {
-            if (submitting || phase === "taking") {
-              e.preventDefault();
-              if (phase === "taking" && !submitting) {
-                setCloseConfirmOpen(true);
-              }
-            }
-          }}
-        >
-          <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0 space-y-2">
-            <div className="flex items-start justify-between gap-3 pr-6">
-              <DialogTitle className="text-left">{sectionTitle}</DialogTitle>
-              {phase === "taking" && remainingSeconds != null && (
-                <div
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm font-semibold tabular-nums shrink-0",
-                    remainingSeconds <= 60
-                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
-                      : remainingSeconds <= 300
-                        ? "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
-                        : "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  )}
-                  aria-live="polite"
-                  aria-label="Tiempo restante"
-                >
-                  <Timer className="h-4 w-4" />
-                  {formatExamCountdown(remainingSeconds)}
-                </div>
-              )}
-            </div>
-            <DialogDescription className="text-left">
-              Nota mínima para aprobar: {notaMinima}
-              {displayQuestions.length > 0 && phase === "taking" && (
-                <span className="block mt-0.5">
-                  {displayQuestions.length} pregunta
-                  {displayQuestions.length !== 1 ? "s" : ""}
-                  {" · "}
-                  Tiempo disponible: {exam?.duracionMinutos ?? estado?.duracionMinutos ?? 90} min
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4">
-            {phase === "loading_exam" && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-                <p className="text-sm text-slate-500">Cargando evaluación...</p>
-              </div>
-            )}
-
-            {phase === "taking" && exam && (
-              <div className="space-y-5">
-                {examRequiereCorreccion && (
-                  <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30">
-                    <Hourglass className="h-4 w-4 text-amber-600" />
-                    <AlertTitle className="text-amber-900 dark:text-amber-100">
-                      Esta evaluación se corrige manualmente
-                    </AlertTitle>
-                    <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm">
-                      Incluye preguntas de desarrollo, por lo que al enviarla queda
-                      en espera de corrección y vas a recibir la nota en las
-                      próximas horas.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {displayQuestions.map((question, index) => {
-                  const esDesarrollo = isDesarrolloQuestion(question);
-                  const isMultiple = isMultipleChoiceQuestion(question);
-                  const selected = answers[question.id] ?? [];
-                  const textoRespuesta = textAnswers[question.id] ?? "";
-
-                  return (
-                    <div
-                      key={question.id}
-                      className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-3"
-                    >
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                        <span className="text-orange-500 mr-2">{index + 1}.</span>
-                        {question.texto}
-                      </p>
-                      {question.imagenUrl ? (
-                        <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-2">
-                          <img
-                            src={question.imagenUrl}
-                            alt={`Imagen de la pregunta ${index + 1}`}
-                            className="max-h-72 w-full object-contain rounded"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : null}
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {esDesarrollo
-                          ? "Escribí tu respuesta. La corrige un docente."
-                          : isMultiple
-                            ? "Podés seleccionar más de una respuesta"
-                            : "Seleccioná una respuesta"}
-                      </p>
-
-                      {esDesarrollo ? (
-                        <Textarea
-                          id={`modal-${question.id}-desarrollo`}
-                          value={textoRespuesta}
-                          onChange={(e) =>
-                            handleTextAnswerChange(question.id, e.target.value)
-                          }
-                          disabled={submitting}
-                          rows={5}
-                          placeholder="Escribí tu respuesta acá..."
-                          className="resize-y min-h-[120px]"
-                        />
-                      ) : isMultiple ? (
-                        <div className="space-y-2">
-                          {question.opciones.map((option) => (
-                            <div
-                              key={option.id}
-                              className="flex items-start gap-3 rounded-md border border-transparent hover:border-slate-200 dark:hover:border-slate-600 p-2"
-                            >
-                              <Checkbox
-                                id={`modal-${question.id}-${option.id}`}
-                                checked={selected.includes(option.id)}
-                                onCheckedChange={(checked) =>
-                                  handleMultipleToggle(
-                                    question.id,
-                                    option.id,
-                                    checked === true
-                                  )
-                                }
-                                disabled={submitting}
-                              />
-                              <Label
-                                htmlFor={`modal-${question.id}-${option.id}`}
-                                className="text-sm font-normal leading-snug cursor-pointer flex-1"
-                              >
-                                {option.texto}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <RadioGroup
-                          value={selected[0] ?? ""}
-                          onValueChange={(value) => handleSingleSelect(question.id, value)}
-                          className="space-y-2"
-                          disabled={submitting}
-                        >
-                          {question.opciones.map((option) => (
-                            <div
-                              key={option.id}
-                              className="flex items-start gap-3 rounded-md border border-transparent hover:border-slate-200 dark:hover:border-slate-600 p-2"
-                            >
-                              <RadioGroupItem
-                                value={option.id}
-                                id={`modal-${question.id}-${option.id}`}
-                                className="mt-0.5"
-                              />
-                              <Label
-                                htmlFor={`modal-${question.id}-${option.id}`}
-                                className="text-sm font-normal leading-snug cursor-pointer flex-1"
-                              >
-                                {option.texto}
-                              </Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {phase === "result" &&
-              lastResult &&
-              (lastResult.estado === "pendiente_correccion" || lastResultPublicacionManual ? (
-                <div className="space-y-4 py-4">
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center space-y-2 dark:border-amber-900 dark:bg-amber-950/30">
-                    <Hourglass className="h-12 w-12 text-amber-600 mx-auto" />
-                    <p className="text-lg font-semibold text-amber-900 dark:text-amber-100">
-                      Evaluación enviada
-                    </p>
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {lastResultPublicacionManual && lastResult.estado !== "pendiente_correccion"
-                        ? "Tu evaluación fue enviada. La nota será publicada por el administrador en las próximas horas."
-                        : "Recibimos tus respuestas. La evaluación la corrige un docente y vas a ver la nota en las próximas horas."}
-                    </p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
-                      No hace falta que la vuelvas a enviar.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 py-4">
-                  <div
-                    className={cn(
-                      "rounded-lg border p-6 text-center space-y-2",
-                      lastResult.aprobado
-                        ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
-                        : "border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30"
-                    )}
-                  >
-                    {lastResult.aprobado ? (
-                      <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-                    ) : (
-                      <XCircle className="h-12 w-12 text-orange-500 mx-auto" />
-                    )}
-                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                      {lastResult.aprobado ? "¡Aprobaste!" : "No aprobaste"}
-                    </p>
-                    <ExamResultDisplay result={lastResult} prominent />
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {lastResult.aprobado
-                        ? `Felicitaciones, alcanzaste la nota mínima de ${notaMinima}.`
-                        : intentosAgotados
-                          ? estado?.mensajeBloqueo ||
-                            `Alcanzaste el máximo de ${intentosMaximos} intentos. La evaluación quedó bloqueada.`
-                          : `Necesitás al menos ${notaMinima} para aprobar. Te ${intentosRestantes === 1 ? "queda" : "quedan"} ${intentosRestantes} ${intentosRestantes === 1 ? "intento" : "intentos"}.`}
-                    </p>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          {(phase === "taking" || phase === "result") && (
-            <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-4 flex flex-col sm:flex-row gap-2 bg-background">
-              {phase === "taking" && (
-                <>
-                  <Button
-                    onClick={() => void handleSubmit()}
-                    disabled={submitting}
-                    className="flex-1 sm:flex-none"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Enviando...
-                      </>
-                    ) : (
-                      "Finalizar evaluación"
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={submitting}
-                    onClick={() => setCloseConfirmOpen(true)}
-                  >
-                    Cancelar
-                  </Button>
-                </>
-              )}
-
-              {phase === "result" &&
-                (lastResult?.estado === "pendiente_correccion" || lastResultPublicacionManual) && (
-                  <Button
-                    className="w-full sm:w-auto"
-                    onClick={() => handleModalChange(false)}
-                  >
-                    Entendido
-                  </Button>
-                )}
-
-              {phase === "result" &&
-                lastResult &&
-                !lastResult.aprobado &&
-                lastResult.estado !== "pendiente_correccion" &&
-                !lastResultPublicacionManual &&
-                examenHabilitado &&
-                !intentosAgotados &&
-                estado?.puedeRealizar && (
-                  <Button
-                    className="w-full sm:w-auto gap-2"
-                    onClick={() => void openExamModal()}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    Reintentar evaluación
-                  </Button>
-                )}
-
-              {phase === "result" &&
-                lastResult &&
-                !lastResult.aprobado &&
-                lastResult.estado !== "pendiente_correccion" &&
-                !lastResultPublicacionManual &&
-                (intentosAgotados || !estado?.puedeRealizar) && (
-                  <Button
-                    className="w-full sm:w-auto"
-                    onClick={() => handleModalChange(false)}
-                  >
-                    Cerrar
-                  </Button>
-                )}
-
-              {phase === "result" && lastResult?.aprobado && (
-                <>
-                  {lastResult.id && (
-                    <Button
-                      variant="outline"
-                      className="w-full sm:w-auto gap-2"
-                      onClick={() => void handleVerExamenRealizado()}
-                    >
-                      <FileText className="h-4 w-4" />
-                      Ver examen realizado
-                    </Button>
-                  )}
-                  <Button
-                    className="w-full sm:w-auto"
-                    onClick={() => handleModalChange(false)}
-                  >
-                    Cerrar
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+      <AlertDialog open={startConfirmOpen} onOpenChange={setStartConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Cerrar la evaluación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Si cerrás ahora, se registrará como un intento perdido con las
-              respuestas que hayas marcado hasta el momento. Esta acción no se
-              puede deshacer.
+            <AlertDialogTitle>¿Comenzar la evaluación?</AlertDialogTitle>
+            {/* Solo para lectores de pantalla: el resumen de abajo ya muestra las condiciones */}
+            <AlertDialogDescription className="sr-only">
+              {sectionTitle}. Revisá las condiciones antes de empezar.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <ExamStartSummary rules={rules} />
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Seguir rindiendo</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={submitting}
-              onClick={(e) => {
-                e.preventDefault();
-                confirmAbandonExam();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {submitting ? "Registrando..." : "Cerrar y registrar intento"}
-            </AlertDialogAction>
+            <AlertDialogCancel>Ahora no</AlertDialogCancel>
+            <AlertDialogAction onClick={goToExam}>Comenzar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

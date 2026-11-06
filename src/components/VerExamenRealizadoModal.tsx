@@ -1,6 +1,8 @@
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -158,24 +160,36 @@ export default function VerExamenRealizadoModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Examen realizado
+      {/* Pantalla completa, igual que los visores de material */}
+      <DialogContent className="!max-w-[100vw] !max-h-[100dvh] !w-screen !h-[100dvh] !m-0 !p-0 !gap-0 !rounded-none !border-0 !left-0 !top-0 !translate-x-0 !translate-y-0 flex flex-col [&>button]:hidden">
+        <DialogHeader className="flex-row items-center gap-3 space-y-0 border-b border-slate-200 px-3 py-1.5 sm:px-4 dark:border-slate-800">
+          <DialogTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm sm:text-base">
+            <FileText className="w-5 h-5 shrink-0 text-orange-500" />
+            <span className="truncate">Examen realizado</span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Revisión de las respuestas del intento
+          </DialogDescription>
+          <DialogClose
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+            aria-label="Cerrar"
+            title="Cerrar"
+          >
+            <X className="h-7 w-7" />
+          </DialogClose>
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex flex-1 items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>
         ) : !detalle ? (
-          <p className="text-sm text-muted-foreground py-4">
+          <p className="text-sm text-muted-foreground p-6 text-center">
             No se pudo cargar el examen realizado.
           </p>
         ) : (
-          <div className="overflow-y-auto pr-2 space-y-4 flex-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 sm:px-6">
             {esPendientePublicacion ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 dark:border-amber-900 dark:bg-amber-950/30">
                 <Hourglass className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -267,7 +281,7 @@ export default function VerExamenRealizadoModal({
                         <img
                           src={pregunta.imagenUrl}
                           alt={`Imagen de la pregunta ${pregunta.orden || index + 1}`}
-                          className="max-h-64 w-full object-contain rounded"
+                          className="max-h-80 w-full object-contain rounded"
                           loading="lazy"
                         />
                       </div>
@@ -286,6 +300,7 @@ export default function VerExamenRealizadoModal({
                 </Card>
               ))
             )}
+          </div>
           </div>
         )}
       </DialogContent>

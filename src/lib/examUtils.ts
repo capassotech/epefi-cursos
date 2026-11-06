@@ -40,18 +40,18 @@ export function sortQuestionsByOrder(questions: ExamQuestion[]): ExamQuestion[] 
   return [...questions].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 }
 
-export function validateAllQuestionsAnswered(
+export function countUnansweredQuestions(
   questions: ExamQuestion[],
   answers: StudentAnswersMap,
   textAnswers: StudentTextAnswersMap = {}
-): boolean {
-  return questions.every((q) => {
+): number {
+  return questions.filter((q) => {
     if (isDesarrolloQuestion(q)) {
-      return (textAnswers[q.id] ?? "").trim().length > 0;
+      return (textAnswers[q.id] ?? "").trim().length === 0;
     }
     const selected = answers[q.id] ?? [];
-    return selected.length > 0;
-  });
+    return selected.length === 0;
+  }).length;
 }
 
 function buildAnswerEntry(
@@ -108,6 +108,75 @@ export function formatNota(nota: number): string {
 /** Muestra 75% en lugar de 75.0%. */
 export function formatPorcentaje(porcentaje: number): string {
   return `${String(parseFloat(porcentaje.toFixed(1)))}%`;
+}
+
+export const DEFAULT_EXAM_MINUTES = 90;
+
+/** Igual que el backend (MAX_INTENTOS_EXAMEN): 1 intento si el examen no tiene límite configurado */
+export const DEFAULT_EXAM_ATTEMPTS = 1;
+
+export interface ExamRules {
+  duracionMinutos: number;
+  notaMinima: number;
+  intentosMaximos: number;
+  intentosUsados: number;
+  intentosRestantes: number;
+}
+
+/** Condiciones de la evaluación según el estado del backend, con los valores por defecto. */
+export function getExamRules(estado: ExamEstado | null | undefined): ExamRules {
+  const duracionMinutos =
+    typeof estado?.duracionMinutos === "number" && estado.duracionMinutos > 0
+      ? estado.duracionMinutos
+      : DEFAULT_EXAM_MINUTES;
+  const notaMinima =
+    typeof estado?.notaMinima === "number" && estado.notaMinima > 0
+      ? estado.notaMinima / 10
+      : PASSING_GRADE;
+  const intentosMaximos =
+    typeof estado?.intentosMaximos === "number" && estado.intentosMaximos > 0
+      ? estado.intentosMaximos
+      : DEFAULT_EXAM_ATTEMPTS;
+  const intentosUsados =
+    typeof estado?.intentosUsados === "number" && estado.intentosUsados >= 0
+      ? estado.intentosUsados
+      : 0;
+  return {
+    duracionMinutos,
+    notaMinima,
+    intentosMaximos,
+    intentosUsados,
+    intentosRestantes: Math.max(0, intentosMaximos - intentosUsados),
+  };
+}
+
+/** Motivo por el que no se puede comenzar la evaluación, o null si está disponible. */
+export function getExamBlockReason(
+  estado: ExamEstado
+): { title: string; description: string } | null {
+  if (!estado.idExamen) {
+    return {
+      title: "Evaluación no disponible",
+      description: "No hay evaluación configurada para este curso.",
+    };
+  }
+  if (estado.examenHabilitado === false) {
+    return {
+      title: "Evaluación no disponible",
+      description:
+        estado.mensajeBloqueo ||
+        "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios.",
+    };
+  }
+  if (estado.intentosAgotados) {
+    return {
+      title: "Evaluación bloqueada",
+      description:
+        estado.mensajeBloqueo ||
+        "Alcanzaste el máximo de intentos. Ya no podés volver a realizarla.",
+    };
+  }
+  return null;
 }
 
 export { PASSING_GRADE };

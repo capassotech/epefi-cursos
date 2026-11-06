@@ -9,15 +9,16 @@ const EnvironmentBanner = () => {
     return null;
   }
 
+  // Franja fina dentro del flujo (no flotante): empuja el contenido en lugar de taparlo
   return (
-    <div className="fixed top-2 right-2 z-50 bg-yellow-500 text-black px-3 py-1.5 rounded-md font-bold text-xs shadow-lg">
-      <div className="flex items-center justify-center gap-1.5">
-        <AlertTriangle className="w-3 h-3" />
-        <span>ENTORNO PARA PRUEBAS</span>
-      </div>
+    <div
+      role="status"
+      className="flex h-6 w-full items-center justify-center gap-1.5 bg-amber-400 text-[11px] font-semibold tracking-wide text-amber-950"
+    >
+      <AlertTriangle className="w-3 h-3" />
+      <span>ENTORNO PARA PRUEBAS</span>
     </div>
   );
 };
 
 export default EnvironmentBanner;
-

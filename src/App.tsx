@@ -10,6 +10,8 @@ import Search from "./pages/Search";
 import Layout from "./components/Layout";
 import NotFound from "./pages/NotFound";
 import Curso from "./pages/Curso";
+import Evaluacion from "./pages/Evaluacion";
+import Material from "./pages/Material";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import AuthRedirectRoute from "./components/AuthRedirectRoute";
@@ -38,6 +40,15 @@ const App = () => (
                 <Route
                   path="/recuperar-contrasena"
                   element={<ForgotPassword />}
+                />
+              </Route>
+
+              {/* Evaluación a pantalla completa - SIN Layout para que el alumno se concentre */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/curso/:courseId/evaluacion" element={<Evaluacion />} />
+                <Route
+                  path="/curso/:courseId/material/:moduloId/:tipo/:index"
+                  element={<Material />}
                 />
               </Route>
 

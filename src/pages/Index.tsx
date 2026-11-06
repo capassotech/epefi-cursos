@@ -150,14 +150,11 @@ type StudentHomeCourse = Course & {
 const Index = () => {
   const navigate = useNavigate();
 
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const { user } = useAuth();
   const { data: courses = [], isPending: loading } = useStudentHome(
     user?.uid,
     user?.activo
   );
-  const [isMobile, setIsMobile] = useState(false);
-  const banners = ["/banner1.jpg", "/banner2.jpg", "/banner3.jpg"];
 
   const { theme } = useTheme();
 
@@ -277,79 +274,10 @@ const Index = () => {
     }
   };
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 639px)");
-
-    const updateIsMobile = (event: MediaQueryList | MediaQueryListEvent) => {
-      setIsMobile(event.matches);
-    };
-
-    // Initialize state on mount
-    updateIsMobile(mediaQuery);
-
-    const listener = (event: MediaQueryListEvent) => updateIsMobile(event);
-
-    if ("addEventListener" in mediaQuery) {
-      mediaQuery.addEventListener("change", listener);
-      return () => mediaQuery.removeEventListener("change", listener);
-    }
-
-    // Fallback para navegadores más antiguos
-    const legacyMediaQuery = mediaQuery as MediaQueryList & {
-      addListener?: (listener: (event: MediaQueryListEvent) => void) => void;
-      removeListener?: (listener: (event: MediaQueryListEvent) => void) => void;
-    };
-
-    if (legacyMediaQuery.addListener) {
-      legacyMediaQuery.addListener(listener);
-      return () => legacyMediaQuery.removeListener?.(listener);
-    }
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentBannerIndex((prev) =>
-        prev === banners.length - 1 ? 0 : prev + 1,
-      );
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
-
   return (
     <>
       <EnvironmentBanner />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8">
-        {!isMobile && user?.activo !== false && (
-          <div className="relative w-full overflow-hidden rounded-lg sm:rounded-xl shadow-lg mb-6 sm:mb-10">
-            <div
-              className="flex transition-transform duration-500 ease-in-out"
-              style={{ transform: `translateX(-${currentBannerIndex * 100}%)` }}
-            >
-              {banners.map((banner, index) => (
-                <div key={index} className="w-full flex-shrink-0">
-                  <img
-                    src={banner}
-                    alt={`Banner ${index + 1}`}
-                    className="w-full h-40 sm:h-56 md:h-64 lg:h-72 object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 flex justify-center space-x-1 sm:space-x-2">
-              {banners.map((_, index) => (
-                <button
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    index === currentBannerIndex ? "bg-white" : "bg-white/50"
-                  }`}
-                  onClick={() => setCurrentBannerIndex(index)}
-                  aria-label={`Ir a banner ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
         {user?.activo !== false && (
           <div className="text-center mt-4">
             <div className="rounded-lg flex items-center justify-center">
@@ -369,7 +297,7 @@ const Index = () => {
         <div className="space-y-4">
           {user?.activo !== false && (
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 ml-1">
-              Mis formaciones
+              Mis cursos
             </h2>
           )}
           <div className="grid grid-cols-1 gap-4">
@@ -392,7 +320,7 @@ const Index = () => {
                       </p>
                       <p className="text-sm sm:text-base text-red-600 dark:text-red-400 max-w-2xl">
                         Por favor, contacta con el administrador para revertir
-                        esta acción y recuperar el acceso a tus formaciones.
+                        esta acción y recuperar el acceso a tus cursos.
                       </p>
                     </div>
                     <div className="space-y-3 mt-6">
@@ -463,10 +391,10 @@ const Index = () => {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-orange-500"></div>
 
                 <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors duration-300">
-                  Adquirir más formaciones
+                  Adquirir más cursos
                 </h3>
                 <p className="text-gray-600 dark:text-gray-300 mt-2 text-sm sm:text-base">
-                  Explorá toda nuestra oferta de formaciones
+                  Explorá toda nuestra oferta de cursos
                 </p>
 
                 {/* Ícono con detalle naranja */}

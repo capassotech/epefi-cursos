@@ -202,8 +202,9 @@ function normalizeExamEstado(data: unknown): ExamEstado {
         ? raw.notaMinima
         : 70,
     intentosUsados: Number.isFinite(intentosUsados) ? intentosUsados : 0,
-    intentosMaximos: Number.isFinite(intentosMaximos) && intentosMaximos > 0 ? intentosMaximos : 3,
+    intentosMaximos: Number.isFinite(intentosMaximos) && intentosMaximos > 0 ? intentosMaximos : 1,
     intentosAgotados: toBool(raw.intentosAgotados ?? raw.intentos_agotados),
+    puedeRevisar: toBool(raw.puedeRevisar),
     mensajeBloqueo: typeof mensajeBloqueo === "string" ? mensajeBloqueo : undefined,
     progresoFormacion,
     ultimoIntento,
@@ -274,6 +275,7 @@ function normalizeSubmitResult(data: unknown): SubmitExamResult {
     ...summary,
     mensaje: typeof raw.message === "string" ? raw.message : undefined,
     puedeReintentar: toBool(resultado.puedeReintentar ?? raw.puedeReintentar),
+    puedeRevisar: toBool(resultado.puedeRevisar ?? raw.puedeRevisar),
     ...(estado ? { estado } : {}),
     ...(Number.isFinite(intentoNumero) ? { intentoNumero } : {}),
     ...(Number.isFinite(intentosUsados) ? { intentosUsados } : {}),
