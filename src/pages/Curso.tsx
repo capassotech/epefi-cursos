@@ -261,6 +261,11 @@ const CourseDetailPage = () => {
     user?.uid && courseId ? readLastViewed(user.uid, courseId) : null,
     (item) => isContentCompleted(item.moduloId, item.index, item.type)
   );
+  // Con todo el material visto no hay nada que continuar
+  const courseFinished = coursePlaylist
+    .flatMap((group) => group.items)
+    .filter((item) => item.enabled)
+    .every((item) => isContentCompleted(item.moduloId, item.index, item.type));
 
   // Calcular progreso del curso
   const calculateCourseProgress = (): { completed: number; total: number; percentage: number } => {
@@ -572,17 +577,14 @@ const CourseDetailPage = () => {
           })()}
 
           <div className="flex flex-col gap-6 px-4 lg:px-6">
-          {resume && (() => {
+          {resume && !courseFinished && (() => {
             const modulo = modulos.find((m) => m.id === resume.item.moduloId);
             if (!modulo) return null;
-            const allDone = !resume.isLast && isContentCompleted(resume.item.moduloId, resume.item.index, resume.item.type);
             const label = resume.isLast
               ? 'Continuá donde dejaste'
-              : allDone
-                ? 'Repasar el curso'
-                : resume.item.key === coursePlaylist[0]?.items[0]?.key
-                  ? 'Empezá el curso'
-                  : 'Seguí con lo pendiente';
+              : resume.item.key === coursePlaylist[0]?.items[0]?.key
+                ? 'Empezá el curso'
+                : 'Seguí con lo pendiente';
             const ResumeIcon = resume.item.type === 'video' ? Play : FileText;
             return (
               <button
