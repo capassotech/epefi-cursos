@@ -50,8 +50,8 @@ const isGoogleDriveDocument = (url: string) => {
   );
 };
 
-/** PDF ajustado al ancho, con barra de herramientas para zoom y sin panel lateral */
-const formatPDFUrl = (url: string) => `${url.split("#")[0]}#view=FitH&toolbar=1&navpanes=0&scrollbar=1`;
+/** PDF con zoom inicial del 75%, con barra de herramientas para zoom y sin panel lateral */
+const formatPDFUrl = (url: string) => `${url.split("#")[0]}#zoom=75&toolbar=1&navpanes=0&scrollbar=1`;
 
 
 /** Página donde el alumno ve un documento o un video, con el resto del material al costado. */
@@ -264,9 +264,8 @@ export default function Material() {
         />
       );
     }
-    // Ancho máximo para que la hoja se vea a un tamaño natural y no ocupe toda la pantalla
     return (
-      <div className="relative mx-auto h-full max-w-4xl">
+      <div className="relative h-full">
         {docLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-slate-950">
             <div className="flex flex-col items-center gap-3">
