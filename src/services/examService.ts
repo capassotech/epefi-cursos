@@ -40,7 +40,7 @@ api.interceptors.request.use(
 );
 
 const LECTURA_TIMEOUT_MS = 20_000;
-const ENVIO_TIMEOUT_MS = 30_000;
+const ENVIO_TIMEOUT_MS = 90_000;
 const LECTURA_INTENTOS = 3;
 const ENVIO_INTENTOS = 5;
 
