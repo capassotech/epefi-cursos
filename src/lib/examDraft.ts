@@ -7,6 +7,8 @@ export interface ExamDraft {
   deadline: number;
   answers: StudentAnswersMap;
   textAnswers: StudentTextAnswersMap;
+  /** Se conserva al recargar: así un reenvío nunca cuenta como un intento nuevo. */
+  idEnvio?: string;
   savedAt: number;
 }
 
