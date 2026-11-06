@@ -66,6 +66,9 @@ import type {
   SubmitExamResult,
 } from "@/types/exam";
 
+/** Máximo que espera cada dispositivo antes de enviar cuando se termina el tiempo. */
+const ENVIO_POR_TIEMPO_ESPERA_MAX_MS = 30_000;
+
 type ExamPhase = "loading" | "intro" | "blocked" | "starting" | "taking" | "result";
 
 type ConfirmState = { kind: "close" } | { kind: "unanswered"; count: number } | null;
@@ -124,6 +127,10 @@ export default function Evaluacion() {
   const [idEnvio, setIdEnvio] = useState<string | null>(null);
   /** Cambia para volver a intentar solo el envío por tiempo agotado cuando falló. */
   const [autoRetryNonce, setAutoRetryNonce] = useState(0);
+  /** El envío automático por tiempo agotado falló: el alumno ya puede reintentar a mano. */
+  const [envioPorTiempoFallo, setEnvioPorTiempoFallo] = useState(false);
+  /** Se terminó el tiempo y el envío está en camino: para el alumno ya se está enviando. */
+  const enviandoPorTiempo = timeUp && isOnline && !envioPorTiempoFallo;
   const answersRef = useRef<StudentAnswersMap>({});
   const textAnswersRef = useRef<StudentTextAnswersMap>({});
   const displayQuestionsRef = useRef<ExamQuestion[]>([]);
@@ -155,6 +162,7 @@ export default function Evaluacion() {
     setRemainingSeconds(null);
     setDeadline(null);
     setConfirm(null);
+    setEnvioPorTiempoFallo(false);
 
     try {
       const examData = await ExamService.getExamForStudent(idExamen);
@@ -361,6 +369,7 @@ export default function Evaluacion() {
         applySubmitResult(result, motivo);
       } catch (error: unknown) {
         console.error("Error submitting exam:", error);
+        if (motivo === "tiempo") setEnvioPorTiempoFallo(true);
         // Sin conexión las respuestas siguen guardadas en el dispositivo y se reenvían al reconectar
         if (!navigator.onLine) {
           toast.error("Sin conexión", {
@@ -420,7 +429,11 @@ export default function Evaluacion() {
   // Al llegar a 0, cerrar y registrar intento (si no hay conexión, se reintenta al reconectar)
   useEffect(() => {
     if (phase === "taking" && remainingSeconds === 0 && isOnline && !submittingRef.current) {
-      void submitExamAttempt("tiempo");
+      // Si todos empezaron juntos, el tiempo se les termina juntos: se reparten los envíos.
+      // Un reintento no espera de nuevo, porque ya viene con su propia pausa
+      const espera = autoRetryNonce > 0 ? 0 : Math.random() * ENVIO_POR_TIEMPO_ESPERA_MAX_MS;
+      const timerId = window.setTimeout(() => void submitExamAttempt("tiempo"), espera);
+      return () => window.clearTimeout(timerId);
     }
   }, [phase, remainingSeconds, isOnline, submitExamAttempt, autoRetryNonce]);
 
@@ -875,10 +888,10 @@ export default function Evaluacion() {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || (timeUp && !isOnline)}
+              disabled={submitting || enviandoPorTiempo || (timeUp && !isOnline)}
               className="flex-1 sm:ml-auto sm:flex-none"
             >
-              {submitting ? (
+              {submitting || enviandoPorTiempo ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Enviando...

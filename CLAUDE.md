@@ -61,7 +61,7 @@ Las reglas generales de UI están en `../CLAUDE.md`.
 
 ### Envío de la evaluación
 - `idEnvio` se genera al empezar y se guarda en el borrador: reenviar nunca crea otro intento.
-- `examService` tiene timeout y reintentos con espera al azar (`withRetry`). Si se agota el tiempo y el envío falla, se sigue intentando solo cada 20-40 s.
+- `examService` tiene timeout y reintentos con espera al azar (`withRetry`). Al agotarse el tiempo, cada dispositivo espera hasta 30 s al azar antes de enviar, para repartir el pico, y el botón ya muestra "Enviando...". Si el envío falla, se sigue intentando solo cada 20-40 s.
 - Si el servidor responde que el intento ya no se puede registrar (`EVALUACION_YA_APROBADA`, `EVALUACION_PENDIENTE_CORRECCION`, `INTENTOS_AGOTADOS`), se borra el borrador y se muestra el estado real.
 
 ## Ideas ofrecidas, no implementadas
