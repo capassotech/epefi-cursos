@@ -150,6 +150,20 @@ class CoursesService {
       },
     });
   }
+
+  /** Avisa al backend que un video no se pudo reproducir (para detectar archivos o dispositivos con problemas). */
+  reportVideoError(data: {
+    url: string;
+    codigo: number | null;
+    mensaje?: string;
+    idCurso?: string;
+    idModulo?: string;
+    material?: string;
+    dispositivo?: string;
+    conexion?: string;
+  }) {
+    return api.post(`/errores-video`, data, { timeout: 10_000 });
+  }
 }
 
 export default new CoursesService();

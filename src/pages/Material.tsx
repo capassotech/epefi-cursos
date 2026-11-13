@@ -229,7 +229,13 @@ export default function Material() {
       );
     }
     if (current.type === "video") {
-      return <VideoPlayer url={url} slotKey={modulo.id} />;
+      return (
+        <VideoPlayer
+          url={url}
+          slotKey={modulo.id}
+          errorContext={{ idCurso: courseId, idModulo: modulo.id, material: current.name }}
+        />
+      );
     }
     // Los celulares no muestran PDFs dentro de la página: fila compacta para dejar lugar a la lista
     if (isMobile) {
