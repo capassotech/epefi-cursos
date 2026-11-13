@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2, RotateCw, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import CoursesService from "@/services/coursesService";
 import {
   isAppleTouchDevice,
   isGoogleDriveVideoUrl,
@@ -41,21 +42,47 @@ const getFullscreenNode = () => {
   );
 };
 
+/** Datos del material para el registro de errores. */
+export interface VideoErrorContext {
+  idCurso?: string;
+  idModulo?: string;
+  material?: string;
+}
+
 interface VideoPlayerProps {
   /** Enlace original del video (YouTube, Google Drive o archivo propio) */
   url: string;
   /** Mientras no cambie, se reutiliza el iframe y solo cambia su `src` (YouTube carga más rápido) */
   slotKey: string;
+  errorContext?: VideoErrorContext;
   className?: string;
 }
 
+/** Tipo de conexión (solo Chrome Android) para el registro de errores. */
+const getConnectionType = () => {
+  const nav = navigator as Navigator & { connection?: { effectiveType?: string; type?: string; saveData?: boolean } };
+  const c = nav.connection;
+  if (!c) return undefined;
+  return [c.type, c.effectiveType, c.saveData ? "ahorro-datos" : null].filter(Boolean).join(" ") || undefined;
+};
+
+/** Un aviso por video y por sesión, para no inundar el registro con reintentos. */
+const reportedVideoErrors = new Set<string>();
+
 /** Reproductor que ocupa todo su contenedor; el video se ajusta sin recortarse. */
-export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProps) {
+export default function VideoPlayer({ url, slotKey, errorContext, className }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   /** WebKit iOS no aplica requestFullscreen a los iframes; simulamos “pantalla completa” con CSS. */
   const [immersive, setImmersive] = useState(false);
+  /**
+   * Código de `MediaError` si el `<video>` no se pudo reproducir (0 = sin código):
+   * 2 red, 3 no se pudo decodificar, 4 formato o URL no soportados.
+   */
+  const [loadError, setLoadError] = useState<number | null>(null);
+  /** Cambia en cada "Reintentar" para volver a montar el `<video>`. */
+  const [attempt, setAttempt] = useState(0);
 
   const isYouTube = isYouTubeUrl(url);
   const isGoogleDrive = isGoogleDriveVideoUrl(url);
@@ -91,10 +118,37 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
     return () => events.forEach((name) => document.removeEventListener(name, handleFullscreenChange));
   }, []);
 
-  // Al cambiar de video se sale del modo inmersivo
+  // Al cambiar de video se sale del modo inmersivo y se olvida el error anterior
   useEffect(() => {
     setImmersive(false);
+    setLoadError(null);
+    setAttempt(0);
   }, [url]);
+
+  const handleVideoError = useCallback(() => {
+    const error = videoRef.current?.error;
+    // Código 1: lo canceló el usuario o el navegador (p. ej. al cambiar de video); no es una falla
+    if (error?.code === 1) return;
+    setLoadError(error?.code ?? 0);
+
+    if (reportedVideoErrors.has(videoUrl)) return;
+    reportedVideoErrors.add(videoUrl);
+    CoursesService.reportVideoError({
+      url: videoUrl,
+      codigo: error?.code ?? null,
+      mensaje: error?.message?.slice(0, 500) || undefined,
+      ...errorContext,
+      dispositivo: navigator.userAgent.slice(0, 500),
+      conexion: getConnectionType(),
+    }).catch(() => {
+      // El registro es solo para diagnóstico: si falla, no molestamos al alumno
+    });
+  }, [videoUrl, errorContext]);
+
+  const retry = () => {
+    setLoadError(null);
+    setAttempt((n) => n + 1);
+  };
 
   const toggleFullscreen = useCallback(async () => {
     if (immersive) {
@@ -193,8 +247,10 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
       ) : (
         <video
           ref={videoRef}
-          key={videoUrl}
+          key={`${videoUrl}#${attempt}`}
           src={videoUrl}
+          preload="metadata"
+          onError={handleVideoError}
           controls
           playsInline
           controlsList="nodownload nofullscreen noremoteplayback"
@@ -214,6 +270,29 @@ export default function VideoPlayer({ url, slotKey, className }: VideoPlayerProp
             if (e.touches.length > 1) e.preventDefault();
           }}
         />
+      )}
+
+      {!isEmbed && loadError !== null && (
+        <div
+          role="alert"
+          className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/90 px-6 text-center text-white"
+        >
+          <VideoOff className="h-8 w-8 text-white/70" aria-hidden />
+          <div>
+            <p className="font-medium">No se pudo cargar el video</p>
+            <p className="mt-1 text-sm text-white/70">
+              {loadError === 2 ? "Revisá tu conexión e intentá de nuevo." : "Intentá de nuevo o probá desde otro navegador."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={retry}
+            className="h-12 min-w-40 touch-manipulation bg-orange-500 text-white hover:bg-orange-600"
+          >
+            <RotateCw className="mr-2 h-4 w-4" />
+            Reintentar
+          </Button>
+        </div>
       )}
     </div>
   );

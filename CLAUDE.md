@@ -39,6 +39,7 @@ Las reglas generales de UI están en `../CLAUDE.md`.
   - Entre ítems usa `replace`.
   - Cerrar usa `navigate(-1)` si se llegó desde el curso (`state.fromCourse`); si no, `replace` al curso.
 - Player: `src/components/material/VideoPlayer.tsx`. Reproduce inline (`playsInline`). Tiene fullscreen (en iPhone: `webkitEnterFullscreen` para `<video>` y modo inmersivo por CSS para iframes) y protección contra descarga.
+- Si el `<video>` falla (archivo propio, no YouTube/Drive): overlay "No se pudo cargar el video" con **Reintentar**, y un aviso por video y sesión a `POST /api/errores-video` (`CoursesService.reportVideoError`) con código de `MediaError`, user agent y conexión.
 - Helpers de URLs: `src/lib/videoEmbed.ts`.
 - `src/hooks/useCellularDataWarning.ts`:
   - Si un video se reproduce con datos móviles, muestra un toast que recomienda WiFi, una vez por sesión.
