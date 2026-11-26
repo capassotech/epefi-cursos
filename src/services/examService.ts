@@ -401,16 +401,33 @@ function normalizeExamenRealizadoDetalle(data: unknown): ExamRealizadoDetalle {
 }
 
 class ExamService {
-  /** Paso 1: estado al entrar a la formación. */
-  async getExamEstado(idFormacion: string): Promise<ExamEstado> {
+  /** Paso 1: estado al entrar a la formación. Con `idExamen` fuerza un examen específico. */
+  async getExamEstado(idFormacion: string, options?: { idExamen?: string }): Promise<ExamEstado> {
     const response = await withRetry(
       () =>
         api.get(`/examenes/alumno/formacion/${encodeURIComponent(idFormacion)}/estado`, {
           timeout: LECTURA_TIMEOUT_MS,
+          params: options?.idExamen ? { idExamen: options.idExamen } : undefined,
         }),
       LECTURA_INTENTOS
     );
     return normalizeExamEstado(response.data);
+  }
+
+  /** Paso 1b: estados de TODOS los exámenes de la formación (para cursos con múltiples exámenes). */
+  async getExamEstados(idFormacion: string): Promise<{ formacionCompleta: boolean; examenes: ExamEstado[] }> {
+    const response = await withRetry(
+      () =>
+        api.get(`/examenes/alumno/formacion/${encodeURIComponent(idFormacion)}/estados`, {
+          timeout: LECTURA_TIMEOUT_MS,
+        }),
+      LECTURA_INTENTOS
+    );
+    const raw = response.data as { formacionCompleta?: unknown; examenes?: unknown[] };
+    return {
+      formacionCompleta: raw.formacionCompleta === true,
+      examenes: Array.isArray(raw.examenes) ? raw.examenes.map(normalizeExamEstado) : [],
+    };
   }
 
   /** Paso 3: preguntas para el alumno (aleatorio automático en reintentos). */
