@@ -78,6 +78,7 @@ export default function Evaluacion() {
   const { courseId = "" } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const formacionId = searchParams.get("formacion") || courseId;
+  const examenIdParam = searchParams.get("examen") || undefined;
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -216,7 +217,7 @@ export default function Evaluacion() {
   const loadEstado = useCallback(async (isCancelled?: () => boolean) => {
     setPhase("loading");
     try {
-      const fresh = await ExamService.getExamEstado(formacionId);
+      const fresh = await ExamService.getExamEstado(formacionId, { idExamen: examenIdParam });
       if (isCancelled?.()) return;
       setEstado(fresh);
       const reason = getExamBlockReason(fresh);
