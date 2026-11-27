@@ -9,8 +9,12 @@ Las reglas generales de UI están en `../CLAUDE.md`.
 - Verificar con `npx tsc -b` y `npx eslint <archivos>`.
 - Hay errores de lint viejos. No arreglarlos salvo que se pida.
 
+## Inicio — `src/pages/Index.tsx`
+- Si `/inicio` trae `examenParaRendir`, la tarjeta del curso muestra abajo una franja naranja "Examen disponible · Rendir". El inicio se invalida al enviar un examen (`Evaluacion.tsx`).
+
 ## Página del curso — `src/pages/Curso.tsx`
 - Header de progreso con el porcentaje a la derecha. El título y las fechas se ocultan al hacer scroll.
+- La sección del examen (`CourseExamSection`) va primero, antes de "Continuar donde dejaste" y del contenido (pedido de alumnos).
 - Card grande **"Continuar donde dejaste"**, que abre el visor en el último material visto. Usa `saveLastViewed`, `readLastViewed` y `pickResumeItem` de `src/lib/viewerPlaylist.ts`.
 - Módulos:
   - La descripción va en un tooltip.

@@ -581,6 +581,20 @@ const CourseDetailPage = () => {
           })()}
 
           <div className="flex flex-col gap-6 px-4 lg:px-6">
+          {/* El examen va primero, antes del contenido, para encontrarlo sin buscar */}
+          {user?.uid && courseId && (
+            <CourseExamSection
+              key={courseId}
+              courseId={courseId}
+              coursePayload={courseDetail}
+              progressRevision={examProgressRevision}
+              modulos={modulos}
+              materiaIds={materias.map((m) => m.id)}
+              enabledModules={enabledModules}
+              progress={progress}
+            />
+          )}
+
           {resume && !courseFinished && (() => {
             const modulo = modulos.find((m) => m.id === resume.item.moduloId);
             if (!modulo) return null;
@@ -721,19 +735,6 @@ const CourseDetailPage = () => {
               </div>
             )}
           </section>
-
-          {user?.uid && courseId && (
-            <CourseExamSection
-              key={courseId}
-              courseId={courseId}
-              coursePayload={courseDetail}
-              progressRevision={examProgressRevision}
-              modulos={modulos}
-              materiaIds={materias.map((m) => m.id)}
-              enabledModules={enabledModules}
-              progress={progress}
-            />
-          )}
 
           {/* Documentos del curso: discretos, al final de la página */}
           {(courseDetail?.planDeEstudiosUrl || courseDetail?.fechasDeExamenesUrl) && (

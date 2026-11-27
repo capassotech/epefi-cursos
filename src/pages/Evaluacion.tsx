@@ -36,6 +36,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { ExamResultDisplay, ExamStartSummary } from "@/components/exam/ExamParts";
 import VerExamenRealizadoModal from "@/components/VerExamenRealizadoModal";
 import { cn } from "@/lib/utils";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import {
   buildForcedClosePayload,
   buildSubmissionPayload,
@@ -279,6 +280,8 @@ export default function Evaluacion() {
       setLastResult(intentoResultado);
       setPhase("result");
       setRemainingSeconds(null);
+      // El aviso "Examen disponible" del inicio depende de este intento
+      if (userId) void queryClient.invalidateQueries({ queryKey: queryKeys.studentHome(userId) });
 
       if (publicacionManual || pendienteCorreccion) {
         toast.success("Evaluación enviada", {
@@ -338,7 +341,7 @@ export default function Evaluacion() {
           : prev
       );
     },
-    []
+    [userId]
   );
 
   const submitExamAttempt = useCallback(
@@ -669,9 +672,11 @@ export default function Evaluacion() {
             <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
               <Lock className="h-4 w-4 text-amber-600" />
               <AlertTitle className="text-amber-900 dark:text-amber-100">{blockReason.title}</AlertTitle>
-              <AlertDescription className="text-amber-800 dark:text-amber-200">
-                {blockReason.description}
-              </AlertDescription>
+              {blockReason.description && (
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  {blockReason.description}
+                </AlertDescription>
+              )}
             </Alert>
             <Button variant="outline" className="w-full gap-2" onClick={goToCourse}>
               <ArrowLeft className="h-4 w-4" />

@@ -113,7 +113,7 @@ function SingleExamCard({
     : esperandoCorreccion
       ? "Tu evaluación está en corrección."
       : !examenHabilitado
-        ? "Todavía no está disponible."
+        ? "El examen todavía no está habilitado."
         : intentosAgotados
           ? "Ya usaste todos los intentos disponibles."
           : canShowButton && !tieneIntento
@@ -133,7 +133,7 @@ function SingleExamCard({
 
       const reason = getExamBlockReason(fresh);
       if (reason) {
-        toast.error(reason.title, { description: reason.description });
+        toast.error(reason.title, reason.description ? { description: reason.description } : undefined);
         return;
       }
 
@@ -303,17 +303,6 @@ function SingleExamCard({
               </Button>
             )}
           </div>
-
-          {!examenHabilitado && (
-            <Alert className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-              <Lock className="h-4 w-4 text-amber-600" />
-              <AlertTitle className="text-amber-900 dark:text-amber-100">Evaluación no disponible</AlertTitle>
-              <AlertDescription className="text-amber-800 dark:text-amber-200">
-                {estado.mensajeBloqueo ||
-                  "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios. Si tenés alguna consulta, comunicate con tu profesor."}
-              </AlertDescription>
-            </Alert>
-          )}
 
           {examenHabilitado && intentosAgotados && (
             <Alert className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30">

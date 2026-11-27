@@ -162,10 +162,8 @@ export function getExamBlockReason(
   }
   if (estado.examenHabilitado === false) {
     return {
-      title: "Evaluación no disponible",
-      description:
-        estado.mensajeBloqueo ||
-        "Esta evaluación aún no está disponible. Las evaluaciones se habilitarán según el plan de estudios.",
+      title: "El examen todavía no está habilitado",
+      description: "",
     };
   }
   if (estado.intentosAgotados) {
