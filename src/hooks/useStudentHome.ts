@@ -7,6 +7,8 @@ export type StudentHomeCourse = Course & {
   progresoPorcentaje?: number;
   progresoCompletados?: number;
   progresoTotal?: number;
+  /** Hay un examen del curso que el alumno puede rendir ahora. */
+  examenParaRendir?: boolean;
 };
 
 export function useStudentHome(

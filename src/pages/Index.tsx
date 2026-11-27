@@ -9,6 +9,7 @@ import {
   Mail,
   Phone,
   MessageCircle,
+  ClipboardCheck,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useNavigate } from "react-router-dom";
@@ -24,11 +25,13 @@ const CourseCard = ({
   onNavigate,
   formatDate,
   progressPercentage = 0,
+  examenParaRendir = false,
 }: {
   course: Course;
   onNavigate: (url: string) => void;
   formatDate: (date: string | Date | any | undefined) => string;
   progressPercentage?: number;
+  examenParaRendir?: boolean;
 }) => {
   const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -139,12 +142,19 @@ const CourseCard = ({
           </div>
         </div>
       </CardContent>
+      {/* Aviso de examen: va al curso, donde el examen está arriba de todo */}
+      {examenParaRendir && (
+        <div className="flex min-h-[52px] items-center gap-3 bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-3 text-white">
+          <ClipboardCheck className="h-5 w-5 shrink-0" />
+          <span className="flex-1 text-sm font-semibold sm:text-base">Examen disponible</span>
+          <span className="flex items-center gap-1 text-sm font-medium text-white/90">
+            Rendir
+            <ChevronRight className="h-4 w-4" />
+          </span>
+        </div>
+      )}
     </Card>
   );
-};
-
-type StudentHomeCourse = Course & {
-  progresoPorcentaje?: number;
 };
 
 const Index = () => {
@@ -369,6 +379,7 @@ const Index = () => {
                       onNavigate={navigate}
                       formatDate={formatDate}
                       progressPercentage={course.progresoPorcentaje ?? 0}
+                      examenParaRendir={course.examenParaRendir === true}
                     />
                   ))
                 )}

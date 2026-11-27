@@ -36,6 +36,7 @@ import { useTheme } from "@/components/ThemeProvider";
 import { ExamResultDisplay, ExamStartSummary } from "@/components/exam/ExamParts";
 import VerExamenRealizadoModal from "@/components/VerExamenRealizadoModal";
 import { cn } from "@/lib/utils";
+import { queryClient, queryKeys } from "@/lib/queryClient";
 import {
   buildForcedClosePayload,
   buildSubmissionPayload,
@@ -279,6 +280,8 @@ export default function Evaluacion() {
       setLastResult(intentoResultado);
       setPhase("result");
       setRemainingSeconds(null);
+      // El aviso "Examen disponible" del inicio depende de este intento
+      if (userId) void queryClient.invalidateQueries({ queryKey: queryKeys.studentHome(userId) });
 
       if (publicacionManual || pendienteCorreccion) {
         toast.success("Evaluación enviada", {
@@ -338,7 +341,7 @@ export default function Evaluacion() {
           : prev
       );
     },
-    []
+    [userId]
   );
 
   const submitExamAttempt = useCallback(
